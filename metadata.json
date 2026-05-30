@@ -1,0 +1,6 @@
+{
+  "name": "Invoice Generator",
+  "description": "Professional mobile billing and stock tracking system. Create items with GST tax, manage clients, auto-calculate subtotals, track inventory, and generate professional PDFs to share instantly via email or WhatsApp.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
