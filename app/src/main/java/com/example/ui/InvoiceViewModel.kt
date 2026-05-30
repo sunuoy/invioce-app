@@ -19,7 +19,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         database.invoiceDao(),
         database.productDao(),
         database.customerDao(),
-        database.businessProfileDao()
+        database.businessProfileDao(),
+        database.savedBusinessProfileDao()
     )
 
     // Standard business alerts
@@ -38,6 +39,9 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
     val businessProfile: StateFlow<BusinessProfile?> = repository.businessProfile
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val savedBusinessProfiles: StateFlow<List<SavedBusinessProfile>> = repository.savedBusinessProfiles
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val totalSales: StateFlow<Double?> = repository.totalSales
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
@@ -72,6 +76,24 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             )
             repository.saveBusinessProfile(profile)
             _uiEvents.emit(UiEvent.ShowSuccess("Business profile updated successfully!"))
+        }
+    }
+
+    fun saveSavedBusinessProfile(profile: SavedBusinessProfile) {
+        viewModelScope.launch {
+            if (profile.businessName.isBlank()) {
+                _uiEvents.emit(UiEvent.ShowError("Profile name cannot be empty"))
+                return@launch
+            }
+            repository.saveSavedBusinessProfile(profile)
+            _uiEvents.emit(UiEvent.ShowSuccess("Business profile template saved to your list!"))
+        }
+    }
+
+    fun deleteSavedBusinessProfile(id: Int) {
+        viewModelScope.launch {
+            repository.deleteSavedBusinessProfile(id)
+            _uiEvents.emit(UiEvent.ShowSuccess("Removed from saved list"))
         }
     }
 

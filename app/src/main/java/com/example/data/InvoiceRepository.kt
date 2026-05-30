@@ -6,7 +6,8 @@ class InvoiceRepository(
     private val invoiceDao: InvoiceDao,
     private val productDao: ProductDao,
     private val customerDao: CustomerDao,
-    private val businessProfileDao: BusinessProfileDao
+    private val businessProfileDao: BusinessProfileDao,
+    private val savedBusinessProfileDao: SavedBusinessProfileDao
 ) {
     // ------------------ PRODUCTS ------------------
     val allProducts: Flow<List<Product>> = productDao.getAllProducts()
@@ -38,6 +39,13 @@ class InvoiceRepository(
     suspend fun getBusinessProfileSync(): BusinessProfile? = businessProfileDao.getProfileSync()
     
     suspend fun saveBusinessProfile(profile: BusinessProfile) = businessProfileDao.insertOrUpdateProfile(profile)
+
+    // ------------------ SAVED BUSINESS PROFILES ------------------
+    val savedBusinessProfiles: Flow<List<SavedBusinessProfile>> = savedBusinessProfileDao.getAllSavedProfiles()
+
+    suspend fun saveSavedBusinessProfile(profile: SavedBusinessProfile) = savedBusinessProfileDao.insertSavedProfile(profile)
+
+    suspend fun deleteSavedBusinessProfile(id: Int) = savedBusinessProfileDao.deleteSavedProfile(id)
 
     // ------------------ INVOICES ------------------
     val allInvoices: Flow<List<InvoiceWithDetails>> = invoiceDao.getAllInvoices()

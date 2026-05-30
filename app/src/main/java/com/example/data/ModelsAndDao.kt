@@ -20,6 +20,20 @@ data class BusinessProfile(
     val shortIcon: String = "💼"
 )
 
+@Entity(tableName = "saved_business_profile")
+data class SavedBusinessProfile(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val businessName: String = "",
+    val address: String = "",
+    val phone: String = "",
+    val email: String = "",
+    val gstin: String = "",
+    val logoUrl: String = "",
+    val upiId: String = "",
+    val gmailId: String = "",
+    val shortIcon: String = "💼"
+)
+
 @Entity(tableName = "products")
 data class Product(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
@@ -204,17 +218,30 @@ interface BusinessProfileDao {
     suspend fun clearBusinessProfile()
 }
 
+@Dao
+interface SavedBusinessProfileDao {
+    @Query("SELECT * FROM saved_business_profile ORDER BY id DESC")
+    fun getAllSavedProfiles(): Flow<List<SavedBusinessProfile>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSavedProfile(profile: SavedBusinessProfile)
+
+    @Query("DELETE FROM saved_business_profile WHERE id = :id")
+    suspend fun deleteSavedProfile(id: Int)
+}
+
 // ------------------ DATABASE ------------------
 
 @Database(
     entities = [
         BusinessProfile::class,
+        SavedBusinessProfile::class,
         Product::class,
         Customer::class,
         Invoice::class,
         InvoiceLineItem::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class InvoiceDatabase : RoomDatabase() {
@@ -222,6 +249,7 @@ abstract class InvoiceDatabase : RoomDatabase() {
     abstract fun productDao(): ProductDao
     abstract fun customerDao(): CustomerDao
     abstract fun businessProfileDao(): BusinessProfileDao
+    abstract fun savedBusinessProfileDao(): SavedBusinessProfileDao
 
     companion object {
         @Volatile
