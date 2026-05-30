@@ -702,40 +702,42 @@ fun CreateInvoiceScreen(
                             )
                         } else {
                             var clientSelectorExpanded by remember { mutableStateOf(false) }
-                            OutlinedTextField(
-                                value = selectedCustomer?.name ?: "Tap to choose recipient...",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Client Address Name") },
-                                trailingIcon = { Icon(Icons.Default.ArrowDropDown, "Open dropdown") },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { clientSelectorExpanded = true },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    focusedBorderColor = MaterialTheme.colorScheme.outline,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                    focusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    focusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                ),
-                                enabled = true
-                            )
-                            DropdownMenu(
-                                expanded = clientSelectorExpanded,
-                                onDismissRequest = { clientSelectorExpanded = false },
-                                modifier = Modifier.fillMaxWidth(0.9f)
-                            ) {
-                                customers.forEach { c ->
-                                    DropdownMenuItem(
-                                        text = { Text("${c.name} (Ph: ${c.phone})") },
-                                        onClick = {
-                                            selectedCustomer = c
-                                            clientSelectorExpanded = false
-                                        }
-                                    )
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                OutlinedTextField(
+                                    value = selectedCustomer?.name ?: "Tap to choose recipient...",
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Client Address Name") },
+                                    trailingIcon = { Icon(Icons.Default.ArrowDropDown, "Open dropdown") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    enabled = false
+                                )
+                                // Clear overlay box that intercepts the click perfectly
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .clickable { clientSelectorExpanded = true }
+                                )
+                                DropdownMenu(
+                                    expanded = clientSelectorExpanded,
+                                    onDismissRequest = { clientSelectorExpanded = false },
+                                    modifier = Modifier.fillMaxWidth(0.9f)
+                                ) {
+                                    customers.forEach { c ->
+                                        DropdownMenuItem(
+                                            text = { Text("${c.name} (Ph: ${c.phone})") },
+                                            onClick = {
+                                                selectedCustomer = c
+                                                clientSelectorExpanded = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1091,53 +1093,55 @@ fun CreateInvoiceScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Dropdown selecting from Product list
-                    OutlinedTextField(
-                        value = chosenInventoryProd?.name ?: "Or pick from inventory Products...",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Inventory Product Stock (Optional)") },
-                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, "Open details") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { dropdownExpanded = true },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            focusedBorderColor = MaterialTheme.colorScheme.outline,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                            focusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            focusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        enabled = true
-                    )
-                    DropdownMenu(
-                        expanded = dropdownExpanded,
-                        onDismissRequest = { dropdownExpanded = false },
-                        modifier = Modifier.fillMaxWidth(0.8f)
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("-- Clear Inventory Selection --") },
-                            onClick = {
-                                chosenInventoryProd = null
-                                dropdownExpanded = false
-                            }
+                    // Dropdown selecting from Product list with reliable click overlay
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = chosenInventoryProd?.name ?: "Or pick from inventory Products...",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Inventory Product Stock (Optional)") },
+                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, "Open details") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            enabled = false
                         )
-                        products.forEach { p ->
+                        // Clear overlay box to capture tap event
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clickable { dropdownExpanded = true }
+                        )
+                        DropdownMenu(
+                            expanded = dropdownExpanded,
+                            onDismissRequest = { dropdownExpanded = false },
+                            modifier = Modifier.fillMaxWidth(0.8f)
+                        ) {
                             DropdownMenuItem(
-                                text = { Text("${p.name} (Qty Left: ${p.stock} ${p.unit})") },
+                                text = { Text("-- Clear Inventory Selection --") },
                                 onClick = {
-                                    chosenInventoryProd = p
-                                    typedItemName = p.name
-                                    inputPrice = p.price.toString()
-                                    inputTaxRate = p.taxRate.toString()
-                                    inputUnit = p.unit
-                                    inputHsnSac = p.hsnSac
+                                    chosenInventoryProd = null
                                     dropdownExpanded = false
                                 }
                             )
+                            products.forEach { p ->
+                                DropdownMenuItem(
+                                    text = { Text("${p.name} (Qty Left: ${p.stock} ${p.unit})") },
+                                    onClick = {
+                                        chosenInventoryProd = p
+                                        typedItemName = p.name
+                                        inputPrice = p.price.toString()
+                                        inputTaxRate = p.taxRate.toString()
+                                        inputUnit = p.unit
+                                        inputHsnSac = p.hsnSac
+                                        dropdownExpanded = false
+                                    }
+                                )
+                            }
                         }
                     }
 
