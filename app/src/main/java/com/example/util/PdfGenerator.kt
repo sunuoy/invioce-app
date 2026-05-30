@@ -33,40 +33,83 @@ object PdfGenerator {
         val page = pdfDocument.startPage(pageInfo)
         val canvas: Canvas = page.canvas
 
-        // Paints for drawing
+        // --- ENHANCED COLOR PALETTE PAINTS ---
+        val primaryColor = Color.parseColor("#1E3A8A") // Deep Royal Navy
+        val secondaryColor = Color.parseColor("#2563EB") // Accent Blue
+        val dividerColor = Color.parseColor("#E2E8F0") // Subtle Gray/Slate
+        val textDarkColor = Color.parseColor("#1F2937") // Charcoal Slate (on-surface)
+        val textMutedColor = Color.parseColor("#64748B") // Cool Muted Slate
+        
         val titlePaint = Paint().apply {
-            color = Color.parseColor("#1E3A8A") // Deep blue primary
+            color = primaryColor
             textSize = 24f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
         }
 
         val headerPaint = Paint().apply {
-            color = Color.BLACK
+            color = textDarkColor
             textSize = 10f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val whiteHeaderPaint = Paint().apply {
+            color = Color.WHITE
+            textSize = 10f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
         }
 
         val textPaint = Paint().apply {
-            color = Color.DKGRAY
+            color = textDarkColor
             textSize = 9f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            isAntiAlias = true
         }
 
         val labelPaint = Paint().apply {
-            color = Color.GRAY
+            color = textMutedColor
             textSize = 9f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
         }
 
         val linePaint = Paint().apply {
-            color = Color.LTGRAY
+            color = dividerColor
             strokeWidth = 1f
             style = Paint.Style.STROKE
+            isAntiAlias = true
         }
 
         val bgPaint = Paint().apply {
-            color = Color.parseColor("#F3F4F6") // Cool gray background
+            color = primaryColor
             style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+        val rowEvenPaint = Paint().apply {
+            color = Color.parseColor("#F8FAFC") // Very clean subtle row fill
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+        val topBarPaint = Paint().apply {
+            color = primaryColor
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+        val accentIndicatorPaint = Paint().apply {
+            color = secondaryColor
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+        val totalsCardBgPaint = Paint().apply {
+            color = Color.parseColor("#F0F5FF") // Clean soft-blue totals tint
+            style = Paint.Style.FILL
+            isAntiAlias = true
         }
 
         // --- PAGE LAYOUT COORDINATES ---
@@ -79,33 +122,66 @@ object PdfGenerator {
         val sfd = SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.getDefault())
         val invoiceDate = sfd.format(Date(invoice.dateTimestamp))
 
+        // Decorative top bar stripe 
+        canvas.drawRect(leftMargin, 15f, rightMargin, 21f, topBarPaint)
+
+        yPos = 55f
+
         // 1. Header Title
         canvas.drawText("TAX INVOICE", leftMargin, yPos, titlePaint)
         
-        // Status stamp
-        val statusPaint = Paint().apply {
-            color = when (invoice.status) {
-                "Paid" -> Color.parseColor("#10B981") // Green
-                "Sent" -> Color.parseColor("#3B82F6") // Blue
-                else -> Color.parseColor("#F59E0B")   // Amber for Draft
-            }
-            textSize = 12f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        // Beautiful Rounded Status Badge Card 
+        val statusText = invoice.status.uppercase(Locale.ROOT)
+        val (badgeBg, badgeText) = when (invoice.status) {
+            "Paid" -> Pair("#DCFCE7", "#166534") // Emerald soft tint
+            "Sent" -> Pair("#DBEAFE", "#1E40AF") // Cobalt soft tint
+            else -> Pair("#FEF3C7", "#92400E")   // Amber soft tint
         }
-        canvas.drawText("[ ${invoice.status.uppercase(Locale.ROOT)} ]", rightMargin - 80f, yPos - 5f, statusPaint)
+
+        val badgeBgPaint = Paint().apply {
+            color = Color.parseColor(badgeBg)
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+        val badgeTextPaint = Paint().apply {
+            color = Color.parseColor(badgeText)
+            textSize = 10f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        // Draw status badge
+        val badgeRight = rightMargin
+        val badgeLeft = rightMargin - 95f
+        val badgeTop = yPos - 22f
+        val badgeBottom = yPos + 2f
         
-        yPos += 30f
-        canvas.drawLine(leftMargin, yPos, rightMargin, yPos, linePaint)
+        // Draw matching rounded badge
+        canvas.drawRoundRect(badgeLeft, badgeTop, badgeRight, badgeBottom, 6f, 6f, badgeBgPaint)
+        
+        // Center text in badge
+        val textWidth = badgeTextPaint.measureText(statusText)
+        val textX = badgeLeft + ((badgeRight - badgeLeft) - textWidth) / 2f
+        val textY = badgeTop + 15f
+        canvas.drawText(statusText, textX, textY, badgeTextPaint)
+        
         yPos += 20f
+        canvas.drawLine(leftMargin, yPos, rightMargin, yPos, linePaint)
+        yPos += 25f
 
         // 2. Business Profile Details (Left Column)
         val businessX = leftMargin
-        canvas.drawText("FROM:", businessX, yPos, labelPaint)
-        yPos += 14f
+        
+        // Side block decorative line
+        canvas.drawRect(businessX, yPos - 11f, businessX + 3f, yPos + 2f, accentIndicatorPaint)
+        canvas.drawText("FROM:", businessX + 8f, yPos, labelPaint)
+        
+        yPos += 16f
         val bIcon = if (profile == null || profile.shortIcon.isBlank()) "💼" else profile.shortIcon
         val bName = if (profile?.businessName.isNullOrBlank()) "My Business" else profile!!.businessName
         val headerWithIcon = "$bIcon  $bName"
-        canvas.drawText(headerWithIcon, businessX, yPos, headerPaint)
+        canvas.drawText(headerWithIcon, businessX, yPos, headerPaint.apply { color = primaryColor; textSize = 11f })
+        headerPaint.apply { color = textDarkColor; textSize = 10f } // reset
         
         if (profile != null) {
             if (profile.address.isNotBlank()) {
@@ -129,8 +205,11 @@ object PdfGenerator {
         // 3. Invoice Metadata (Right Column overlay)
         val metaX = 350f
         var metaY = yPos - (if (profile?.gstin.isNullOrBlank()) 40f else 54f)
+        
+        canvas.drawRect(metaX - 8f, metaY - 11f, metaX - 5f, metaY + 2f, accentIndicatorPaint)
         canvas.drawText("INVOICE DETAILS:", metaX, metaY, labelPaint)
-        metaY += 14f
+        
+        metaY += 16f
         canvas.drawText("Invoice No: ${invoice.invoiceNumber}", metaX, metaY, headerPaint)
         metaY += 13f
         canvas.drawText("Date: $invoiceDate", metaX, metaY, textPaint)
@@ -150,13 +229,16 @@ object PdfGenerator {
         
         yPos = maxOf(yPos, metaY) + 25f
         canvas.drawLine(leftMargin, yPos, rightMargin, yPos, linePaint)
-        yPos += 20f
+        yPos += 25f
 
         // 4. Customer Details (To Address)
-        canvas.drawText("BILL TO:", leftMargin, yPos, labelPaint)
-        yPos += 14f
+        canvas.drawRect(leftMargin, yPos - 11f, leftMargin + 3f, yPos + 2f, accentIndicatorPaint)
+        canvas.drawText("BILL TO:", leftMargin + 8f, yPos, labelPaint)
+        
+        yPos += 16f
         if (customer != null) {
-            canvas.drawText(customer.name, leftMargin, yPos, headerPaint)
+            canvas.drawText(customer.name, leftMargin, yPos, headerPaint.apply { color = primaryColor; textSize = 11f })
+            headerPaint.apply { color = textDarkColor; textSize = 10f } // reset
             if (customer.address.isNotBlank()) {
                 yPos += 13f
                 canvas.drawText(customer.address, leftMargin, yPos, textPaint)
@@ -178,32 +260,36 @@ object PdfGenerator {
             canvas.drawText("Walk-in Customer", leftMargin, yPos, headerPaint)
         }
 
-        yPos += 25f
+        yPos += 28f
 
-        // 5. Products/Services Table Headers
-        canvas.drawRect(leftMargin, yPos - 12f, rightMargin, yPos + 15f, bgPaint)
+        // 5. Products/Services Table Headers (Premium Rich navy Blue filled header block)
+        canvas.drawRect(leftMargin, yPos - 12f, rightMargin, yPos + 18f, bgPaint)
         
         var colX = leftMargin
         val headerColLabels = arrayOf("S.N.", "Description / Product", "Unit", "Qty", "Rate", "Tax(%)", "Total")
         for (i in headerColLabels.indices) {
-            canvas.drawText(headerColLabels[i], colX + 4f, yPos + 4f, headerPaint)
+            canvas.drawText(headerColLabels[i], colX + 4f, yPos + 5f, whiteHeaderPaint)
             colX += colWidths[i]
         }
         
-        yPos += 20f
+        yPos += 24f
 
         // 6. Table Rows
         var itemIndex = 1
         for (item in items) {
             // Guard height overflow
             if (yPos > 650f) {
-                // simple break or draw warning. For simple invoices, 1 page is plenty. Let's make it robust:
                 canvas.drawText("... More items omitted (Multi-page not fully rendered) ...", leftMargin, yPos, textPaint)
                 break
             }
             
-            canvas.drawLine(leftMargin, yPos + 10f, rightMargin, yPos + 10f, linePaint)
-            yPos += 8f
+            // Draw alternating shaded rows for even indices
+            if (itemIndex % 2 == 0) {
+                canvas.drawRect(leftMargin, yPos - 11f, rightMargin, yPos + 11f, rowEvenPaint)
+            }
+            
+            canvas.drawLine(leftMargin, yPos + 11f, rightMargin, yPos + 11f, linePaint)
+            yPos += 4f
 
             var colRowX = leftMargin
             // index
@@ -212,7 +298,7 @@ object PdfGenerator {
 
             // productName (truncate if too long)
             val hsnSuffix = if (item.hsnSac.isNotBlank()) " (HSN: ${item.hsnSac})" else ""
-            val displayName = if (item.productName.length > 18) item.productName.take(15) + "..." else item.productName
+            val displayName = if (item.productName.length > 22) item.productName.take(19) + "..." else item.productName
             canvas.drawText("$displayName$hsnSuffix", colRowX + 4f, yPos, textPaint)
             colRowX += colWidths[1]
 
@@ -235,20 +321,32 @@ object PdfGenerator {
             // total
             canvas.drawText(String.format(Locale.US, "%.2f", item.total), colRowX + 4f, yPos, textPaint)
 
-            yPos += 14f
+            yPos += 18f
             itemIndex++
         }
 
-        yPos += 15f
+        yPos += 10f
         canvas.drawLine(leftMargin, yPos, rightMargin, yPos, linePaint)
         yPos += 15f
 
-        // 7. Calculations Box (Receipt totals aligned to the right)
+        // 7. Premium Calculations Box Card (Beautiful soft-blue border frame container aligned on the right)
         val totalsX = 350f
+        val totalsStartY = yPos - 10f
+        
+        // Let's determine totals box height based on tax lines
+        val infoLines = if (invoice.taxTotal > 0) 5 else 3
+        val totalsHeight = infoLines * 18f + 14f
+        
+        // Draw elegant card panel highlight background
+        canvas.drawRoundRect(totalsX - 10f, totalsStartY, rightMargin, totalsStartY + totalsHeight, 8f, 8f, totalsCardBgPaint)
+        // Accent line on left side of Card
+        canvas.drawRect(totalsX - 10f, totalsStartY, totalsX - 7f, totalsStartY + totalsHeight, accentIndicatorPaint)
+        
+        yPos += 10f
         canvas.drawText("Subtotal:", totalsX, yPos, textPaint)
         canvas.drawText(String.format(Locale.US, "₹%.2f", invoice.subtotal), rightMargin - 70f, yPos, textPaint)
         
-        yPos += 15f
+        yPos += 18f
         canvas.drawText("GST Tax total:", totalsX, yPos, textPaint)
         canvas.drawText(String.format(Locale.US, "₹%.2f", invoice.taxTotal), rightMargin - 70f, yPos, textPaint)
 
@@ -261,21 +359,26 @@ object PdfGenerator {
                 String.format(Locale.US, "%.2f%%", halfGstPercent)
             }
             
-            yPos += 13f
-            canvas.drawText("  CGST (Central GST - $percentStr):", totalsX, yPos, labelPaint)
+            yPos += 18f
+            canvas.drawText("  CGST (Central - $percentStr):", totalsX, yPos, labelPaint.apply { textSize = 8.5f })
             canvas.drawText(String.format(Locale.US, "₹%.2f", invoice.taxTotal / 2.0), rightMargin - 70f, yPos, labelPaint)
 
-            yPos += 13f
-            canvas.drawText("  SGST (State GST - $percentStr):", totalsX, yPos, labelPaint)
+            yPos += 18f
+            canvas.drawText("  SGST (State - $percentStr):", totalsX, yPos, labelPaint)
             canvas.drawText(String.format(Locale.US, "₹%.2f", invoice.taxTotal / 2.0), rightMargin - 70f, yPos, labelPaint)
+            
+            labelPaint.apply { textSize = 9f } // reset
         }
 
-        yPos += 16f
-        // Grand Total highlights
+        yPos += 20f
+        // Separator inside Totals Card
+        canvas.drawLine(totalsX - 4f, yPos - 10f, rightMargin - 10f, yPos - 10f, linePaint)
+        
         val grandPaint = Paint().apply {
-            color = Color.parseColor("#111827")
-            textSize = 11f
+            color = primaryColor
+            textSize = 12f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
         }
         canvas.drawText("Grand Total:", totalsX, yPos, grandPaint)
         canvas.drawText(String.format(Locale.US, "₹%.2f", invoice.grandTotal), rightMargin - 70f, yPos, grandPaint)
