@@ -129,7 +129,31 @@ fun SettingsScreen(
                 title = { Text("Business Configuration", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
-                )
+                ),
+                actions = {
+                    TextButton(
+                        onClick = {
+                            if (name.isBlank()) {
+                                Toast.makeText(context, "Business Name cannot be empty", Toast.LENGTH_SHORT).show()
+                            } else {
+                                viewModel.saveBusinessProfile(name, address, phone, email, gstin, upiId, gmailId, shortIcon)
+                                Toast.makeText(context, "Business Metadata Saved Successfully!", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .testTag("top_bar_save_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Save,
+                            contentDescription = "Save settings top option",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Save", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
             )
         },
         modifier = modifier
@@ -678,14 +702,12 @@ fun SettingsScreen(
                                             .clickable {
                                                 isGmailSyncing = true
                                                 // Simulate secured sync
-                                                context.mainExecutor.execute {
-                                                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                                        gmailId = "younusM33@gmail.com"
-                                                        isGmailSyncing = false
-                                                        showGoogleAccountChooser = false
-                                                        Toast.makeText(context, "Synced successfully with younusM33@gmail.com!", Toast.LENGTH_SHORT).show()
-                                                    }, 1500)
-                                                }
+                                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                                    gmailId = "younusM33@gmail.com"
+                                                    isGmailSyncing = false
+                                                    showGoogleAccountChooser = false
+                                                    Toast.makeText(context, "Synced successfully with younusM33@gmail.com!", Toast.LENGTH_SHORT).show()
+                                                }, 1500)
                                             }
                                             .background(
                                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
