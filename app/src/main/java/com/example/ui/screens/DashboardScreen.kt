@@ -57,17 +57,34 @@ fun DashboardScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = profile?.businessName?.takeIf { it.isNotBlank() } ?: "My Business",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Revenue Dashboard",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = profile?.shortIcon?.takeIf { it.isNotBlank() } ?: "💼",
+                                    fontSize = 20.sp
+                                )
+                            }
+                        }
+                        Column {
+                            Text(
+                                text = profile?.businessName?.takeIf { it.isNotBlank() } ?: "My Business",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Revenue Dashboard",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -402,6 +419,7 @@ fun InvoiceStatusBadge(status: String) {
     val color = when (status) {
         "Paid" -> Color(0xFF10B981) // Green
         "Sent" -> Color(0xFF3B82F6) // Blue
+        "Closed" -> Color(0xFF6B7280) // Gray for closed status
         else -> Color(0xFFF59E0B)   // Amber
     }
 

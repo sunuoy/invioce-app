@@ -144,8 +144,8 @@ fun ProductsScreen(
     if (showCreatorDialog) {
         ProductDialogEditor(
             onDismiss = { showCreatorDialog = false },
-            onConfirm = { name, price, tax, unit, stock ->
-                viewModel.saveProduct(0, name, price, tax, unit, stock)
+            onConfirm = { name, price, tax, unit, stock, hsnSac ->
+                viewModel.saveProduct(0, name, price, tax, unit, stock, hsnSac)
                 showCreatorDialog = false
             }
         )
@@ -156,8 +156,8 @@ fun ProductsScreen(
         ProductDialogEditor(
             product = item,
             onDismiss = { activeEditorProduct = null },
-            onConfirm = { name, price, tax, unit, stock ->
-                viewModel.saveProduct(item.id, name, price, tax, unit, stock)
+            onConfirm = { name, price, tax, unit, stock, hsnSac ->
+                viewModel.saveProduct(item.id, name, price, tax, unit, stock, hsnSac)
                 activeEditorProduct = null
             }
         )
@@ -211,6 +211,20 @@ fun ProductItemRow(
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
+                    }
+                    if (product.hsnSac.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ) {
+                            Text(
+                                text = "HSN/SAC: ${product.hsnSac}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -274,13 +288,14 @@ fun StockIndicatorTracker(stockValue: Double, unitStr: String) {
 fun ProductDialogEditor(
     product: Product? = null,
     onDismiss: () -> Unit,
-    onConfirm: (name: String, price: Double, tax: Double, unit: String, stock: Double) -> Unit
+    onConfirm: (name: String, price: Double, tax: Double, unit: String, stock: Double, hsnSac: String) -> Unit
 ) {
     var name by remember { mutableStateOf(product?.name ?: "") }
     var priceStr by remember { mutableStateOf(product?.price?.toString() ?: "") }
     var taxStr by remember { mutableStateOf(product?.taxRate?.toString() ?: "18") } // default GST is 18%
     var unit by remember { mutableStateOf(product?.unit ?: "pcs") }
     var stockStr by remember { mutableStateOf(product?.stock?.toString() ?: "50") }
+    var hsnSac by remember { mutableStateOf(product?.hsnSac ?: "") }
 
     val isEdit = product != null
 
@@ -319,6 +334,28 @@ fun ProductDialogEditor(
                     )
                 }
 
+                // Quick unit suggestions
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    listOf("kg", "bags", "pcs", "hrs", "box").forEach { sug ->
+                        SuggestionChip(
+                            onClick = { unit = sug },
+                            label = { Text(sug, fontSize = 11.sp) }
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = hsnSac,
+                    onValueChange = { hsnSac = it },
+                    label = { Text("HSN / SAC Code") },
+                    placeholder = { Text("e.g. 998311, 8471") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = taxStr,
@@ -343,7 +380,7 @@ fun ProductDialogEditor(
                 val tax = taxStr.toDoubleOrNull() ?: 18.0
                 val stock = stockStr.toDoubleOrNull() ?: 0.0
 
-                onConfirm(name, price, tax, unit, stock)
+                onConfirm(name, price, tax, unit, stock, hsnSac)
             }) {
                 Text(if (isEdit) "Save Edits" else "Confirm Register")
             }

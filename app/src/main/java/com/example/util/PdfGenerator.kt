@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
+import android.widget.Toast
 import com.example.data.BusinessProfile
 import com.example.data.InvoiceWithDetails
 import java.io.File
@@ -101,8 +102,10 @@ object PdfGenerator {
         val businessX = leftMargin
         canvas.drawText("FROM:", businessX, yPos, labelPaint)
         yPos += 14f
+        val bIcon = if (profile == null || profile.shortIcon.isBlank()) "💼" else profile.shortIcon
         val bName = if (profile?.businessName.isNullOrBlank()) "My Business" else profile!!.businessName
-        canvas.drawText(bName, businessX, yPos, headerPaint)
+        val headerWithIcon = "$bIcon  $bName"
+        canvas.drawText(headerWithIcon, businessX, yPos, headerPaint)
         
         if (profile != null) {
             if (profile.address.isNotBlank()) {
@@ -132,6 +135,19 @@ object PdfGenerator {
         metaY += 13f
         canvas.drawText("Date: $invoiceDate", metaX, metaY, textPaint)
         
+        if (invoice.placeOfSupply.isNotBlank()) {
+            metaY += 13f
+            canvas.drawText("Place of Supply: ${invoice.placeOfSupply}", metaX, metaY, textPaint)
+        }
+        if (invoice.vehicleNumber.isNotBlank()) {
+            metaY += 13f
+            canvas.drawText("Vehicle No: ${invoice.vehicleNumber}", metaX, metaY, textPaint)
+        }
+        if (invoice.brokerageBy.isNotBlank()) {
+            metaY += 13f
+            canvas.drawText("Brokerage By: ${invoice.brokerageBy}", metaX, metaY, textPaint)
+        }
+        
         yPos = maxOf(yPos, metaY) + 25f
         canvas.drawLine(leftMargin, yPos, rightMargin, yPos, linePaint)
         yPos += 20f
@@ -152,6 +168,11 @@ object PdfGenerator {
                     customer.email.takeIf { it.isNotBlank() }?.let { "Email: $it" }
                 ).joinToString(" | ")
                 canvas.drawText(contactInfo, leftMargin, yPos, textPaint)
+            }
+            if (customer.gstin.isNotBlank()) {
+                yPos += 13f
+                canvas.drawText("GSTIN: ${customer.gstin}", leftMargin, yPos, textPaint.apply { typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) })
+                textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             }
         } else {
             canvas.drawText("Walk-in Customer", leftMargin, yPos, headerPaint)
@@ -190,8 +211,9 @@ object PdfGenerator {
             colRowX += colWidths[0]
 
             // productName (truncate if too long)
-            val displayName = if (item.productName.length > 28) item.productName.take(25) + "..." else item.productName
-            canvas.drawText(displayName, colRowX + 4f, yPos, textPaint)
+            val hsnSuffix = if (item.hsnSac.isNotBlank()) " (HSN: ${item.hsnSac})" else ""
+            val displayName = if (item.productName.length > 18) item.productName.take(15) + "..." else item.productName
+            canvas.drawText("$displayName$hsnSuffix", colRowX + 4f, yPos, textPaint)
             colRowX += colWidths[1]
 
             // unit
@@ -258,6 +280,17 @@ object PdfGenerator {
             canvas.drawText(invoice.notes, leftMargin, yPos, textPaint)
         }
 
+        // UPI ID payment details in notes
+        if (profile != null && profile.upiId.isNotBlank()) {
+            yPos += 20f
+            val upiPaint = Paint().apply {
+                color = Color.parseColor("#065F46") // Deep forestry green
+                textSize = 9f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            canvas.drawText("PAYMENT METHOD | UPI ID: ${profile.upiId}", leftMargin, yPos, upiPaint)
+        }
+
         // Footer Sign-off
         val footerY = 800f
         canvas.drawLine(leftMargin, footerY, rightMargin, footerY, linePaint)
@@ -297,5 +330,87 @@ object PdfGenerator {
         // Resolve activity to make sure it doesn't crash on tablets
         chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(chooser)
+    }
+
+    fun shareViaWhatsApp(context: Context, pdfFile: File) {
+        try {
+            val uri = FileProvider.getUriForFile(
+                context,
+                "com.aistudio.invoicegenerator.gqtwv.fileprovider",
+                pdfFile
+            )
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_TEXT, "Hello, please find attached the invoice PDF.")
+                setPackage("com.whatsapp")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = Intent.createChooser(intent, "Share on WhatsApp")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(chooser)
+        } catch (e: Exception) {
+            val uri = FileProvider.getUriForFile(
+                context,
+                "com.aistudio.invoicegenerator.gqtwv.fileprovider",
+                pdfFile
+            )
+            try {
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    setPackage("com.whatsapp.w4b") // WhatsApp Business
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val chooser = Intent.createChooser(intent, "Share on WhatsApp Business")
+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(chooser)
+            } catch (ex: Exception) {
+                Toast.makeText(context, "WhatsApp not installed. Opening universal share.", Toast.LENGTH_SHORT).show()
+                shareInvoicePdf(context, pdfFile)
+            }
+        }
+    }
+
+    fun shareViaEmail(context: Context, pdfFile: File) {
+        try {
+            val uri = FileProvider.getUriForFile(
+                context,
+                "com.aistudio.invoicegenerator.gqtwv.fileprovider",
+                pdfFile
+            )
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "message/rfc822"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "Invoice: ${pdfFile.name}")
+                putExtra(Intent.EXTRA_TEXT, "Hello,\n\nPlease find attached the invoice PDF.")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = Intent.createChooser(intent, "Send Email")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(chooser)
+        } catch (e: Exception) {
+            shareInvoicePdf(context, pdfFile)
+        }
+    }
+
+    fun previewPdf(context: Context, pdfFile: File) {
+        try {
+            val uri = FileProvider.getUriForFile(
+                context,
+                "com.aistudio.invoicegenerator.gqtwv.fileprovider",
+                pdfFile
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/pdf")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            val chooser = Intent.createChooser(intent, "Open Invoice PDF")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(chooser)
+        } catch (e: Exception) {
+            Toast.makeText(context, "No PDF viewer available. Try standard sharing.", Toast.LENGTH_SHORT).show()
+        }
     }
 }

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
+import com.example.util.BackupRestoreHelper
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -52,7 +53,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // ------------------ BUSINESS OPERATIONS ------------------
-    fun saveBusinessProfile(name: String, address: String, phone: String, email: String, gstin: String) {
+    fun saveBusinessProfile(name: String, address: String, phone: String, email: String, gstin: String, upiId: String, gmailId: String, shortIcon: String) {
         viewModelScope.launch {
             if (name.isBlank()) {
                 _uiEvents.emit(UiEvent.ShowError("Business Name cannot be empty"))
@@ -64,7 +65,10 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 address = address.trim(),
                 phone = phone.trim(),
                 email = email.trim(),
-                gstin = gstin.trim()
+                gstin = gstin.trim(),
+                upiId = upiId.trim(),
+                gmailId = gmailId.trim(),
+                shortIcon = shortIcon.trim()
             )
             repository.saveBusinessProfile(profile)
             _uiEvents.emit(UiEvent.ShowSuccess("Business profile updated successfully!"))
@@ -72,7 +76,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // ------------------ PRODUCT STOCK OPERATIONS ------------------
-    fun saveProduct(id: Int, name: String, price: Double, tax: Double, unit: String, stock: Double) {
+    fun saveProduct(id: Int, name: String, price: Double, tax: Double, unit: String, stock: Double, hsnSac: String = "") {
         viewModelScope.launch {
             if (name.isBlank()) {
                 _uiEvents.emit(UiEvent.ShowError("Product name cannot be blank"))
@@ -97,7 +101,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 price = price,
                 taxRate = tax,
                 unit = unit.trim(),
-                stock = stock
+                stock = stock,
+                hsnSac = hsnSac.trim()
             )
             repository.insertProduct(product)
             _uiEvents.emit(UiEvent.ShowSuccess("Product stock saved successfully!"))
@@ -112,7 +117,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // ------------------ CUSTOMER OPERATIONS ------------------
-    fun saveCustomer(id: Int, name: String, phone: String, email: String, address: String) {
+    fun saveCustomer(id: Int, name: String, phone: String, email: String, address: String, gstin: String = "", placeOfSupply: String = "") {
         viewModelScope.launch {
             if (name.isBlank()) {
                 _uiEvents.emit(UiEvent.ShowError("Customer name cannot be blank"))
@@ -123,7 +128,9 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 name = name.trim(),
                 phone = phone.trim(),
                 email = email.trim(),
-                address = address.trim()
+                address = address.trim(),
+                gstin = gstin.trim(),
+                placeOfSupply = placeOfSupply.trim()
             )
             repository.insertCustomer(customer)
             _uiEvents.emit(UiEvent.ShowSuccess("Customer details saved!"))
@@ -144,7 +151,10 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         customerId: Int,
         status: String,
         items: List<InvoiceLineItem>,
-        notes: String
+        notes: String,
+        vehicleNumber: String = "",
+        brokerageBy: String = "",
+        placeOfSupply: String = ""
     ) {
         viewModelScope.launch {
             if (invoiceNumber.isBlank()) {
@@ -165,7 +175,10 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 invoiceNumber = invoiceNumber.trim(),
                 customerId = customerId,
                 status = status,
-                notes = notes.trim()
+                notes = notes.trim(),
+                vehicleNumber = vehicleNumber.trim(),
+                brokerageBy = brokerageBy.trim(),
+                placeOfSupply = placeOfSupply.trim()
             )
 
             val invoiceId = repository.saveInvoice(invoice, items)
@@ -188,6 +201,26 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 val updatedInvoice = match.invoice.copy(status = newStatus)
                 repository.saveInvoice(updatedInvoice, match.lineItems)
                 _uiEvents.emit(UiEvent.ShowSuccess("Invoice status updated to $newStatus"))
+            }
+        }
+    }
+
+    fun restoreDatabaseBackup(jsonString: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val backupData = BackupRestoreHelper.importFromJson(jsonString)
+                repository.restoreData(
+                    profile = backupData.profile,
+                    products = backupData.products,
+                    customers = backupData.customers,
+                    invoices = backupData.invoices,
+                    lineItems = backupData.lineItems
+                )
+                onSuccess()
+                _uiEvents.emit(UiEvent.ShowSuccess("Data backup restored successfully!"))
+            } catch (e: Exception) {
+                onError(e.message ?: "Invalid backup file or corrupt formatting")
+                _uiEvents.emit(UiEvent.ShowError("Backup Restore Failed: ${e.message}"))
             }
         }
     }

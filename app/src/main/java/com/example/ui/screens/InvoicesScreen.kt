@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.widget.Toast
+import android.content.Intent
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -48,6 +49,7 @@ fun InvoicesScreen(
     var activeInvoiceDetails by remember { mutableStateOf<InvoiceWithDetails?>(null) }
     // Navigation inside screener: List or Create Invoice
     var isCreatingInvoice by remember { mutableStateOf(false) }
+    var editingInvoice by remember { mutableStateOf<InvoiceWithDetails?>(null) }
 
     // Filter invoices
     val filteredInvoices = remember(invoices, selectedFilter, searchQuery) {
@@ -59,10 +61,14 @@ fun InvoicesScreen(
         }
     }
 
-    if (isCreatingInvoice) {
+    if (isCreatingInvoice || editingInvoice != null) {
         CreateInvoiceScreen(
             viewModel = viewModel,
-            onBack = { isCreatingInvoice = false }
+            editingInvoice = editingInvoice,
+            onBack = {
+                isCreatingInvoice = false
+                editingInvoice = null
+            }
         )
     } else {
         Scaffold(
@@ -116,15 +122,15 @@ fun InvoicesScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    val statusFilters = listOf("All", "Draft", "Sent", "Paid")
+                    val statusFilters = listOf("All", "Draft", "Sent", "Paid", "Closed")
                     statusFilters.forEach { item ->
                         val isSelected = selectedFilter == item
                         FilterChip(
                             selected = isSelected,
                             onClick = { selectedFilter = item },
-                            label = { Text(item) },
+                            label = { Text(item, fontSize = 11.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -195,6 +201,10 @@ fun InvoicesScreen(
                     // Update active view
                     activeInvoiceDetails = billing.copy(invoice = billing.invoice.copy(status = st))
                 },
+                onEdit = {
+                    editingInvoice = billing
+                    activeInvoiceDetails = null
+                },
                 onDelete = {
                     viewModel.deleteInvoice(billing.invoice.id)
                     activeInvoiceDetails = null
@@ -208,6 +218,30 @@ fun InvoicesScreen(
                         Toast.makeText(context, "Export Error: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 },
+                onPreviewPdf = {
+                    try {
+                        val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
+                        PdfGenerator.previewPdf(context, pdfFile)
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Preview Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                },
+                onShareWhatsApp = {
+                    try {
+                        val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
+                        PdfGenerator.shareViaWhatsApp(context, pdfFile)
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "WhatsApp Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                },
+                onShareEmail = {
+                    try {
+                        val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
+                        PdfGenerator.shareViaEmail(context, pdfFile)
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Email Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                },
                 onDismiss = { activeInvoiceDetails = null }
             )
         }
@@ -219,10 +253,15 @@ fun InvoiceDetailLayout(
     item: InvoiceWithDetails,
     businessProfile: BusinessProfile?,
     onUpdateStatus: (String) -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
     onExportShare: () -> Unit,
+    onPreviewPdf: () -> Unit,
+    onShareWhatsApp: () -> Unit,
+    onShareEmail: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     val dateStr = remember(item.invoice.dateTimestamp) {
         val format = SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.getDefault())
         format.format(Date(item.invoice.dateTimestamp))
@@ -255,6 +294,28 @@ fun InvoiceDetailLayout(
 
         Divider(modifier = Modifier.padding(vertical = 12.dp))
 
+        // Change Status Chips Selector Header
+        Text("Change Status:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            listOf("Draft", "Sent", "Paid", "Closed").forEach { st ->
+                val active = item.invoice.status == st
+                SuggestionChip(
+                    onClick = { onUpdateStatus(st) },
+                    label = { Text(st, fontSize = 11.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal) },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         // Quick Actions Row
         Row(
             modifier = Modifier
@@ -270,21 +331,19 @@ fun InvoiceDetailLayout(
             ) {
                 Icon(Icons.Default.Share, contentDescription = "PDF Share", modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Export & Share PDF", fontSize = 13.sp)
+                Text("Export & Share", fontSize = 13.sp)
             }
 
             IconButton(
-                onClick = {
-                    onUpdateStatus(if (item.invoice.status == "Paid") "Sent" else "Paid")
-                },
+                onClick = onEdit,
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.tertiaryContainer)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
             ) {
                 Icon(
-                    imageVector = if (item.invoice.status == "Paid") Icons.Default.Cancel else Icons.Default.CheckCircle,
-                    contentDescription = "Toggle status",
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Edit invoice details",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
 
@@ -302,25 +361,127 @@ fun InvoiceDetailLayout(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // WhatsApp / Email Share & PDF Preview Row
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Button(
+                onClick = onShareWhatsApp,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(6.dp),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) {
+                Icon(Icons.Default.Send, contentDescription = "WhatsApp", modifier = Modifier.size(14.dp), tint = Color.White)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("WhatsApp", fontSize = 11.sp, color = Color.White)
+            }
 
-        // Client info card
+            Button(
+                onClick = onShareEmail,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(6.dp),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) {
+                Icon(Icons.Default.Email, contentDescription = "Email Share", modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Email PDF", fontSize = 11.sp)
+            }
+
+            Button(
+                onClick = onPreviewPdf,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                modifier = Modifier.weight(1.2f),
+                shape = RoundedCornerShape(6.dp),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) {
+                Icon(Icons.Default.PictureAsPdf, contentDescription = "Preview", modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("PDF Preview", fontSize = 11.sp)
+            }
+        }
+
+        // UPI Pay Card if Business profile has UPI ID
+        if (businessProfile != null && businessProfile.upiId.isNotBlank()) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Business UPI Payment Details:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(businessProfile.upiId, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                    Button(
+                        onClick = {
+                            try {
+                                val upiUri = "upi://pay?pa=${businessProfile.upiId}&pn=${businessProfile.businessName}&am=${item.invoice.grandTotal}&cu=INR"
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, "Hello, please pay ₹${String.format(Locale.US, "%.2f", item.invoice.grandTotal)} to ${businessProfile.businessName} via UPI ID: ${businessProfile.upiId}\nPayment Link: $upiUri")
+                                }
+                                val chooser = Intent.createChooser(shareIntent, "Share Payment Link")
+                                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                context.startActivity(chooser)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Cannot share UPI link", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Icon(Icons.Default.QrCode, contentDescription = "Pay UPI link", modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Share Pay Link", fontSize = 10.sp)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Client info & transport details card
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Text("Client/Customer:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                Text("Client/Customer Details:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(item.customer?.name ?: "Walk-in Guest", fontWeight = FontWeight.Bold)
                 item.customer?.let { client ->
                     if (client.phone.isNotBlank()) Text("Phone: ${client.phone}", style = MaterialTheme.typography.bodySmall)
+                    if (client.gstin.isNotBlank()) Text("GSTIN: ${client.gstin}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    if (client.placeOfSupply.isNotBlank()) Text("Place of Supply: ${client.placeOfSupply}", style = MaterialTheme.typography.bodySmall)
                     if (client.address.isNotBlank()) Text("Address: ${client.address}", style = MaterialTheme.typography.bodySmall)
+                }
+
+                if (item.invoice.placeOfSupply.isNotBlank() || item.invoice.vehicleNumber.isNotBlank() || item.invoice.brokerageBy.isNotBlank()) {
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    Text("Transportation Details:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    if (item.invoice.placeOfSupply.isNotBlank()) {
+                        Text("Sourcing State: ${item.invoice.placeOfSupply}", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (item.invoice.vehicleNumber.isNotBlank()) {
+                        Text("Vehicle Number: ${item.invoice.vehicleNumber}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                    }
+                    if (item.invoice.brokerageBy.isNotBlank()) {
+                        Text("Brokerage By: ${item.invoice.brokerageBy}", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         // Line items summary headers
         Text("Billing Items (${item.lineItems.size}):", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
@@ -329,7 +490,7 @@ fun InvoiceDetailLayout(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 200.dp),
+                .heightIn(max = 180.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(item.lineItems) { line ->
@@ -342,8 +503,9 @@ fun InvoiceDetailLayout(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(line.productName, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val hsnText = if (line.hsnSac.isNotBlank()) " | HSN: ${line.hsnSac}" else ""
                         Text(
-                            text = "${line.quantity} ${line.unit} @ ₹${line.price} + ${line.taxRate}% tax",
+                            text = "${line.quantity} ${line.unit} @ ₹${line.price} + ${line.taxRate}% tax$hsnText",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -357,7 +519,7 @@ fun InvoiceDetailLayout(
             }
         }
 
-        Divider(modifier = Modifier.padding(vertical = 12.dp))
+        Divider(modifier = Modifier.padding(vertical = 10.dp))
 
         // Receipt Summary Calculations
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -412,19 +574,31 @@ fun InvoiceDetailLayout(
 @Composable
 fun CreateInvoiceScreen(
     viewModel: InvoiceViewModel,
+    editingInvoice: InvoiceWithDetails? = null,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
     val customers by viewModel.customers.collectAsStateWithLifecycle()
     val products by viewModel.products.collectAsStateWithLifecycle()
 
-    var invoiceNum by remember { mutableStateOf(viewModel.generateNextInvoiceNumber()) }
-    var selectedCustomer by remember { mutableStateOf<Customer?>(null) }
-    var notes by remember { mutableStateOf("") }
-    var statusState by remember { mutableStateOf("Paid") } // default status is Paid
+    var invoiceNum by remember { mutableStateOf(editingInvoice?.invoice?.invoiceNumber ?: viewModel.generateNextInvoiceNumber()) }
+    var selectedCustomer by remember { mutableStateOf<Customer?>(editingInvoice?.customer) }
+    var notes by remember { mutableStateOf(editingInvoice?.invoice?.notes ?: "") }
+    var statusState by remember { mutableStateOf(editingInvoice?.invoice?.status ?: "Paid") } // default status is Paid
+    var vehicleNumber by remember { mutableStateOf(editingInvoice?.invoice?.vehicleNumber ?: "") }
+    var brokerageBy by remember { mutableStateOf(editingInvoice?.invoice?.brokerageBy ?: "") }
+    var placeOfSupply by remember { mutableStateOf(editingInvoice?.invoice?.placeOfSupply ?: "") }
 
     // List of active line items currently added
     val addedItems = remember { mutableStateListOf<InvoiceLineItem>() }
+
+    // Prepopulate added items from editing item
+    LaunchedEffect(editingInvoice) {
+        editingInvoice?.let {
+            addedItems.clear()
+            addedItems.addAll(it.lineItems)
+        }
+    }
 
     // Dialog sheets
     var showAddItemDialog by remember { mutableStateOf(false) }
@@ -438,7 +612,7 @@ fun CreateInvoiceScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Design Invoice", fontWeight = FontWeight.Bold) },
+                title = { Text(if (editingInvoice != null) "Edit Invoice" else "Design Invoice", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Return")
@@ -453,12 +627,15 @@ fun CreateInvoiceScreen(
                                 Toast.makeText(context, "Billing needs at least 1 item", Toast.LENGTH_SHORT).show()
                             } else {
                                 viewModel.saveInvoice(
-                                    id = 0,
+                                    id = editingInvoice?.invoice?.id ?: 0,
                                     invoiceNumber = invoiceNum,
                                     customerId = selectedCustomer!!.id,
                                     status = statusState,
-                                    items = addedItems,
-                                    notes = notes
+                                    items = addedItems.toList(),
+                                    notes = notes,
+                                    vehicleNumber = vehicleNumber,
+                                    brokerageBy = brokerageBy,
+                                    placeOfSupply = placeOfSupply
                                 )
                                 Toast.makeText(context, "Invoice Saved Successfully!", Toast.LENGTH_SHORT).show()
                                 onBack()
@@ -588,6 +765,55 @@ fun CreateInvoiceScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                             }
+                        }
+                    }
+                }
+            }
+
+            // Sourcing, Transport and Brokerage Parameters
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Transport & Supply Details (Optional)",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        OutlinedTextField(
+                            value = placeOfSupply,
+                            onValueChange = { placeOfSupply = it },
+                            label = { Text("Place of Supply / Sourcing State") },
+                            placeholder = { Text("e.g. Maharashtra, Haryana, Delhi") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = vehicleNumber,
+                                onValueChange = { vehicleNumber = it },
+                                label = { Text("Vehicle Number") },
+                                placeholder = { Text("e.g. GJ-01-XX-9999") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = brokerageBy,
+                                onValueChange = { brokerageBy = it },
+                                label = { Text("Brokerage By") },
+                                placeholder = { Text("e.g. Transit Logix") },
+                                modifier = Modifier.weight(1.2f),
+                                singleLine = true
+                            )
                         }
                     }
                 }
@@ -748,12 +974,15 @@ fun CreateInvoiceScreen(
                             return@Button
                         }
                         viewModel.saveInvoice(
-                            id = 0,
+                            id = editingInvoice?.invoice?.id ?: 0,
                             invoiceNumber = invoiceNum,
                             customerId = selectedCustomer!!.id,
                             status = statusState,
-                            items = addedItems,
-                            notes = notes
+                            items = addedItems.toList(),
+                            notes = notes,
+                            vehicleNumber = vehicleNumber,
+                            brokerageBy = brokerageBy,
+                            placeOfSupply = placeOfSupply
                         )
                         Toast.makeText(context, "Invoice Saved Successfully!", Toast.LENGTH_SHORT).show()
                         onBack()
@@ -848,6 +1077,7 @@ fun CreateInvoiceScreen(
         var inputTaxRate by remember { mutableStateOf("") }
         var inputUnit by remember { mutableStateOf("pcs") }
         var inputQty by remember { mutableStateOf("1") }
+        var inputHsnSac by remember { mutableStateOf("") }
 
         // Autocomplete helper from products inventory lists
         var chosenInventoryProd by remember { mutableStateOf<Product?>(null) }
@@ -904,6 +1134,7 @@ fun CreateInvoiceScreen(
                                     inputPrice = p.price.toString()
                                     inputTaxRate = p.taxRate.toString()
                                     inputUnit = p.unit
+                                    inputHsnSac = p.hsnSac
                                     dropdownExpanded = false
                                 }
                             )
@@ -941,6 +1172,23 @@ fun CreateInvoiceScreen(
                         )
                     }
 
+                    // Quick unit helper chips
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("kg", "bags", "pcs", "box").forEach { suggestion ->
+                            val isSelected = inputUnit.lowercase(Locale.ROOT) == suggestion
+                            SuggestionChip(
+                                onClick = { inputUnit = suggestion },
+                                label = { Text(suggestion, fontSize = 10.sp) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+                                )
+                            )
+                        }
+                    }
+
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = inputPrice,
@@ -958,6 +1206,15 @@ fun CreateInvoiceScreen(
                             modifier = Modifier.weight(1f)
                         )
                     }
+
+                    OutlinedTextField(
+                        value = inputHsnSac,
+                        onValueChange = { inputHsnSac = it },
+                        label = { Text("HSN/SAC Code (Optional)") },
+                        placeholder = { Text("e.g. 998311, 4802") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             },
             confirmButton = {
@@ -994,7 +1251,8 @@ fun CreateInvoiceScreen(
                         unit = inputUnit.trim().lowercase(Locale.ROOT),
                         subtotal = sub,
                         tax = computedTax,
-                        total = total
+                        total = total,
+                        hsnSac = inputHsnSac.trim()
                     )
 
                     addedItems.add(item)

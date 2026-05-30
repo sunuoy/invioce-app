@@ -144,8 +144,8 @@ fun CustomersScreen(
     if (showAddDialog) {
         CustomerEditorDialog(
             onDismiss = { showAddDialog = false },
-            onConfirm = { name, phone, email, addr ->
-                viewModel.saveCustomer(0, name, phone, email, addr)
+            onConfirm = { name, phone, email, addr, gstin, supply ->
+                viewModel.saveCustomer(0, name, phone, email, addr, gstin, supply)
                 showAddDialog = false
             }
         )
@@ -156,8 +156,8 @@ fun CustomersScreen(
         CustomerEditorDialog(
             customer = original,
             onDismiss = { activeEditingCustomer = null },
-            onConfirm = { name, phone, email, addr ->
-                viewModel.saveCustomer(original.id, name, phone, email, addr)
+            onConfirm = { name, phone, email, addr, gstin, supply ->
+                viewModel.saveCustomer(original.id, name, phone, email, addr, gstin, supply)
                 activeEditingCustomer = null
             }
         )
@@ -250,6 +250,44 @@ fun CustomerItemCard(
                         )
                     }
                 }
+                if (customer.gstin.isNotBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(top = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AssignmentInd,
+                            contentDescription = "Client Tax Identification",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.outline
+                        )
+                        Text(
+                            text = "GSTIN: ${customer.gstin}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                if (customer.placeOfSupply.isNotBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(top = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Map,
+                            contentDescription = "Place of Supply",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.outline
+                        )
+                        Text(
+                            text = "Supply State: ${customer.placeOfSupply}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -276,12 +314,14 @@ fun CustomerItemCard(
 fun CustomerEditorDialog(
     customer: Customer? = null,
     onDismiss: () -> Unit,
-    onConfirm: (name: String, phone: String, email: String, address: String) -> Unit
+    onConfirm: (name: String, phone: String, email: String, address: String, gstin: String, placeOfSupply: String) -> Unit
 ) {
     var name by remember { mutableStateOf(customer?.name ?: "") }
     var phone by remember { mutableStateOf(customer?.phone ?: "") }
     var email by remember { mutableStateOf(customer?.email ?: "") }
     var address by remember { mutableStateOf(customer?.address ?: "") }
+    var gstin by remember { mutableStateOf(customer?.gstin ?: "") }
+    var placeOfSupply by remember { mutableStateOf(customer?.placeOfSupply ?: "") }
 
     val isEdit = customer != null
 
@@ -319,6 +359,22 @@ fun CustomerEditorDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
+                    value = gstin,
+                    onValueChange = { gstin = it },
+                    label = { Text("Client GSTIN/Tax ID") },
+                    placeholder = { Text("e.g. 07AAACH1234F1Z1") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = placeOfSupply,
+                    onValueChange = { placeOfSupply = it },
+                    label = { Text("Place of Supply (State)") },
+                    placeholder = { Text("e.g. Maharashtra, Delhi") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
                     value = address,
                     onValueChange = { address = it },
                     label = { Text("Billing Address") },
@@ -328,7 +384,7 @@ fun CustomerEditorDialog(
         },
         confirmButton = {
             Button(onClick = {
-                onConfirm(name, phone, email, address)
+                onConfirm(name, phone, email, address, gstin, placeOfSupply)
             }) {
                 Text(if (isEdit) "Save Details" else "Add Directory")
             }

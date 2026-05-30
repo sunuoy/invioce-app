@@ -14,7 +14,10 @@ data class BusinessProfile(
     val phone: String = "",
     val email: String = "",
     val gstin: String = "",
-    val logoUrl: String = ""
+    val logoUrl: String = "",
+    val upiId: String = "",
+    val gmailId: String = "",
+    val shortIcon: String = "💼"
 )
 
 @Entity(tableName = "products")
@@ -24,7 +27,8 @@ data class Product(
     val price: Double,
     val taxRate: Double, // Percentage e.g. 18.0 for 18% GST
     val unit: String,    // "pcs", "kg", "hrs", "box", etc.
-    val stock: Double = 0.0 // stock quantity
+    val stock: Double = 0.0, // stock quantity
+    val hsnSac: String = ""
 )
 
 @Entity(tableName = "customers")
@@ -33,7 +37,9 @@ data class Customer(
     val name: String,
     val phone: String = "",
     val email: String = "",
-    val address: String = ""
+    val address: String = "",
+    val gstin: String = "",
+    val placeOfSupply: String = ""
 )
 
 @Entity(tableName = "invoices")
@@ -46,7 +52,10 @@ data class Invoice(
     val subtotal: Double = 0.0,
     val taxTotal: Double = 0.0,
     val grandTotal: Double = 0.0,
-    val notes: String = ""
+    val notes: String = "",
+    val vehicleNumber: String = "",
+    val brokerageBy: String = "",
+    val placeOfSupply: String = ""
 )
 
 @Entity(tableName = "invoice_line_items")
@@ -61,7 +70,8 @@ data class InvoiceLineItem(
     val unit: String,    // e.g. "pcs", "kg", "hrs"
     val subtotal: Double, // quantity * price
     val tax: Double,      // (subtotal * taxRate) / 100.0
-    val total: Double     // subtotal + tax
+    val total: Double,     // subtotal + tax
+    val hsnSac: String = ""
 )
 
 // ------------------ RELATIONS ------------------
@@ -111,6 +121,15 @@ interface InvoiceDao {
     @Query("DELETE FROM invoice_line_items WHERE invoiceId = :invoiceId")
     suspend fun deleteLineItemsByInvoiceId(invoiceId: Int)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertInvoicesBulk(invoices: List<Invoice>)
+
+    @Query("DELETE FROM invoices")
+    suspend fun clearAllInvoices()
+
+    @Query("DELETE FROM invoice_line_items")
+    suspend fun clearAllLineItems()
+
     // Simple analytics queries (Paid only counts towards sales, Draft/Sent can be tracked in code)
     @Query("SELECT SUM(grandTotal) FROM invoices WHERE status = 'Paid'")
     fun getTotalSales(): Flow<Double?>
@@ -138,6 +157,12 @@ interface ProductDao {
 
     @Query("DELETE FROM products WHERE id = :id")
     suspend fun deleteProductById(id: Int)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProductsBulk(products: List<Product>)
+
+    @Query("DELETE FROM products")
+    suspend fun clearAllProducts()
 }
 
 @Dao
@@ -156,6 +181,12 @@ interface CustomerDao {
 
     @Delete
     suspend fun deleteCustomer(customer: Customer)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCustomersBulk(customers: List<Customer>)
+
+    @Query("DELETE FROM customers")
+    suspend fun clearAllCustomers()
 }
 
 @Dao
@@ -168,6 +199,9 @@ interface BusinessProfileDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateProfile(profile: BusinessProfile)
+
+    @Query("DELETE FROM business_profile")
+    suspend fun clearBusinessProfile()
 }
 
 // ------------------ DATABASE ------------------
@@ -180,7 +214,7 @@ interface BusinessProfileDao {
         Invoice::class,
         InvoiceLineItem::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class InvoiceDatabase : RoomDatabase() {

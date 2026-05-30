@@ -92,4 +92,35 @@ class InvoiceRepository(
     // ------------------ ANALYTICS ------------------
     val totalSales: Flow<Double?> = invoiceDao.getTotalSales()
     val outstandingAmount: Flow<Double?> = invoiceDao.getOutstandingAmount()
+
+    // ------------------ BACKUP & RESTORE ------------------
+    suspend fun restoreData(
+        profile: BusinessProfile?,
+        products: List<Product>,
+        customers: List<Customer>,
+        invoices: List<Invoice>,
+        lineItems: List<InvoiceLineItem>
+    ) {
+        businessProfileDao.clearBusinessProfile()
+        productDao.clearAllProducts()
+        customerDao.clearAllCustomers()
+        invoiceDao.clearAllInvoices()
+        invoiceDao.clearAllLineItems()
+
+        if (profile != null) {
+            businessProfileDao.insertOrUpdateProfile(profile)
+        }
+        if (products.isNotEmpty()) {
+            productDao.insertProductsBulk(products)
+        }
+        if (customers.isNotEmpty()) {
+            customerDao.insertCustomersBulk(customers)
+        }
+        if (invoices.isNotEmpty()) {
+            invoiceDao.insertInvoicesBulk(invoices)
+        }
+        if (lineItems.isNotEmpty()) {
+            invoiceDao.insertLineItems(lineItems)
+        }
+    }
 }
