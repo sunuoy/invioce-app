@@ -253,12 +253,20 @@ object PdfGenerator {
         canvas.drawText(String.format(Locale.US, "₹%.2f", invoice.taxTotal), rightMargin - 70f, yPos, textPaint)
 
         if (invoice.taxTotal > 0) {
+            val baseGstPercent = if (invoice.subtotal > 0) (invoice.taxTotal / invoice.subtotal) * 100.0 else 0.0
+            val halfGstPercent = baseGstPercent / 2.0
+            val percentStr = if (halfGstPercent % 1.0 == 0.0) {
+                String.format(Locale.US, "%.0f%%", halfGstPercent)
+            } else {
+                String.format(Locale.US, "%.2f%%", halfGstPercent)
+            }
+            
             yPos += 13f
-            canvas.drawText("  CGST (Central GST - 50%):", totalsX, yPos, labelPaint)
+            canvas.drawText("  CGST (Central GST - $percentStr):", totalsX, yPos, labelPaint)
             canvas.drawText(String.format(Locale.US, "₹%.2f", invoice.taxTotal / 2.0), rightMargin - 70f, yPos, labelPaint)
 
             yPos += 13f
-            canvas.drawText("  SGST (State GST - 50%):", totalsX, yPos, labelPaint)
+            canvas.drawText("  SGST (State GST - $percentStr):", totalsX, yPos, labelPaint)
             canvas.drawText(String.format(Locale.US, "₹%.2f", invoice.taxTotal / 2.0), rightMargin - 70f, yPos, labelPaint)
         }
 

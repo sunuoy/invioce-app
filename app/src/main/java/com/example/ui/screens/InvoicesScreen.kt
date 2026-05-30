@@ -531,13 +531,22 @@ fun InvoiceDetailLayout(
             Text(String.format(Locale.US, "₹%.2f", item.invoice.taxTotal))
         }
         if (item.invoice.taxTotal > 0) {
+            val sub = item.invoice.subtotal
+            val totalTax = item.invoice.taxTotal
+            val baseGstPercent = if (sub > 0) (totalTax / sub) * 100.0 else 0.0
+            val halfGstPercent = baseGstPercent / 2.0
+            val percentStr = if (halfGstPercent % 1.0 == 0.0) {
+                String.format(Locale.US, "%.0f%%", halfGstPercent)
+            } else {
+                String.format(Locale.US, "%.2f%%", halfGstPercent)
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("CGST (Central GST - 50%)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                Text("CGST (Central GST - $percentStr)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                 Text(String.format(Locale.US, "₹%.2f", item.invoice.taxTotal / 2.0), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
             }
             Row(
@@ -546,7 +555,7 @@ fun InvoiceDetailLayout(
                     .padding(start = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("SGST (State GST - 50%)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                Text("SGST (State GST - $percentStr)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                 Text(String.format(Locale.US, "₹%.2f", item.invoice.taxTotal / 2.0), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
             }
         }
@@ -921,13 +930,20 @@ fun CreateInvoiceScreen(
                             Text(String.format(Locale.US, "₹%.2f", taxTotal))
                         }
                         if (taxTotal > 0) {
+                            val baseGstPercent = if (subtotal > 0) (taxTotal / subtotal) * 100.0 else 0.0
+                            val halfGstPercent = baseGstPercent / 2.0
+                            val percentStr = if (halfGstPercent % 1.0 == 0.0) {
+                                String.format(Locale.US, "%.0f%%", halfGstPercent)
+                            } else {
+                                String.format(Locale.US, "%.2f%%", halfGstPercent)
+                            }
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(start = 16.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("CGST (Central GST - 50%)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                Text("CGST (Central GST - $percentStr)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                                 Text(String.format(Locale.US, "₹%.2f", taxTotal / 2.0), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                             }
                             Row(
@@ -936,7 +952,7 @@ fun CreateInvoiceScreen(
                                     .padding(start = 16.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("SGST (State GST - 50%)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                Text("SGST (State GST - $percentStr)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                                 Text(String.format(Locale.US, "₹%.2f", taxTotal / 2.0), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                             }
                         }

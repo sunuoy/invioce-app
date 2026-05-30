@@ -45,11 +45,11 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     val outstandingAmount: StateFlow<Double?> = repository.outstandingAmount
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    // Support generation: INV-YEAR-0001
+    // Support generation: YYYY-MM-DD-0001
     fun generateNextInvoiceNumber(): String {
         val count = invoices.value.size
-        val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
-        return "INV-$year-${String.format("%04d", count + 1)}"
+        val dateString = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+        return "$dateString-${String.format(java.util.Locale.US, "%04d", count + 1)}"
     }
 
     // ------------------ BUSINESS OPERATIONS ------------------
