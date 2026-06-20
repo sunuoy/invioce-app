@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -210,12 +211,25 @@ fun InvoicesScreen(
                     activeInvoiceDetails = null
                     Toast.makeText(context, "Invoice Deleted", Toast.LENGTH_SHORT).show()
                 },
-                onExportShare = {
+                onExportPdf = {
+                    try {
+                        val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
+                        val exportedMessage = PdfGenerator.exportPdfToDownloads(context, pdfFile, billing.invoice.invoiceNumber)
+                        if (exportedMessage != null) {
+                            Toast.makeText(context, "$exportedMessage", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(context, "Failed to export PDF locally.", Toast.LENGTH_LONG).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Export Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                },
+                onSharePdf = {
                     try {
                         val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
                         PdfGenerator.shareInvoicePdf(context, pdfFile)
                     } catch (e: Exception) {
-                        Toast.makeText(context, "Export Error: ${e.message}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Share Error: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 },
                 onPreviewPdf = {
@@ -255,7 +269,8 @@ fun InvoiceDetailLayout(
     onUpdateStatus: (String) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onExportShare: () -> Unit,
+    onExportPdf: () -> Unit,
+    onSharePdf: () -> Unit,
     onPreviewPdf: () -> Unit,
     onShareWhatsApp: () -> Unit,
     onShareEmail: () -> Unit,
@@ -321,17 +336,29 @@ fun InvoiceDetailLayout(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
-                onClick = onExportShare,
+                onClick = onExportPdf,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                modifier = Modifier.weight(1.5f),
+                modifier = Modifier.weight(1.1f),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Icon(Icons.Default.Share, contentDescription = "PDF Share", modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Export & Share", fontSize = 13.sp)
+                Icon(Icons.Default.Download, contentDescription = "PDF Export", modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Export", fontSize = 12.sp)
+            }
+
+            Button(
+                onClick = onSharePdf,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                modifier = Modifier.weight(1.1f),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(Icons.Default.Share, contentDescription = "PDF Share", modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Share", fontSize = 12.sp)
             }
 
             IconButton(
@@ -410,38 +437,54 @@ fun InvoiceDetailLayout(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
             ) {
-                Row(
-                    modifier = Modifier.padding(10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Business UPI Payment Details:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(businessProfile.upiId, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                    Button(
-                        onClick = {
-                            try {
-                                val upiUri = "upi://pay?pa=${businessProfile.upiId}&pn=${businessProfile.businessName}&am=${item.invoice.grandTotal}&cu=INR"
-                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, "Hello, please pay ₹${String.format(Locale.US, "%.2f", item.invoice.grandTotal)} to ${businessProfile.businessName} via UPI ID: ${businessProfile.upiId}\nPayment Link: $upiUri")
-                                }
-                                val chooser = Intent.createChooser(shareIntent, "Share Payment Link")
-                                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                context.startActivity(chooser)
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Cannot share UPI link", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(4.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.QrCode, contentDescription = "Pay UPI link", modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Share Pay Link", fontSize = 10.sp)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Business UPI Payment Details:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(businessProfile.upiId, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Total Bill: ₹${String.format(Locale.US, "%.2f", item.invoice.grandTotal)}", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Button(
+                            onClick = {
+                                try {
+                                    val upiUri = "upi://pay?pa=${businessProfile.upiId}&pn=${businessProfile.businessName}&am=${item.invoice.grandTotal}&cu=INR"
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, "Hello, please pay ₹${String.format(Locale.US, "%.2f", item.invoice.grandTotal)} to ${businessProfile.businessName} via UPI ID: ${businessProfile.upiId}\nPayment Link: $upiUri")
+                                    }
+                                    val chooser = Intent.createChooser(shareIntent, "Share Payment Link")
+                                    chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    context.startActivity(chooser)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Cannot share UPI link", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Icon(Icons.Default.QrCode, contentDescription = "Pay UPI link", modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Share Pay Link", fontSize = 10.sp)
+                        }
                     }
+
+                    // REAL UPI QR Code scan & pay visualization
+                    Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                    Text("Scan to Pay Instantly", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    UpiQrImage(
+                        upiId = businessProfile.upiId,
+                        businessName = businessProfile.businessName,
+                        amount = item.invoice.grandTotal
+                    )
                 }
             }
         }
@@ -612,11 +655,13 @@ fun CreateInvoiceScreen(
     // Dialog sheets
     var showAddItemDialog by remember { mutableStateOf(false) }
     var showAddClientDialog by remember { mutableStateOf(false) }
+    var clientSelectorSheetOpen by remember { mutableStateOf(false) }
 
-    // Computations
-    val subtotal = addedItems.sumOf { it.subtotal }
-    val taxTotal = addedItems.sumOf { it.tax }
-    val grandTotal = addedItems.sumOf { it.total }
+    // Computations via custom high-performance hook
+    val invoiceTotals by com.example.util.rememberInvoiceTotals(addedItems)
+    val subtotal = invoiceTotals.subtotal
+    val taxTotal = invoiceTotals.taxTotal
+    val grandTotal = invoiceTotals.grandTotal
 
     Scaffold(
         topBar = {
@@ -703,52 +748,28 @@ fun CreateInvoiceScreen(
                             }
                         }
 
-                        if (customers.isEmpty()) {
-                            Text(
-                                "No registered clients yet. Please create one to generate bills.",
-                                color = MaterialTheme.colorScheme.error,
-                                fontSize = 12.sp
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = selectedCustomer?.name ?: "Tap to choose recipient...",
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Client Address Name") },
+                                trailingIcon = { Icon(Icons.Default.ArrowDropDown, "Open sheet") },
+                                modifier = Modifier.fillMaxWidth().testTag("client_picker_trigger"),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                    disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                enabled = false
                             )
-                        } else {
-                            var clientSelectorExpanded by remember { mutableStateOf(false) }
-                            Box(modifier = Modifier.fillMaxWidth()) {
-                                OutlinedTextField(
-                                    value = selectedCustomer?.name ?: "Tap to choose recipient...",
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    label = { Text("Client Address Name") },
-                                    trailingIcon = { Icon(Icons.Default.ArrowDropDown, "Open dropdown") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                        disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    enabled = false
-                                )
-                                // Clear overlay box that intercepts the click perfectly
-                                Box(
-                                    modifier = Modifier
-                                        .matchParentSize()
-                                        .clickable { clientSelectorExpanded = true }
-                                )
-                                DropdownMenu(
-                                    expanded = clientSelectorExpanded,
-                                    onDismissRequest = { clientSelectorExpanded = false },
-                                    modifier = Modifier.fillMaxWidth(0.9f)
-                                ) {
-                                    customers.forEach { c ->
-                                        DropdownMenuItem(
-                                            text = { Text("${c.name} (Ph: ${c.phone})") },
-                                            onClick = {
-                                                selectedCustomer = c
-                                                clientSelectorExpanded = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
+                            // Clear overlay box that intercepts the click perfectly
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .clickable { clientSelectorSheetOpen = true }
+                            )
                         }
 
                         // Status Chooser
@@ -1019,6 +1040,262 @@ fun CreateInvoiceScreen(
         }
     }
 
+    // ModalBottomSheet for selecting/searching and inline editing/adding clients
+    if (clientSelectorSheetOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { clientSelectorSheetOpen = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Select Client Recipient", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    IconButton(onClick = { clientSelectorSheetOpen = false }) {
+                        Icon(Icons.Default.Close, contentDescription = "Close sheet")
+                    }
+                }
+
+                var clientSearchText by remember { mutableStateOf("") }
+                var showAddClientDialogFlow by remember { mutableStateOf(false) }
+                var activeEditClientFlow by remember { mutableStateOf<Customer?>(null) }
+
+                val filteredSheetCustomers = remember(customers, clientSearchText) {
+                    customers.filter {
+                        it.name.contains(clientSearchText, ignoreCase = true) ||
+                                it.phone.contains(clientSearchText) ||
+                                it.email.contains(clientSearchText, ignoreCase = true)
+                    }
+                }
+
+                OutlinedTextField(
+                    value = clientSearchText,
+                    onValueChange = { clientSearchText = it },
+                    placeholder = { Text("Search client name, phone or email...", fontSize = 13.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search icon") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp)
+                )
+
+                // Quick client add action
+                Button(
+                    onClick = { showAddClientDialogFlow = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), contentColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.PersonAdd, contentDescription = "Add Client", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Add New Client Profile", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Text("Saved Profiles (${filteredSheetCustomers.size})", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 240.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (filteredSheetCustomers.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("No clients match. Add one above!", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                    } else {
+                        items(filteredSheetCustomers) { clientItem ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectedCustomer = clientItem
+                                        clientSelectorSheetOpen = false
+                                    },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (selectedCustomer?.id == clientItem.id) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(clientItem.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        if (clientItem.phone.isNotBlank()) {
+                                            Text("Phone: ${clientItem.phone}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        if (clientItem.email.isNotBlank()) {
+                                            Text("Email: ${clientItem.email}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                    IconButton(onClick = { activeEditClientFlow = clientItem }) {
+                                        Icon(Icons.Default.Edit, contentDescription = "Edit Profile inline", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Inner dialog launchers
+                if (showAddClientDialogFlow) {
+                    var newCliName by remember { mutableStateOf("") }
+                    var newCliPhone by remember { mutableStateOf("") }
+                    var newCliEmail by remember { mutableStateOf("") }
+                    var newCliAddr by remember { mutableStateOf("") }
+
+                    AlertDialog(
+                        onDismissRequest = { showAddClientDialogFlow = false },
+                        title = { Text("Register New Client") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OutlinedTextField(
+                                    value = newCliName,
+                                    onValueChange = { newCliName = it },
+                                    label = { Text("Client/Business Name*") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                OutlinedTextField(
+                                    value = newCliPhone,
+                                    onValueChange = { newCliPhone = it },
+                                    label = { Text("Phone Number") },
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                OutlinedTextField(
+                                    value = newCliEmail,
+                                    onValueChange = { newCliEmail = it },
+                                    label = { Text("Email Address") },
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Email),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                OutlinedTextField(
+                                    value = newCliAddr,
+                                    onValueChange = { newCliAddr = it },
+                                    label = { Text("Billing Address") },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            Button(onClick = {
+                                if (newCliName.isBlank()) {
+                                    Toast.makeText(context, "Name cannot be blank", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                viewModel.saveCustomer(
+                                    id = 0,
+                                    name = newCliName,
+                                    phone = newCliPhone,
+                                    email = newCliEmail,
+                                    address = newCliAddr
+                                )
+                                showAddClientDialogFlow = false
+                            }) {
+                                Text("Save Client")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showAddClientDialogFlow = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
+
+                activeEditClientFlow?.let { origin ->
+                    var newCliName by remember { mutableStateOf(origin.name) }
+                    var newCliPhone by remember { mutableStateOf(origin.phone) }
+                    var newCliEmail by remember { mutableStateOf(origin.email) }
+                    var newCliAddr by remember { mutableStateOf(origin.address) }
+
+                    AlertDialog(
+                        onDismissRequest = { activeEditClientFlow = null },
+                        title = { Text("Edit Client Details") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OutlinedTextField(
+                                    value = newCliName,
+                                    onValueChange = { newCliName = it },
+                                    label = { Text("Client/Business Name*") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                OutlinedTextField(
+                                    value = newCliPhone,
+                                    onValueChange = { newCliPhone = it },
+                                    label = { Text("Phone Number") },
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                OutlinedTextField(
+                                    value = newCliEmail,
+                                    onValueChange = { newCliEmail = it },
+                                    label = { Text("Email Address") },
+                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Email),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                OutlinedTextField(
+                                    value = newCliAddr,
+                                    onValueChange = { newCliAddr = it },
+                                    label = { Text("Billing Address") },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            Button(onClick = {
+                                if (newCliName.isBlank()) {
+                                    Toast.makeText(context, "Name cannot be blank", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                viewModel.saveCustomer(
+                                    id = origin.id,
+                                    name = newCliName,
+                                    phone = newCliPhone,
+                                    email = newCliEmail,
+                                    address = newCliAddr
+                                )
+                                activeEditClientFlow = null
+                            }) {
+                                Text("Save Changes")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { activeEditClientFlow = null }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+
     // Modal adding new client inline dialog
     if (showAddClientDialog) {
         var newCliName by remember { mutableStateOf("") }
@@ -1257,9 +1534,10 @@ fun CreateInvoiceScreen(
                         return@Button
                     }
 
-                    val sub = qty * rate
-                    val computedTax = (sub * tax) / 100.0
-                    val total = sub + computedTax
+                    val amounts = com.example.util.InvoiceCalculator.calculateLineItem(rate, qty, tax)
+                    val sub = amounts.subtotal
+                    val computedTax = amounts.tax
+                    val total = amounts.total
 
                     val item = InvoiceLineItem(
                         invoiceId = 0,
@@ -1289,3 +1567,38 @@ fun CreateInvoiceScreen(
         )
     }
 }
+
+@Composable
+fun UpiQrImage(upiId: String, businessName: String, amount: Double) {
+    val upiUri = remember(upiId, businessName, amount) {
+        "upi://pay?pa=$upiId&pn=$businessName&am=$amount&cu=INR"
+    }
+    val qrBitmap = remember(upiUri) {
+        try {
+            val size = 220
+            val wm = com.google.zxing.MultiFormatWriter()
+            val bitMatrix = wm.encode(upiUri, com.google.zxing.BarcodeFormat.QR_CODE, size, size)
+            val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+            for (x in 0 until size) {
+                for (y in 0 until size) {
+                    bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+                }
+            }
+            bitmap
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    qrBitmap?.let {
+        androidx.compose.foundation.Image(
+            bitmap = it.asImageBitmap(),
+            contentDescription = "Scan to Pay UPI QR Code",
+            modifier = Modifier
+                .size(150.dp)
+                .background(androidx.compose.ui.graphics.Color.White, shape = RoundedCornerShape(8.dp))
+                .padding(8.dp)
+        )
+    }
+}
+

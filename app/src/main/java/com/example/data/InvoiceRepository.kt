@@ -53,6 +53,19 @@ class InvoiceRepository(
     fun getInvoiceById(id: Int): Flow<InvoiceWithDetails?> = invoiceDao.getInvoiceById(id)
 
     suspend fun saveInvoice(invoice: Invoice, items: List<InvoiceLineItem>): Long {
+        // Revert stock for older line items if editing an existing invoice
+        if (invoice.id != 0) {
+            val oldItems = invoiceDao.getLineItemsByInvoiceId(invoice.id)
+            for (oldItem in oldItems) {
+                if (oldItem.productId != 0) {
+                    val prod = productDao.getProductById(oldItem.productId)
+                    if (prod != null) {
+                        productDao.updateProduct(prod.copy(stock = prod.stock + oldItem.quantity))
+                    }
+                }
+            }
+        }
+
         // Compute actual numbers from line items
         val subtotal = items.sumOf { it.subtotal }
         val taxTotal = items.sumOf { it.tax }
@@ -76,15 +89,13 @@ class InvoiceRepository(
         val preparedItems = items.map { it.copy(invoiceId = invoiceId) }
         invoiceDao.insertLineItems(preparedItems)
 
-        // Optional: Deduct stock automatically if invoice is marked "Sent" or "Paid"
-        if (finalizedInvoice.status == "Paid" || finalizedInvoice.status == "Sent") {
-            for (it in preparedItems) {
-                if (it.productId != 0) {
-                    val prod = productDao.getProductById(it.productId)
-                    if (prod != null) {
-                        val newStock = prod.stock - it.quantity
-                        productDao.updateProduct(prod.copy(stock = newStock))
-                    }
+        // Deduct stock automatically for current line items
+        for (newItem in preparedItems) {
+            if (newItem.productId != 0) {
+                val prod = productDao.getProductById(newItem.productId)
+                if (prod != null) {
+                    val newStock = prod.stock - newItem.quantity
+                    productDao.updateProduct(prod.copy(stock = newStock))
                 }
             }
         }
@@ -93,6 +104,16 @@ class InvoiceRepository(
     }
 
     suspend fun deleteInvoice(invoiceId: Int) {
+        // Restore stock levels before removing the invoice
+        val oldItems = invoiceDao.getLineItemsByInvoiceId(invoiceId)
+        for (oldItem in oldItems) {
+            if (oldItem.productId != 0) {
+                val prod = productDao.getProductById(oldItem.productId)
+                if (prod != null) {
+                    productDao.updateProduct(prod.copy(stock = prod.stock + oldItem.quantity))
+                }
+            }
+        }
         invoiceDao.deleteInvoiceById(invoiceId)
         invoiceDao.deleteLineItemsByInvoiceId(invoiceId)
     }

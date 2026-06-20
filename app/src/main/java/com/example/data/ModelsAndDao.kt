@@ -129,6 +129,9 @@ interface InvoiceDao {
     suspend fun deleteInvoiceById(id: Int)
 
     // Lines items queries
+    @Query("SELECT * FROM invoice_line_items WHERE invoiceId = :invoiceId")
+    suspend fun getLineItemsByInvoiceId(invoiceId: Int): List<InvoiceLineItem>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLineItems(items: List<InvoiceLineItem>)
 

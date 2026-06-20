@@ -9,6 +9,8 @@ import android.content.Intent
 import java.io.File
 import com.example.util.BackupRestoreHelper
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
@@ -56,6 +58,29 @@ fun SettingsScreen(
     var upiId by remember { mutableStateOf("") }
     var gmailId by remember { mutableStateOf("") }
     var shortIcon by remember { mutableStateOf("💼") }
+    var logoUrl by remember { mutableStateOf("") }
+
+    val selectImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    val logoFile = File(context.filesDir, "custom_brand_logo.png")
+                    logoFile.outputStream().use { outputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                    logoUrl = logoFile.absolutePath
+                    Toast.makeText(context, "Local logo image successfully saved!", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to copy logo image: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val prefs = remember { context.getSharedPreferences("invoice_generator_prefs", android.content.Context.MODE_PRIVATE) }
+    var pdfTheme by remember { mutableStateOf(prefs.getString("pdf_theme", "Classic Navy") ?: "Classic Navy") }
 
     var showGoogleAccountChooser by remember { mutableStateOf(false) }
     var isGmailSyncing by remember { mutableStateOf(false) }
@@ -124,6 +149,7 @@ fun SettingsScreen(
             upiId = it.upiId
             gmailId = it.gmailId
             shortIcon = if (it.shortIcon.isBlank()) "💼" else it.shortIcon
+            logoUrl = it.logoUrl
         }
     }
 
@@ -140,7 +166,8 @@ fun SettingsScreen(
                             if (name.isBlank()) {
                                 Toast.makeText(context, "Business Name cannot be empty", Toast.LENGTH_SHORT).show()
                             } else {
-                                viewModel.saveBusinessProfile(name, address, phone, email, gstin, upiId, gmailId, shortIcon)
+                                viewModel.saveBusinessProfile(name, address, phone, email, gstin, upiId, gmailId, shortIcon, logoUrl)
+                                prefs.edit().putString("pdf_theme", pdfTheme).apply()
                                 Toast.makeText(context, "Business Metadata Saved Successfully!", Toast.LENGTH_SHORT).show()
                             }
                         },
@@ -753,6 +780,167 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth().testTag("custom_short_icon_input"),
                         singleLine = true
                     )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Step 2: Premium Brand Logo Option",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Choose a corporate asset emblem or paste a custom link path below to represent your business on the invoice document:",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    val logoPresets = listOf(
+                        "preset_tech" to "⚡ Tech Pro",
+                        "preset_crest" to "🛡️ Shield Crest",
+                        "preset_leaf" to "🌿 Green Leaf",
+                        "preset_star" to "✨ Premium Star",
+                        "preset_gear" to "⚙️ Build Gear",
+                        "preset_cart" to "🛒 Hyper Depot"
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        logoPresets.forEach { (presetKey, displayName) ->
+                            val isSelected = logoUrl == presetKey
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { logoUrl = presetKey },
+                                label = { Text(displayName, fontSize = 11.sp) },
+                                leadingIcon = if (isSelected) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                                } else null
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = { selectImageLauncher.launch("image/*") },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f).testTag("select_local_logo_button")
+                        ) {
+                            Icon(Icons.Default.Image, contentDescription = "Gallery logo selection", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Pick Logo Image from Device", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        if (logoUrl.isNotBlank() && !logoUrl.startsWith("preset_")) {
+                            Box(
+                                modifier = Modifier
+                                    .height(40.dp)
+                                    .padding(horizontal = 8.dp)
+                                    .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp))
+                                    .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f), shape = RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val isLocalPath = File(logoUrl).exists()
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(if (isLocalPath) "📸" else "🌐", fontSize = 11.sp)
+                                    Text(
+                                        text = if (isLocalPath) "Active Local Logo" else "Active Web Link",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    OutlinedTextField(
+                        value = logoUrl,
+                        onValueChange = { logoUrl = it },
+                        label = { Text("Or Custom Brand Image URL / Logo Path") },
+                        placeholder = { Text("e.g. https://domain.com/logo.png") },
+                        modifier = Modifier.fillMaxWidth().testTag("custom_logo_url_input"),
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.Link, contentDescription = "Web link icon") },
+                        trailingIcon = if (logoUrl.isNotBlank()) {
+                            {
+                                IconButton(onClick = { logoUrl = "" }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Reset input field")
+                                }
+                            }
+                        } else null
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Step 3: PDF Print Accent Design Theme",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Elevate billing aesthetics by switching the border borders, titles, headers, and backgrounds of printed documents:",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    val themesList = listOf("Classic Navy", "Forest Green", "Burgundy", "Charcoal", "Sunset Indigo")
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        themesList.forEach { tName ->
+                            val isSelected = pdfTheme == tName
+                            val chipColor = when(tName) {
+                                "Classic Navy" -> Color(0xFF1E3A8A)
+                                "Forest Green" -> Color(0xFF065F46)
+                                "Burgundy" -> Color(0xFF881337)
+                                "Charcoal" -> Color(0xFF1F2937)
+                                else -> Color(0xFF4338CA)
+                            }
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { pdfTheme = tName },
+                                label = { Text(tName, fontSize = 11.sp) },
+                                leadingIcon = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .background(chipColor, shape = CircleShape)
+                                    )
+                                }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -775,6 +963,59 @@ fun SettingsScreen(
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.outline
                 )
+            }
+
+            // Demo & Dummy Data Seeding Card
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("demo_seeding_card"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = "Load Sample Data Icon",
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Text(
+                            text = "Instant Demo Data Seeding",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+
+                    Text(
+                        text = "Seed the database with sample business profiles, ready-to-bill products/services, clients, and mock invoices. This gives you beautiful charts, metrics, and instant test templates on the streaming simulator!",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Button(
+                        onClick = {
+                            viewModel.populateDummyData()
+                            Toast.makeText(context, "Sample dataset seeded! Go back to Home / Products to explore.", Toast.LENGTH_LONG).show()
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("seed_sample_dataset_button"),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary,
+                            contentColor = MaterialTheme.colorScheme.onTertiary
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Repopulate", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Seed & Populate Demo Data", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
 
             // Data Backup & Recovery Section
@@ -1018,7 +1259,8 @@ fun SettingsScreen(
                         Toast.makeText(context, "Business Name cannot be empty", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-                    viewModel.saveBusinessProfile(name, address, phone, email, gstin, upiId, gmailId, shortIcon)
+                    viewModel.saveBusinessProfile(name, address, phone, email, gstin, upiId, gmailId, shortIcon, logoUrl)
+                    prefs.edit().putString("pdf_theme", pdfTheme).apply()
                     Toast.makeText(context, "Business Metadata Saved Successfully!", Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier
