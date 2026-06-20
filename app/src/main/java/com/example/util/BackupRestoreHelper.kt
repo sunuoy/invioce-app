@@ -79,6 +79,7 @@ object BackupRestoreHelper {
                 put("vehicleNumber", inv.vehicleNumber)
                 put("brokerageBy", inv.brokerageBy)
                 put("placeOfSupply", inv.placeOfSupply)
+                put("downloadCount", inv.downloadCount)
             }
 
             val itemsArr = JSONArray()
@@ -188,7 +189,8 @@ object BackupRestoreHelper {
                         notes = invJson.optString("notes", ""),
                         vehicleNumber = invJson.optString("vehicleNumber", ""),
                         brokerageBy = invJson.optString("brokerageBy", ""),
-                        placeOfSupply = invJson.optString("placeOfSupply", "")
+                        placeOfSupply = invJson.optString("placeOfSupply", ""),
+                        downloadCount = invJson.optInt("downloadCount", 0)
                     )
                 )
 

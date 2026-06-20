@@ -238,6 +238,17 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun incrementDownloadCount(invoiceId: Int) {
+        viewModelScope.launch {
+            val scopeInvoices = invoices.value
+            val match = scopeInvoices.find { it.invoice.id == invoiceId }
+            if (match != null) {
+                val updatedInvoice = match.invoice.copy(downloadCount = match.invoice.downloadCount + 1)
+                repository.saveInvoice(updatedInvoice, match.lineItems)
+            }
+        }
+    }
+
     fun restoreDatabaseBackup(jsonString: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {

@@ -216,7 +216,20 @@ fun InvoicesScreen(
                         val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
                         val exportedMessage = PdfGenerator.exportPdfToDownloads(context, pdfFile, billing.invoice.invoiceNumber)
                         if (exportedMessage != null) {
+                            // Increment download count since they exported the copy
+                            viewModel.incrementDownloadCount(billing.invoice.id)
+                            // Update local sheet details state statically to reflect the increment
+                            activeInvoiceDetails = billing.copy(
+                                invoice = billing.invoice.copy(downloadCount = billing.invoice.downloadCount + 1)
+                            )
                             Toast.makeText(context, "$exportedMessage", Toast.LENGTH_LONG).show()
+                            
+                            // Automatically open the exported PDF file
+                            try {
+                                PdfGenerator.previewPdf(context, pdfFile)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Unable to auto-open PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
                         } else {
                             Toast.makeText(context, "Failed to export PDF locally.", Toast.LENGTH_LONG).show()
                         }
@@ -301,6 +314,37 @@ fun InvoiceDetailLayout(
                     fontWeight = FontWeight.Bold
                 )
                 Text(text = "Billed on: $dateStr", style = MaterialTheme.typography.bodySmall)
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                val downloads = item.invoice.downloadCount
+                val remaining = (3 - downloads).coerceAtLeast(0)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .background(
+                            color = if (downloads >= 3) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.secondaryContainer,
+                            shape = RoundedCornerShape(4.dp)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Icon(
+                        imageVector = if (downloads >= 3) Icons.Default.Warning else Icons.Default.DownloadDone,
+                        contentDescription = null,
+                        modifier = Modifier.size(10.dp),
+                        tint = if (downloads >= 3) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Text(
+                        text = if (downloads >= 3) {
+                            "Duplicate Copy Mode (Downloaded $downloads times)"
+                        } else {
+                            "Original COPY ($remaining/3 left before Duplicate PDF)"
+                        },
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (downloads >= 3) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
             }
             IconButton(onClick = onDismiss) {
                 Icon(Icons.Default.Close, contentDescription = "Dismiss")

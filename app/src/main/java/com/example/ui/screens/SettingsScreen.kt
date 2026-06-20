@@ -8,6 +8,11 @@ import androidx.core.content.FileProvider
 import android.content.Intent
 import java.io.File
 import com.example.util.BackupRestoreHelper
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -60,22 +65,13 @@ fun SettingsScreen(
     var shortIcon by remember { mutableStateOf("💼") }
     var logoUrl by remember { mutableStateOf("") }
 
+    var pendingLogoUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
     val selectImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: android.net.Uri? ->
         if (uri != null) {
-            try {
-                context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    val logoFile = File(context.filesDir, "custom_brand_logo.png")
-                    logoFile.outputStream().use { outputStream ->
-                        inputStream.copyTo(outputStream)
-                    }
-                    logoUrl = logoFile.absolutePath
-                    Toast.makeText(context, "Local logo image successfully saved!", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Failed to copy logo image: ${e.message}", Toast.LENGTH_LONG).show()
-            }
+            pendingLogoUri = uri
         }
     }
 
@@ -86,6 +82,32 @@ fun SettingsScreen(
     var isGmailSyncing by remember { mutableStateOf(false) }
 
     var showRestoreConfirmation by remember { mutableStateOf<String?>(null) }
+
+    if (pendingLogoUri != null) {
+        LogoCropperDialog(
+            uri = pendingLogoUri!!,
+            onDismiss = { pendingLogoUri = null },
+            onCropped = { croppedBitmap ->
+                pendingLogoUri = null
+                try {
+                    val timestamp = System.currentTimeMillis()
+                    val logoFile = File(context.filesDir, "custom_brand_logo_${timestamp}.png")
+                    context.filesDir.listFiles()?.forEach { file ->
+                        if (file.name.startsWith("custom_brand_logo") && file.name.endsWith(".png")) {
+                            file.delete()
+                        }
+                    }
+                    logoFile.outputStream().use { out ->
+                        croppedBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                    }
+                    logoUrl = logoFile.absolutePath
+                    Toast.makeText(context, "Cropped brand logo successfully saved!", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Failed to save cropped logo: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        )
+    }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -1275,4 +1297,235 @@ fun SettingsScreen(
             }
         }
     }
+}
+
+@Composable
+fun LogoCropperDialog(
+    uri: android.net.Uri,
+    onDismiss: () -> Unit,
+    onCropped: (android.graphics.Bitmap) -> Unit
+) {
+    val context = LocalContext.current
+    val density = context.resources.displayMetrics.density
+    
+    val rawBitmap = remember(uri) {
+        loadRescaledBitmap(context, uri, maxDim = 1200)
+    }
+    
+    if (rawBitmap == null) {
+        LaunchedEffect(Unit) {
+            Toast.makeText(context, "Could not load image.", Toast.LENGTH_SHORT).show()
+            onDismiss()
+        }
+        return
+    }
+    
+    var zoom by remember { mutableStateOf(1.0f) }
+    var panX by remember { mutableStateOf(0f) }
+    var panY by remember { mutableStateOf(0f) }
+    var rotationDegrees by remember { mutableStateOf(0f) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "Polish & Crop Logo",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium
+            )
+        },
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "Drag to pan. Use zoom slider and rotation button to center company logo inside the square crop box:",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .size(240.dp)
+                        .background(Color.Black.copy(alpha = 0.05f), shape = RoundedCornerShape(8.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        .clipToBounds(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.foundation.Image(
+                        bitmap = rawBitmap.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(
+                                scaleX = zoom,
+                                scaleY = zoom,
+                                translationX = panX,
+                                translationY = panY,
+                                rotationZ = rotationDegrees
+                            )
+                            .pointerInput(Unit) {
+                                detectDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    panX += dragAmount.x
+                                    panY += dragAmount.y
+                                }
+                            }
+                    )
+                    
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .border(2.5.dp, MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(4.dp))
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Default.ZoomOut,
+                        contentDescription = "Zoom Out",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Slider(
+                        value = zoom,
+                        onValueChange = { zoom = it },
+                        valueRange = 1.0f..4.0f,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                    )
+                    Icon(
+                        Icons.Default.ZoomIn,
+                        contentDescription = "Zoom In",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    TextButton(
+                        onClick = { rotationDegrees = (rotationDegrees + 90f) % 360f },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(Icons.Default.RotateRight, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Rotate 90°", fontSize = 12.sp)
+                    }
+                    
+                    TextButton(
+                        onClick = {
+                            zoom = 1.0f
+                            panX = 0f
+                            panY = 0f
+                            rotationDegrees = 0f
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Reset Layout", fontSize = 12.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val cropped = generateCroppedBitmap(
+                        original = rawBitmap,
+                        zoom = zoom,
+                        panX = panX,
+                        panY = panY,
+                        rotation = rotationDegrees,
+                        displayDensity = density
+                    )
+                    onCropped(cropped)
+                }
+            ) {
+                Text("Confirm & Crop", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+fun loadRescaledBitmap(context: android.content.Context, uri: android.net.Uri, maxDim: Int): android.graphics.Bitmap? {
+    return try {
+        context.contentResolver.openInputStream(uri)?.use { stream ->
+            val options = android.graphics.BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            android.graphics.BitmapFactory.decodeStream(stream, null, options)
+            var inSampleSize = 1
+            while ((options.outWidth / inSampleSize) > maxDim || (options.outHeight / inSampleSize) > maxDim) {
+                inSampleSize *= 2
+            }
+            val loadOptions = android.graphics.BitmapFactory.Options().apply {
+                this.inSampleSize = inSampleSize
+            }
+            context.contentResolver.openInputStream(uri)?.use { stream2 ->
+                android.graphics.BitmapFactory.decodeStream(stream2, null, loadOptions)
+            }
+        }
+    } catch (e: java.lang.Exception) {
+        null
+    }
+}
+
+fun generateCroppedBitmap(
+    original: android.graphics.Bitmap,
+    zoom: Float,
+    panX: Float,
+    panY: Float,
+    rotation: Float,
+    displayDensity: Float
+): android.graphics.Bitmap {
+    val targetSize = 512
+    val croppedBitmap = android.graphics.Bitmap.createBitmap(targetSize, targetSize, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(croppedBitmap)
+    
+    val paint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        isFilterBitmap = true
+        isDither = true
+    }
+    
+    canvas.drawColor(android.graphics.Color.TRANSPARENT)
+    
+    val matrix = android.graphics.Matrix()
+    val srcW = original.width.toFloat()
+    val srcH = original.height.toFloat()
+    val initialScale = Math.min(targetSize / srcW, targetSize / srcH)
+    
+    matrix.postTranslate(-srcW / 2f, -srcH / 2f)
+    matrix.postScale(initialScale, initialScale)
+    matrix.postRotate(rotation)
+    matrix.postScale(zoom, zoom)
+    
+    val viewportPx = 240f * displayDensity
+    val scaleRelation = targetSize / viewportPx
+    
+    matrix.postTranslate(
+        targetSize / 2f + panX * scaleRelation,
+        targetSize / 2f + panY * scaleRelation
+    )
+    
+    canvas.drawBitmap(original, matrix, paint)
+    return croppedBitmap
 }

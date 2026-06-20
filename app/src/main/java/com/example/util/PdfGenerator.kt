@@ -226,6 +226,22 @@ object PdfGenerator {
         // Draw outer box
         canvas.drawRect(leftBorder, topBorder, rightBorder, bottomBorder, borderPaint)
 
+        // Draw background watermark for 4th copy onwards (downloadCount >= 3)
+        if (invoice.downloadCount >= 3) {
+            canvas.save()
+            val watermarkPaint = Paint().apply {
+                color = Color.parseColor("#10000000") // ~6% opacity black, highly subtle and visible
+                textSize = 60f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                style = Paint.Style.FILL
+                textAlign = Paint.Align.CENTER
+                isAntiAlias = true
+            }
+            canvas.rotate(-35f, 297f, 421f) // rotate 35 degrees under central A4 point (297, 421)
+            canvas.drawText("DUPLICATE COPY", 297f, 421f, watermarkPaint)
+            canvas.restore()
+        }
+
         // --- 2. HEADER TOP BAR (PREMIUM SOLID DESIGN) ---
         val headerBarPaint = Paint().apply {
             color = primaryColor
@@ -258,7 +274,10 @@ object PdfGenerator {
         val titleCenter = leftBorder + ((rightBorder - leftBorder) - titleWidth) / 2f
         canvas.drawText(docTitle, titleCenter, 28f, headerBoldTextPaint)
 
-        canvas.drawText("ORIGINAL COPY", rightBorder - 85f, 28f, headerTextPaint)
+        val rightHeaderLabel = if (invoice.downloadCount >= 3) "DUPLICATE COPY" else "ORIGINAL COPY"
+        val rightHeaderWidth = headerTextPaint.measureText(rightHeaderLabel)
+        val rightHeaderX = (rightBorder - 22f) - rightHeaderWidth
+        canvas.drawText(rightHeaderLabel, rightHeaderX, 28f, headerTextPaint)
 
         // --- 3. COMPANY / SELLER PROFILE BOX (y: 38 to 125) ---
         canvas.drawLine(leftBorder, 125f, rightBorder, 125f, borderPaint)
@@ -399,7 +418,7 @@ object PdfGenerator {
             isAntiAlias = true
         }
 
-        var tableRowY = 280f
+        var tableRowY = 287f
         var totalAmountBeforeDisc = 0.0
 
         for (idx in items.indices) {

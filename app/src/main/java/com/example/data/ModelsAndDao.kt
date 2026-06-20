@@ -69,7 +69,8 @@ data class Invoice(
     val notes: String = "",
     val vehicleNumber: String = "",
     val brokerageBy: String = "",
-    val placeOfSupply: String = ""
+    val placeOfSupply: String = "",
+    val downloadCount: Int = 0
 )
 
 @Entity(tableName = "invoice_line_items")
@@ -244,7 +245,7 @@ interface SavedBusinessProfileDao {
         Invoice::class,
         InvoiceLineItem::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class InvoiceDatabase : RoomDatabase() {
