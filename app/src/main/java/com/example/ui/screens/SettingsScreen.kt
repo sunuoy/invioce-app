@@ -78,6 +78,41 @@ fun SettingsScreen(
     val prefs = remember { context.getSharedPreferences("invoice_generator_prefs", android.content.Context.MODE_PRIVATE) }
     var pdfTheme by remember { mutableStateOf(prefs.getString("pdf_theme", "Classic Navy") ?: "Classic Navy") }
 
+    var customFontPath by remember { mutableStateOf(prefs.getString("custom_font_path", "") ?: "") }
+    var customFontName by remember { mutableStateOf(prefs.getString("custom_font_name", "") ?: "") }
+
+    val selectFontLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    val fontFile = File(context.filesDir, "custom_app_font.ttf")
+                    fontFile.outputStream().use { outputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                    customFontPath = fontFile.absolutePath
+                    
+                    var fileName = "custom_font.ttf"
+                    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                        val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex != -1 && cursor.moveToFirst()) {
+                            fileName = cursor.getString(nameIndex)
+                        }
+                    }
+                    customFontName = fileName
+                    prefs.edit()
+                        .putString("custom_font_path", customFontPath)
+                        .putString("custom_font_name", customFontName)
+                        .apply()
+                    Toast.makeText(context, "Custom font loaded: $fileName", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to load custom font: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     var showGoogleAccountChooser by remember { mutableStateOf(false) }
     var isGmailSyncing by remember { mutableStateOf(false) }
 
@@ -961,6 +996,116 @@ fun SettingsScreen(
                                     )
                                 }
                             )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Step 4: Custom Print Font Style (.ttf / .otf)",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.testTag("custom_font_title")
+                    )
+                    Text(
+                        text = "Upload any TrueType (.ttf) or OpenType (.otf) font to render printed invoice PDFs with your custom typography brand style:",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    var fontSelectionMode by remember { mutableStateOf(if (customFontPath.isNotBlank()) "custom" else "system") }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = fontSelectionMode == "system",
+                            onClick = {
+                                fontSelectionMode = "system"
+                                customFontPath = ""
+                                customFontName = ""
+                                prefs.edit()
+                                    .putString("custom_font_path", "")
+                                    .putString("custom_font_name", "")
+                                    .apply()
+                                Toast.makeText(context, "Switched to standard system font", Toast.LENGTH_SHORT).show()
+                            },
+                            label = { Text("Default System Font", fontSize = 11.sp) },
+                            leadingIcon = if (fontSelectionMode == "system") {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                            } else null,
+                            modifier = Modifier.testTag("system_font_chip")
+                        )
+
+                        FilterChip(
+                            selected = fontSelectionMode == "custom",
+                            onClick = {
+                                if (customFontPath.isNotBlank()) {
+                                    fontSelectionMode = "custom"
+                                } else {
+                                    selectFontLauncher.launch("*/*")
+                                }
+                            },
+                            label = {
+                                Text(
+                                    text = if (customFontName.isNotBlank()) customFontName else "Custom Uploaded Font",
+                                    fontSize = 11.sp
+                                )
+                            },
+                            leadingIcon = if (fontSelectionMode == "custom") {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                            } else null,
+                            modifier = Modifier.testTag("custom_font_chip")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = { selectFontLauncher.launch("*/*") },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f).testTag("select_local_font_button")
+                        ) {
+                            Icon(Icons.Default.UploadFile, contentDescription = "Upload custom font", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Upload Custom Font (.ttf / .otf)", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        if (customFontPath.isNotBlank()) {
+                            IconButton(
+                                onClick = {
+                                    customFontPath = ""
+                                    customFontName = ""
+                                    fontSelectionMode = "system"
+                                    prefs.edit()
+                                        .putString("custom_font_path", "")
+                                        .putString("custom_font_name", "")
+                                        .apply()
+                                    Toast.makeText(context, "Cleared custom font", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.testTag("clear_font_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete custom font",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
                 }

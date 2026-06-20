@@ -21,6 +21,24 @@ import java.util.Locale
 
 object PdfGenerator {
 
+    private var customTypefaceCache: Typeface? = null
+    private var customFontPathCache: String? = null
+
+    private fun getNormalTypeface(): Typeface {
+        val base = customTypefaceCache ?: Typeface.DEFAULT
+        return Typeface.create(base, Typeface.NORMAL)
+    }
+
+    private fun getBoldTypeface(): Typeface {
+        val base = customTypefaceCache ?: Typeface.DEFAULT
+        return Typeface.create(base, Typeface.BOLD)
+    }
+
+    private fun getItalicTypeface(): Typeface {
+        val base = customTypefaceCache ?: Typeface.DEFAULT
+        return Typeface.create(base, Typeface.ITALIC)
+    }
+
     private fun englishNumberToWords(number: Long): String {
         if (number == 0L) return "Zero"
         val units = arrayOf("", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
@@ -113,6 +131,20 @@ object PdfGenerator {
         val prefs = context.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE)
         val selectedTheme = prefs.getString("pdf_theme", "Classic Navy") ?: "Classic Navy"
 
+        val customFontPath = prefs.getString("custom_font_path", null)
+        if (customFontPath != customFontPathCache) {
+            customFontPathCache = customFontPath
+            customTypefaceCache = if (customFontPath != null && File(customFontPath).exists()) {
+                try {
+                    Typeface.createFromFile(customFontPath)
+                } catch (e: Exception) {
+                    null
+                }
+            } else {
+                null
+            }
+        }
+
         val primaryColorHex = when (selectedTheme) {
             "Forest Green" -> "#065F46"
             "Burgundy" -> "#881337"
@@ -169,7 +201,7 @@ object PdfGenerator {
 
         val greenUpiPaint = Paint().apply {
             color = Color.parseColor("#065F46") // Deep forestry green
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = getBoldTypeface()
             textSize = 8.5f
             isAntiAlias = true
         }
@@ -178,42 +210,42 @@ object PdfGenerator {
         val titlePaint = Paint().apply {
             color = primaryColor
             textSize = 14f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = getBoldTypeface()
             isAntiAlias = true
         }
 
         val headerLabelPaint = Paint().apply {
             color = textMutedColor
             textSize = 8f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = getBoldTypeface()
             isAntiAlias = true
         }
 
         val textPaint = Paint().apply {
             color = textDarkColor
             textSize = 8.5f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            typeface = getNormalTypeface()
             isAntiAlias = true
         }
 
         val boldTextPaint = Paint().apply {
             color = textDarkColor
             textSize = 8.5f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = getBoldTypeface()
             isAntiAlias = true
         }
 
         val whiteTextPaint = Paint().apply {
             color = Color.WHITE
             textSize = 8.5f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = getBoldTypeface()
             isAntiAlias = true
         }
 
         val footerSmallPaint = Paint().apply {
             color = textMutedColor
             textSize = 7.5f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
+            typeface = getItalicTypeface()
             isAntiAlias = true
         }
 
@@ -232,7 +264,7 @@ object PdfGenerator {
             val watermarkPaint = Paint().apply {
                 color = Color.parseColor("#10000000") // ~6% opacity black, highly subtle and visible
                 textSize = 60f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                typeface = getBoldTypeface()
                 style = Paint.Style.FILL
                 textAlign = Paint.Align.CENTER
                 isAntiAlias = true
@@ -257,13 +289,13 @@ object PdfGenerator {
         val headerTextPaint = Paint().apply {
             color = Color.WHITE
             textSize = 8.5f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            typeface = getNormalTypeface()
             isAntiAlias = true
         }
         val headerBoldTextPaint = Paint().apply {
             color = Color.WHITE
             textSize = 10f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = getBoldTypeface()
             isAntiAlias = true
         }
         
@@ -320,7 +352,7 @@ object PdfGenerator {
         val subHeadingTextPaint = Paint().apply {
             color = primaryColor
             textSize = 8.5f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = getBoldTypeface()
             isAntiAlias = true
         }
 
@@ -605,7 +637,7 @@ object PdfGenerator {
         return Paint().apply {
             textSize = 7.5f
             isAntiAlias = true
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = getBoldTypeface()
         }
     }
 
@@ -841,7 +873,7 @@ object PdfGenerator {
                 val innerPaint = Paint().apply {
                     color = Color.WHITE
                     textSize = 9f
-                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    typeface = getBoldTypeface()
                     isAntiAlias = true
                     textAlign = Paint.Align.CENTER
                 }
@@ -927,7 +959,7 @@ object PdfGenerator {
                     val initialPaint = Paint().apply {
                         color = primaryColor
                         textSize = 12f
-                        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                        typeface = getBoldTypeface()
                         isAntiAlias = true
                         textAlign = Paint.Align.CENTER
                     }
