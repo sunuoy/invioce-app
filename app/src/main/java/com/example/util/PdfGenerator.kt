@@ -602,6 +602,43 @@ object PdfGenerator {
         val centerSigX = pane3X + ((rightBorder - pane3X) - boldTextPaint.measureText(companySignatureLabel)) / 2f
         canvas.drawText(companySignatureLabel, centerSigX, 642f, boldTextPaint)
 
+        // Draw optional digital signature if configured and enabled
+        val isSigEnabled = prefs.getBoolean("authorized_signature_enabled", false)
+        val sigPath = prefs.getString("authorized_signature_path", null)
+        if (isSigEnabled && !sigPath.isNullOrBlank()) {
+            val sigFile = File(sigPath)
+            if (sigFile.exists()) {
+                try {
+                    val sigBitmap = android.graphics.BitmapFactory.decodeFile(sigPath)
+                    if (sigBitmap != null) {
+                        val sigWidthMax = (rightBorder - pane3X) - 30f // around 160f max width
+                        val sigHeightMax = 70f // around 70f max height to fit perfectly
+                        
+                        val scaleX = sigWidthMax / sigBitmap.width.toFloat()
+                        val scaleY = sigHeightMax / sigBitmap.height.toFloat()
+                        val scale = minOf(scaleX, scaleY, 1.0f)
+                        
+                        val finalW = sigBitmap.width * scale
+                        val finalH = sigBitmap.height * scale
+                        
+                        val drawX = pane3X + ((rightBorder - pane3X) - finalW) / 2f
+                        val drawY = 780f - finalH
+                        
+                        val destRect = android.graphics.RectF(drawX, drawY, drawX + finalW, drawY + finalH)
+                        
+                        val sigPaint = android.graphics.Paint().apply {
+                            isAntiAlias = true
+                            isFilterBitmap = true
+                        }
+                        
+                        canvas.drawBitmap(sigBitmap, null, destRect, sigPaint)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
         // Signature baseline
         val signatureLineStartX = pane3X + 25f
         val signatureLineEndX = rightBorder - 25f
@@ -612,10 +649,7 @@ object PdfGenerator {
         val centerSigLabelX = pane3X + ((rightBorder - pane3X) - boldTextPaint.measureText(sigText)) / 2f
         canvas.drawText(sigText, centerSigLabelX, 800f, boldTextPaint)
 
-        // --- 8. CENTRED BRAND CREATION FOOTER ---
-        val platformHeader = "Invoice Created by www.mazu.in"
-        val createCenterPlatformLabelX = leftBorder + ((rightBorder - leftBorder) - platformHeaderWidthPaint().measureText(platformHeader)) / 2f
-        canvas.drawText(platformHeader, createCenterPlatformLabelX, bottomBorder - 6f, platformHeaderWidthPaint().apply { color = secondaryColor })
+        // --- 8. CENTRED BRAND CREATION FOOTER REMOVED ---
 
         pdfDocument.finishPage(page)
 
@@ -631,14 +665,6 @@ object PdfGenerator {
         pdfDocument.close()
 
         return outputFile
-    }
-
-    private fun platformHeaderWidthPaint(): Paint {
-        return Paint().apply {
-            textSize = 7.5f
-            isAntiAlias = true
-            typeface = getBoldTypeface()
-        }
     }
 
     fun shareInvoicePdf(context: Context, pdfFile: File) {

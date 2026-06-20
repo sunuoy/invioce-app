@@ -13,6 +13,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -113,6 +117,20 @@ fun SettingsScreen(
         }
     }
 
+    var signaturePath by remember { mutableStateOf(prefs.getString("authorized_signature_path", "") ?: "") }
+    var isSignatureEnabled by remember { mutableStateOf(prefs.getBoolean("authorized_signature_enabled", false)) }
+    var showSignatureDrawingDialog by remember { mutableStateOf(false) }
+
+    var pendingSignatureUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    val selectSignatureImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            pendingSignatureUri = uri
+        }
+    }
+
     var showGoogleAccountChooser by remember { mutableStateOf(false) }
     var isGmailSyncing by remember { mutableStateOf(false) }
 
@@ -139,6 +157,37 @@ fun SettingsScreen(
                     Toast.makeText(context, "Cropped brand logo successfully saved!", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
                     Toast.makeText(context, "Failed to save cropped logo: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        )
+    }
+
+    if (pendingSignatureUri != null) {
+        LogoCropperDialog(
+            uri = pendingSignatureUri!!,
+            onDismiss = { pendingSignatureUri = null },
+            onCropped = { croppedBitmap ->
+                pendingSignatureUri = null
+                try {
+                    val timestamp = System.currentTimeMillis()
+                    val signatureFile = File(context.filesDir, "custom_authorized_signature_${timestamp}.png")
+                    context.filesDir.listFiles()?.forEach { file ->
+                        if (file.name.startsWith("custom_authorized_signature") && file.name.endsWith(".png")) {
+                            file.delete()
+                        }
+                    }
+                    signatureFile.outputStream().use { out ->
+                        croppedBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                    }
+                    signaturePath = signatureFile.absolutePath
+                    prefs.edit()
+                        .putString("authorized_signature_path", signaturePath)
+                        .putBoolean("authorized_signature_enabled", true)
+                        .apply()
+                    isSignatureEnabled = true
+                    Toast.makeText(context, "Authorized signature image successfully saved!", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Failed to save signature: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         )
@@ -1108,6 +1157,163 @@ fun SettingsScreen(
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Step 5: Authorized Signatory (Optional)",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.testTag("custom_signature_title")
+                    )
+                    Text(
+                        text = "Enable and upload/draw an optional signature image to overlay above the \"Authorized Signatory\" marker in generated PDFs:",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Checkbox(
+                            checked = isSignatureEnabled,
+                            onCheckedChange = { checked ->
+                                isSignatureEnabled = checked
+                                prefs.edit().putBoolean("authorized_signature_enabled", checked).apply()
+                                Toast.makeText(context, if (checked) "Signature enabled on PDFs" else "Signature disabled", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.testTag("signature_enable_checkbox")
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Render signature on generated PDFs",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Enables printed digital overlay above the marker line",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { selectSignatureImageLauncher.launch("image/*") },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f).testTag("upload_signature_button")
+                        ) {
+                            Icon(Icons.Default.UploadFile, contentDescription = "Upload signature", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Upload (.png / .jpg)", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        Button(
+                            onClick = { showSignatureDrawingDialog = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f).testTag("draw_signature_button")
+                        ) {
+                            Icon(Icons.Default.Create, contentDescription = "Draw digital signature", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Draw on Screen", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    if (signaturePath.isNotBlank() && File(signaturePath).exists()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier.fillMaxWidth().testTag("signature_preview_card")
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "Active Signature Preview:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.align(Alignment.Start)
+                                )
+                                
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(80.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color.White)
+                                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                                ) {
+                                    val bitmap = remember(signaturePath) {
+                                        android.graphics.BitmapFactory.decodeFile(signaturePath)
+                                    }
+                                    if (bitmap != null) {
+                                        androidx.compose.foundation.Image(
+                                            bitmap = bitmap.asImageBitmap(),
+                                            contentDescription = "Active Signature preview overlay",
+                                            modifier = Modifier.fillMaxSize().padding(4.dp),
+                                            contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    TextButton(
+                                        onClick = {
+                                            if (File(signaturePath).exists()) {
+                                                File(signaturePath).delete()
+                                            }
+                                            signaturePath = ""
+                                            isSignatureEnabled = false
+                                            prefs.edit()
+                                                .putString("authorized_signature_path", "")
+                                                .putBoolean("authorized_signature_enabled", false)
+                                                .apply()
+                                            Toast.makeText(context, "Signature cleared successfully", Toast.LENGTH_SHORT).show()
+                                        },
+                                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                        modifier = Modifier.testTag("clear_signature_button_preview")
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Delete & Disable", fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1440,6 +1646,36 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Save Configuration Profile", fontSize = 15.sp)
             }
+
+            if (showSignatureDrawingDialog) {
+                SignatureDrawingDialog(
+                    onDismiss = { showSignatureDrawingDialog = false },
+                    onSave = { drawnBitmap ->
+                        try {
+                            val timestamp = System.currentTimeMillis()
+                            val signatureFile = File(context.filesDir, "custom_authorized_signature_${timestamp}.png")
+                            context.filesDir.listFiles()?.forEach { file ->
+                                if (file.name.startsWith("custom_authorized_signature") && file.name.endsWith(".png")) {
+                                    file.delete()
+                                }
+                            }
+                            signatureFile.outputStream().use { out ->
+                                drawnBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                            }
+                            signaturePath = signatureFile.absolutePath
+                            prefs.edit()
+                                .putString("authorized_signature_path", signaturePath)
+                                .putBoolean("authorized_signature_enabled", true)
+                                .apply()
+                            isSignatureEnabled = true
+                            showSignatureDrawingDialog = false
+                            Toast.makeText(context, "Digital signature drawn & saved successfully!", Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Failed to save signature: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -1673,4 +1909,156 @@ fun generateCroppedBitmap(
     
     canvas.drawBitmap(original, matrix, paint)
     return croppedBitmap
+}
+
+@Composable
+fun SignatureDrawingDialog(
+    onDismiss: () -> Unit,
+    onSave: (android.graphics.Bitmap) -> Unit
+) {
+    val strokes = remember { mutableStateListOf<List<Offset>>() }
+    var currentStroke = remember { mutableStateListOf<Offset>() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Draw Authorized Signature", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Sign inside the box below. Use your finger or stylus:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White)
+                        .border(1.dp, MaterialTheme.colorScheme.outline)
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { offset ->
+                                    currentStroke.clear()
+                                    currentStroke.add(offset)
+                                },
+                                onDrag = { change, _ ->
+                                    change.consume()
+                                    currentStroke.add(change.position)
+                                    // To update UI on drag, we force a rebuild
+                                    val temp = currentStroke.toList()
+                                    currentStroke.clear()
+                                    currentStroke.addAll(temp)
+                                },
+                                onDragEnd = {
+                                    if (currentStroke.isNotEmpty()) {
+                                        strokes.add(currentStroke.toList())
+                                        currentStroke.clear()
+                                    }
+                                }
+                            )
+                        }
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        // Draw previous strokes
+                        strokes.forEach { stroke ->
+                            if (stroke.size > 1) {
+                                for (i in 0 until stroke.size - 1) {
+                                    drawLine(
+                                        color = Color.Black,
+                                        start = stroke[i],
+                                        end = stroke[i + 1],
+                                        strokeWidth = 5f,
+                                        cap = StrokeCap.Round
+                                    )
+                                }
+                            }
+                        }
+                        // Draw current stroke
+                        if (currentStroke.size > 1) {
+                            for (i in 0 until currentStroke.size - 1) {
+                                drawLine(
+                                    color = Color.Black,
+                                    start = currentStroke[i],
+                                    end = currentStroke[i + 1],
+                                    strokeWidth = 5f,
+                                    cap = StrokeCap.Round
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (strokes.isEmpty()) {
+                        onDismiss()
+                        return@Button
+                    }
+                    
+                    val width = 450
+                    val height = 220
+                    val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+                    val canvas = android.graphics.Canvas(bitmap)
+                    canvas.drawColor(android.graphics.Color.TRANSPARENT)
+                    
+                    val paint = android.graphics.Paint().apply {
+                        color = android.graphics.Color.BLACK
+                        strokeWidth = 7f
+                        style = android.graphics.Paint.Style.STROKE
+                        strokeCap = android.graphics.Paint.Cap.ROUND
+                        strokeJoin = android.graphics.Paint.Join.ROUND
+                        isAntiAlias = true
+                    }
+                    
+                    val allPoints = strokes.flatMap { it }
+                    val minX = allPoints.minOfOrNull { it.x } ?: 0f
+                    val maxX = allPoints.maxOfOrNull { it.x } ?: 100f
+                    val minY = allPoints.minOfOrNull { it.y } ?: 0f
+                    val maxY = allPoints.maxOfOrNull { it.y } ?: 100f
+                    
+                    val contentWidth = maxX - minX
+                    val contentHeight = maxY - minY
+                    
+                    val padding = 22f
+                    
+                    strokes.forEach { stroke ->
+                        val strokePath = android.graphics.Path()
+                        if (stroke.isNotEmpty()) {
+                            val scaleX = if (contentWidth > 0f) (width - 2 * padding) / contentWidth else 1f
+                            val scaleY = if (contentHeight > 0f) (height - 2 * padding) / contentHeight else 1f
+                            val scale = minOf(scaleX, scaleY)
+                            
+                            val offsetX = padding + (width - 2 * padding - contentWidth * scale) / 2f - minX * scale
+                            val offsetY = padding + (height - 2 * padding - contentHeight * scale) / 2f - minY * scale
+                            
+                            strokePath.moveTo(stroke[0].x * scale + offsetX, stroke[0].y * scale + offsetY)
+                            for (i in 1 until stroke.size) {
+                                strokePath.lineTo(stroke[i].x * scale + offsetX, stroke[i].y * scale + offsetY)
+                            }
+                            canvas.drawPath(strokePath, paint)
+                        }
+                    }
+                    
+                    onSave(bitmap)
+                },
+                modifier = Modifier.testTag("save_dialog_sig_btn")
+            ) {
+                Text("Save Signature")
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { strokes.clear() }, modifier = Modifier.testTag("clear_dialog_sig_btn")) {
+                    Text("Reset")
+                }
+                TextButton(onClick = onDismiss, modifier = Modifier.testTag("close_dialog_sig_btn")) {
+                    Text("Cancel")
+                }
+            }
+        }
+    )
 }
