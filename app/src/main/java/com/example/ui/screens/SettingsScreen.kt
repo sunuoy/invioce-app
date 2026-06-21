@@ -150,8 +150,6 @@ fun SettingsScreen(
     var showGoogleAccountChooser by remember { mutableStateOf(false) }
     var isGmailSyncing by remember { mutableStateOf(false) }
 
-    var showRestoreConfirmation by remember { mutableStateOf<String?>(null) }
-
     if (pendingLogoUri != null) {
         LogoCropperDialog(
             uri = pendingLogoUri!!,
@@ -207,57 +205,6 @@ fun SettingsScreen(
                 }
             }
         )
-    }
-
-    val importLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val jsonString = inputStream?.bufferedReader()?.use { it.readText() }
-                if (!jsonString.isNullOrBlank()) {
-                    showRestoreConfirmation = jsonString
-                } else {
-                    Toast.makeText(context, "Selected backup file was empty", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    val exportBackupData = {
-        try {
-            val jsonString = BackupRestoreHelper.exportToJson(
-                profile = businessProfile,
-                products = products,
-                customers = customers,
-                invoices = invoices
-            )
-            val backupDir = File(context.cacheDir, "backups")
-            if (!backupDir.exists()) backupDir.mkdirs()
-            val file = File(backupDir, "invoice_easy_backup.json")
-            file.writeText(jsonString)
-
-            val fileUri = FileProvider.getUriForFile(
-                context,
-                "com.aistudio.invoicegenerator.gqtwv.fileprovider",
-                file
-            )
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/json"
-                putExtra(Intent.EXTRA_STREAM, fileUri)
-                putExtra(Intent.EXTRA_SUBJECT, "Invoice Easy Database Backup")
-                putExtra(Intent.EXTRA_TEXT, "Here is your Invoice Easy data backup file (JSON).")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            val chooser = Intent.createChooser(shareIntent, "Share / Save Backup")
-            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(chooser)
-        } catch (e: Exception) {
-            Toast.makeText(context, "Backup failed: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
     }
 
     // Prefill fields when profile in DB is loaded
@@ -1037,7 +984,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Step 3: PDF Print Accent Design Theme",
+                        text = "Step 2: PDF Print Accent Design Theme",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -1084,7 +1031,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Step 5: Authorized Signatory (Optional)",
+                        text = "Step 3: Authorized Signatory (Optional)",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -1256,177 +1203,6 @@ fun SettingsScreen(
                     text = "* Fields with star indicators are mandatory for invoice generation.",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.outline
-                )
-            }
-
-            // Demo & Dummy Data Seeding Card
-            Card(
-                modifier = Modifier.fillMaxWidth().testTag("demo_seeding_card"),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = "Load Sample Data Icon",
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Text(
-                            text = "Instant Demo Data Seeding",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.tertiary
-                        )
-                    }
-
-                    Text(
-                        text = "Seed the database with sample business profiles, ready-to-bill products/services, clients, and mock invoices. This gives you beautiful charts, metrics, and instant test templates on the streaming simulator!",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Button(
-                        onClick = {
-                            viewModel.populateDummyData()
-                            Toast.makeText(context, "Sample dataset seeded! Go back to Home / Products to explore.", Toast.LENGTH_LONG).show()
-                        },
-                        modifier = Modifier.fillMaxWidth().testTag("seed_sample_dataset_button"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.tertiary,
-                            contentColor = MaterialTheme.colorScheme.onTertiary
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Repopulate", modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Seed & Populate Demo Data", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            // Data Backup & Recovery Section
-            Card(
-                modifier = Modifier.fillMaxWidth().testTag("backup_recovery_card"),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Backup,
-                            contentDescription = "Restore backup data",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Text(
-                            text = "Database Backup & Recovery",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    Text(
-                        text = "Take periodic backups of your entire local database (business accounts, customer profiles, product items, and past invoices) into a portable JSON file, or restore a previous file back into this device.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Button(
-                            onClick = { exportBackupData() },
-                            modifier = Modifier.weight(1f).testTag("export_backup_button"),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(vertical = 10.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CloudDownload,
-                                contentDescription = "Export backup icon",
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Export Backup", fontSize = 12.sp)
-                        }
-
-                        Button(
-                            onClick = { importLauncher.launch("application/json") },
-                            modifier = Modifier.weight(1f).testTag("import_backup_button"),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(vertical = 10.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CloudUpload,
-                                contentDescription = "Import backup icon",
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Import Backup", fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-
-            // Destructive Overwrite Dialog Warning
-            if (showRestoreConfirmation != null) {
-                AlertDialog(
-                    onDismissRequest = { showRestoreConfirmation = null },
-                    title = { Text("Confirm Backup Overwrite") },
-                    text = {
-                        Text(
-                            "WARNING: Restoring this backup file will completely wipe out your existing business profile, stock items, customer registries, and invoices! This action cannot be undone. Are you sure you want to overwrite all local database files?",
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                val json = showRestoreConfirmation!!
-                                showRestoreConfirmation = null
-                                viewModel.restoreDatabaseBackup(
-                                    jsonString = json,
-                                    onSuccess = {
-                                        Toast.makeText(context, "Backup Restored Successfully!", Toast.LENGTH_SHORT).show()
-                                    },
-                                    onError = { error ->
-                                        Toast.makeText(context, "Error RESTORING: $error", Toast.LENGTH_LONG).show()
-                                    }
-                                )
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                        ) {
-                            Text("Wipe & Restore Now")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showRestoreConfirmation = null }) {
-                            Text("Cancel")
-                        }
-                    }
                 )
             }
 
