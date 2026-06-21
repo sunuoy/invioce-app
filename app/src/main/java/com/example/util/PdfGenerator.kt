@@ -21,22 +21,16 @@ import java.util.Locale
 
 object PdfGenerator {
 
-    private var customTypefaceCache: Typeface? = null
-    private var customFontPathCache: String? = null
-
     private fun getNormalTypeface(): Typeface {
-        val base = customTypefaceCache ?: Typeface.DEFAULT
-        return Typeface.create(base, Typeface.NORMAL)
+        return Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
     }
 
     private fun getBoldTypeface(): Typeface {
-        val base = customTypefaceCache ?: Typeface.DEFAULT
-        return Typeface.create(base, Typeface.BOLD)
+        return Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
 
     private fun getItalicTypeface(): Typeface {
-        val base = customTypefaceCache ?: Typeface.DEFAULT
-        return Typeface.create(base, Typeface.ITALIC)
+        return Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
     }
 
     private fun englishNumberToWords(number: Long): String {
@@ -130,20 +124,6 @@ object PdfGenerator {
         // --- ENHANCED COLOR PALETTE ---
         val prefs = context.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE)
         val selectedTheme = prefs.getString("pdf_theme", "Classic Navy") ?: "Classic Navy"
-
-        val customFontPath = prefs.getString("custom_font_path", null)
-        if (customFontPath != customFontPathCache) {
-            customFontPathCache = customFontPath
-            customTypefaceCache = if (customFontPath != null && File(customFontPath).exists()) {
-                try {
-                    Typeface.createFromFile(customFontPath)
-                } catch (e: Exception) {
-                    null
-                }
-            } else {
-                null
-            }
-        }
 
         val primaryColorHex = when (selectedTheme) {
             "Forest Green" -> "#065F46"
@@ -535,7 +515,13 @@ object PdfGenerator {
         canvas.drawRect(leftBorder + 0.5f, 606.5f, rightBorder - 0.5f, 624f, footerBgPaint)
         canvas.drawLine(leftBorder, 624f, rightBorder, 624f, borderPaint)
         
-        val settledText = "Settled completely by electronic transfer (Bank / UPI / Card) | Outstanding Balance: 0.00"
+        val isPaidOrClosed = invoice.status.equals("Paid", ignoreCase = true) || invoice.status.equals("Closed", ignoreCase = true)
+        val outstandingVal = if (isPaidOrClosed) 0.0 else invoice.grandTotal
+        val settledText = if (isPaidOrClosed) {
+            "Settled completely by electronic transfer (Bank / UPI / Card) | Outstanding Balance: 0.00"
+        } else {
+            "Payment Pending for status: ${invoice.status} | Outstanding Balance: ${String.format(Locale.US, "%,.2f", outstandingVal)}"
+        }
         canvas.drawText(settledText, leftBorder + 10f, 618f, boldTextPaint.apply { color = textMutedColor })
         boldTextPaint.color = textDarkColor // reset
 
@@ -587,15 +573,30 @@ object PdfGenerator {
         }
 
         // Bank Details from Profile
-        val bankNumberHeader = if (profile?.upiId.isNullOrBlank()) "123456789" else profile?.upiId
-        canvas.drawText("Account/UPI ID: $bankNumberHeader", pane2X + 8f, 705f, boldTextPaint.apply { textSize = 7.5f })
-        boldTextPaint.textSize = 8.5f // reset
+        val displayAccountName = if (!profile?.bankAccountName.isNullOrBlank()) profile!!.bankAccountName else bName
+        val displayBank = if (!profile?.bankName.isNullOrBlank()) profile!!.bankName else "ICICI Bank"
+        val displayAccountNo = if (!profile?.bankAccountNo.isNullOrBlank()) profile!!.bankAccountNo else if (!profile?.upiId.isNullOrBlank()) profile!!.upiId else "123456789"
+        val displayBranch = if (!profile?.bankBranch.isNullOrBlank()) profile!!.bankBranch else "Noida"
+        val displayIfsc = if (!profile?.bankIfsc.isNullOrBlank()) profile!!.bankIfsc else "ICICI1234"
 
-        canvas.drawText("Bank: ICICI Bank", pane2X + 8f, 722f, textPaint.apply { textSize = 7.5f })
-        canvas.drawText("IFSC: ICICI1234", pane2X + 8f, 737f, textPaint)
-        canvas.drawText("Branch: Noida", pane2X + 8f, 752f, textPaint)
-        canvas.drawText("Name: $bName", pane2X + 8f, 767f, textPaint)
+        textPaint.textSize = 7.5f
+        boldTextPaint.textSize = 7.5f
+
+        // Draw with Key bold and Value normal for ultra high quality output styling
+        fun drawKeyValue(label: String, value: String, x: Float, y: Float) {
+            canvas.drawText(label, x, y, boldTextPaint)
+            val labelWidth = boldTextPaint.measureText(label)
+            canvas.drawText(value, x + labelWidth, y, textPaint)
+        }
+
+        drawKeyValue("Name: ", displayAccountName, pane2X + 8f, 705f)
+        drawKeyValue("Bank: ", displayBank, pane2X + 8f, 722f)
+        drawKeyValue("A/c No: ", displayAccountNo, pane2X + 8f, 737f)
+        drawKeyValue("Branch Name: ", displayBranch, pane2X + 8f, 752f)
+        drawKeyValue("IFSC Code: ", displayIfsc, pane2X + 8f, 767f)
+
         textPaint.textSize = 8.5f // reset
+        boldTextPaint.textSize = 8.5f // reset
 
         // 7C: PANEL THREE - SIGNATURES & CLOSE (Right Column)
         val companySignatureLabel = "For $bName"
@@ -867,139 +868,24 @@ object PdfGenerator {
             }
         }
 
-        val logoColorPaint = Paint().apply {
-            color = primaryColor
+        val bName = if (profile != null && profile.businessName.isNotBlank()) profile.businessName else "My Business"
+        val initials = bName.trim().split("\\s+".toRegex()).take(2).map { it.take(1) }.joinToString("").uppercase(java.util.Locale.US)
+        val displayInitials = if (initials.isNotBlank()) initials else bName.take(2).uppercase(java.util.Locale.US)
+        val iconBgPaint = Paint().apply {
+            color = Color.parseColor("#EFF6FF")
             style = Paint.Style.FILL
             isAntiAlias = true
         }
-
-        when (logoUrl) {
-            "preset_tech" -> {
-                val p = android.graphics.Path()
-                p.moveTo(centerX + 2f, logoTop + 6f)
-                p.lineTo(centerX - 9f, centerY + 2f)
-                p.lineTo(centerX + 1f, centerY + 2f)
-                p.lineTo(centerX - 2f, logoBottom - 6f)
-                p.lineTo(centerX + 9f, centerY - 2f)
-                p.lineTo(centerX - 1f, centerY - 2f)
-                p.close()
-                canvas.drawPath(p, logoColorPaint)
-            }
-            "preset_crest" -> {
-                val p = android.graphics.Path()
-                p.moveTo(centerX, logoTop + 6f)
-                p.lineTo(logoRight - 8f, logoTop + 10f)
-                p.lineTo(logoRight - 8f, centerY + 4f)
-                p.quadTo(logoRight - 8f, logoBottom - 8f, centerX, logoBottom - 5f)
-                p.quadTo(logoLeft + 8f, logoBottom - 8f, logoLeft + 8f, centerY + 4f)
-                p.lineTo(logoLeft + 8f, logoTop + 10f)
-                p.close()
-                canvas.drawPath(p, logoColorPaint)
-                
-                val innerPaint = Paint().apply {
-                    color = Color.WHITE
-                    textSize = 9f
-                    typeface = getBoldTypeface()
-                    isAntiAlias = true
-                    textAlign = Paint.Align.CENTER
-                }
-                canvas.drawText("★", centerX, centerY + 3f, innerPaint)
-            }
-            "preset_leaf" -> {
-                val p = android.graphics.Path()
-                p.moveTo(centerX - 6f, logoBottom - 6f)
-                p.quadTo(centerX - 10f, centerY - 6f, centerX, logoTop + 6f)
-                p.quadTo(centerX + 10f, centerY + 2f, centerX - 6f, logoBottom - 6f)
-                p.close()
-                canvas.drawPath(p, logoColorPaint)
-
-                val stemPaint = Paint().apply {
-                    color = Color.WHITE
-                    strokeWidth = 1.2f
-                    style = Paint.Style.STROKE
-                    isAntiAlias = true
-                }
-                canvas.drawLine(centerX - 5f, logoBottom - 9f, centerX - 1f, centerY, stemPaint)
-            }
-            "preset_star" -> {
-                val p = android.graphics.Path()
-                p.moveTo(centerX, logoTop + 5f)
-                p.quadTo(centerX, centerY, logoRight - 5f, centerY)
-                p.quadTo(centerX, centerY, centerX, logoBottom - 5f)
-                p.quadTo(centerX, centerY, logoLeft + 5f, centerY)
-                p.quadTo(centerX, centerY, centerX, logoTop + 5f)
-                p.close()
-                canvas.drawPath(p, logoColorPaint)
-            }
-            "preset_gear" -> {
-                canvas.drawCircle(centerX, centerY, 6f, logoColorPaint)
-                val gearOutlinePaint = Paint().apply {
-                    color = primaryColor
-                    strokeWidth = 2.5f
-                    style = Paint.Style.STROKE
-                    isAntiAlias = true
-                }
-                canvas.drawCircle(centerX, centerY, 9f, gearOutlinePaint)
-                val spokePaint = Paint().apply {
-                    color = primaryColor
-                    strokeWidth = 2f
-                    isAntiAlias = true
-                }
-                for (i in 0 until 360 step 60) {
-                    val angle = Math.toRadians(i.toDouble())
-                    val x1 = (centerX + Math.cos(angle) * 6f).toFloat()
-                    val y1 = (centerY + Math.sin(angle) * 6f).toFloat()
-                    val x2 = (centerX + Math.cos(angle) * 12f).toFloat()
-                    val y2 = (centerY + Math.sin(angle) * 12f).toFloat()
-                    canvas.drawLine(x1, y1, x2, y2, spokePaint)
-                }
-            }
-            "preset_cart" -> {
-                canvas.drawCircle(centerX - 3f, logoBottom - 8f, 1.8f, logoColorPaint)
-                canvas.drawCircle(centerX + 3f, logoBottom - 8f, 1.8f, logoColorPaint)
-                val linePaint = Paint().apply {
-                    color = primaryColor
-                    strokeWidth = 1.8f
-                    style = Paint.Style.STROKE
-                    isAntiAlias = true
-                }
-                val p = android.graphics.Path()
-                p.moveTo(logoLeft + 6f, logoTop + 8f)
-                p.lineTo(logoLeft + 11f, logoTop + 8f)
-                p.lineTo(centerX - 5f, centerY + 3f)
-                p.lineTo(centerX + 7f, centerY + 3f)
-                p.lineTo(logoRight - 6f, logoTop + 12f)
-                p.lineTo(logoLeft + 11f, logoTop + 12f)
-                canvas.drawPath(p, linePaint)
-            }
-            else -> {
-                val bIcon = if (profile == null || profile.shortIcon.isBlank()) "💼" else profile.shortIcon
-                val iconBgPaint = Paint().apply {
-                    color = Color.parseColor("#EFF6FF")
-                    style = Paint.Style.FILL
-                    isAntiAlias = true
-                }
-                canvas.drawRoundRect(logoLeft + 2f, logoTop + 2f, logoRight - 2f, logoBottom - 2f, 4f, 4f, iconBgPaint)
-                
-                if (bIcon.length <= 2) {
-                    val initialPaint = Paint().apply {
-                        color = primaryColor
-                        textSize = 12f
-                        typeface = getBoldTypeface()
-                        isAntiAlias = true
-                        textAlign = Paint.Align.CENTER
-                    }
-                    canvas.drawText(bIcon.uppercase(java.util.Locale.US), centerX, centerY + 4f, initialPaint)
-                } else {
-                    val emojiIconPaint = Paint().apply {
-                        textSize = 14f
-                        isAntiAlias = true
-                        textAlign = Paint.Align.CENTER
-                    }
-                    canvas.drawText(bIcon, centerX, centerY + 5.5f, emojiIconPaint)
-                }
-            }
+        canvas.drawRoundRect(logoLeft + 2f, logoTop + 2f, logoRight - 2f, logoBottom - 2f, 4f, 4f, iconBgPaint)
+        
+        val initialPaint = Paint().apply {
+            color = primaryColor
+            textSize = 12f
+            typeface = getBoldTypeface()
+            isAntiAlias = true
+            textAlign = Paint.Align.CENTER
         }
+        canvas.drawText(displayInitials, centerX, centerY + 4f, initialPaint)
         
         val borderOutlinePaint = Paint().apply {
             color = Color.parseColor("#E2E8F0")

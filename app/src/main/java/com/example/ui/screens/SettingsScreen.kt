@@ -50,7 +50,8 @@ import com.example.data.SavedBusinessProfile
 @Composable
 fun SettingsScreen(
     viewModel: InvoiceViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onMenuClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val businessProfile by viewModel.businessProfile.collectAsStateWithLifecycle()
@@ -68,6 +69,21 @@ fun SettingsScreen(
     var gmailId by remember { mutableStateOf("") }
     var shortIcon by remember { mutableStateOf("💼") }
     var logoUrl by remember { mutableStateOf("") }
+    
+    // Bank Details State
+    var bankAccountName by remember { mutableStateOf("") }
+    var bankName by remember { mutableStateOf("") }
+    var bankAccountNo by remember { mutableStateOf("") }
+    var bankBranch by remember { mutableStateOf("") }
+    var bankIfsc by remember { mutableStateOf("") }
+
+    val isBankNameError = remember(bankName) {
+        bankName.isNotEmpty() && !bankName.all { it.isLetter() || it.isWhitespace() }
+    }
+
+    val isBankAccountNoError = remember(bankAccountNo) {
+        bankAccountNo.isNotEmpty() && (!bankAccountNo.all { it.isDigit() } || bankAccountNo.length < 10 || bankAccountNo.length > 14)
+    }
 
     var pendingLogoUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
@@ -256,13 +272,25 @@ fun SettingsScreen(
             gmailId = it.gmailId
             shortIcon = if (it.shortIcon.isBlank()) "💼" else it.shortIcon
             logoUrl = it.logoUrl
+            bankAccountName = it.bankAccountName
+            bankName = it.bankName
+            bankAccountNo = it.bankAccountNo
+            bankBranch = it.bankBranch
+            bankIfsc = it.bankIfsc
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Business Configuration", fontWeight = FontWeight.Bold) },
+                title = { Text("Business Profile", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    if (onMenuClick != null) {
+                        IconButton(onClick = onMenuClick, modifier = Modifier.testTag("profile_menu_btn")) {
+                            Icon(Icons.Default.Menu, contentDescription = "Open navigation menu")
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 ),
@@ -271,8 +299,27 @@ fun SettingsScreen(
                         onClick = {
                             if (name.isBlank()) {
                                 Toast.makeText(context, "Business Name cannot be empty", Toast.LENGTH_SHORT).show()
+                            } else if (isBankNameError) {
+                                Toast.makeText(context, "Bank Name must contain text only", Toast.LENGTH_SHORT).show()
+                            } else if (isBankAccountNoError) {
+                                Toast.makeText(context, "Bank Account number must be 10 to 14 digits only", Toast.LENGTH_SHORT).show()
                             } else {
-                                viewModel.saveBusinessProfile(name, address, phone, email, gstin, upiId, gmailId, shortIcon, logoUrl)
+                                viewModel.saveBusinessProfile(
+                                    name = name,
+                                    address = address,
+                                    phone = phone,
+                                    email = email,
+                                    gstin = gstin,
+                                    upiId = upiId,
+                                    gmailId = gmailId,
+                                    shortIcon = shortIcon,
+                                    logoUrl = logoUrl,
+                                    bankAccountName = bankAccountName,
+                                    bankName = bankName,
+                                    bankAccountNo = bankAccountNo,
+                                    bankBranch = bankBranch,
+                                    bankIfsc = bankIfsc
+                                )
                                 prefs.edit().putString("pdf_theme", pdfTheme).apply()
                                 Toast.makeText(context, "Business Metadata Saved Successfully!", Toast.LENGTH_SHORT).show()
                             }
@@ -373,6 +420,10 @@ fun SettingsScreen(
                             onClick = {
                                 if (name.isBlank()) {
                                     Toast.makeText(context, "Enter a Business name first to save template", Toast.LENGTH_SHORT).show()
+                                } else if (isBankNameError) {
+                                    Toast.makeText(context, "Bank Name must contain text only", Toast.LENGTH_SHORT).show()
+                                } else if (isBankAccountNoError) {
+                                    Toast.makeText(context, "Bank Account number must be 10 to 14 digits only", Toast.LENGTH_SHORT).show()
                                 } else {
                                     val newTemplate = SavedBusinessProfile(
                                         businessName = name.trim(),
@@ -382,7 +433,12 @@ fun SettingsScreen(
                                         gstin = gstin.trim(),
                                         upiId = upiId.trim(),
                                         gmailId = gmailId.trim(),
-                                        shortIcon = shortIcon.trim()
+                                        shortIcon = shortIcon.trim(),
+                                        bankAccountName = bankAccountName.trim(),
+                                        bankName = bankName.trim(),
+                                        bankAccountNo = bankAccountNo.trim(),
+                                        bankBranch = bankBranch.trim(),
+                                        bankIfsc = bankIfsc.trim()
                                     )
                                     viewModel.saveSavedBusinessProfile(newTemplate)
                                 }
@@ -438,6 +494,11 @@ fun SettingsScreen(
                                             upiId = profile.upiId
                                             gmailId = profile.gmailId
                                             shortIcon = if (profile.shortIcon.isBlank()) "💼" else profile.shortIcon
+                                            bankAccountName = profile.bankAccountName
+                                            bankName = profile.bankName
+                                            bankAccountNo = profile.bankAccountNo
+                                            bankBranch = profile.bankBranch
+                                            bankIfsc = profile.bankIfsc
                                             Toast.makeText(context, "Loaded: ${profile.businessName}", Toast.LENGTH_SHORT).show()
                                         },
                                     colors = CardDefaults.cardColors(
@@ -460,7 +521,12 @@ fun SettingsScreen(
                                                 modifier = Modifier.size(28.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                                    Text(profile.shortIcon, fontSize = 14.sp)
+                                                    Icon(
+                                                        imageVector = Icons.Default.Business,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
                                                 }
                                             }
 
@@ -547,7 +613,7 @@ fun SettingsScreen(
                     var headerSelectorExpanded by remember { mutableStateOf(false) }
                     Box(modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
-                            value = if (name.isNotBlank()) "$shortIcon $name" else "",
+                            value = if (name.isNotBlank()) name else "",
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Quick-Load Saved Header Profile") },
@@ -583,7 +649,7 @@ fun SettingsScreen(
                             } else {
                                 savedProfiles.forEach { p ->
                                     DropdownMenuItem(
-                                        leadingIcon = { Text(p.shortIcon, fontSize = 16.sp) },
+                                        leadingIcon = { Icon(Icons.Default.Business, contentDescription = null, modifier = Modifier.size(16.dp)) },
                                         text = { Text("${p.businessName} (Ph: ${p.phone})") },
                                         onClick = {
                                             name = p.businessName
@@ -775,6 +841,107 @@ fun SettingsScreen(
                 }
             }
 
+            // Bank Settlement Details Card
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("business_bank_details_card"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Bank Settlement Details",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    OutlinedTextField(
+                        value = bankAccountName,
+                        onValueChange = { bankAccountName = it },
+                        label = { Text("Account Holder Name") },
+                        placeholder = { Text("e.g. Apex Tech Solutions") },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = "Bank Beneficiary Name") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("setting_bank_acc_name_input"),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = bankName,
+                        onValueChange = { input ->
+                            if (input.all { it.isLetter() || it.isWhitespace() }) {
+                                bankName = input
+                            }
+                        },
+                        label = { Text("Bank Name") },
+                        placeholder = { Text("e.g. ICICI Bank") },
+                        leadingIcon = { Icon(Icons.Default.AccountBalance, contentDescription = "Bank Name") },
+                        isError = isBankNameError,
+                        supportingText = {
+                            if (isBankNameError) {
+                                Text("Bank Name must be text only", color = MaterialTheme.colorScheme.error)
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("setting_bank_name_input"),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = bankAccountNo,
+                        onValueChange = { input ->
+                            if (input.all { it.isDigit() } && input.length <= 14) {
+                                bankAccountNo = input
+                            }
+                        },
+                        label = { Text("A/c No") },
+                        placeholder = { Text("e.g. 9160635224") },
+                        leadingIcon = { Icon(Icons.Default.CreditCard, contentDescription = "Account Number") },
+                        isError = isBankAccountNoError,
+                        supportingText = {
+                            if (isBankAccountNoError) {
+                                Text("Bank Account must be 10 to 14 digits (numbers only)", color = MaterialTheme.colorScheme.error)
+                            } else {
+                                Text("Minimum 10 to 14 digit numbers only", style = MaterialTheme.typography.labelSmall)
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("setting_bank_acc_no_input"),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = bankBranch,
+                        onValueChange = { bankBranch = it },
+                        label = { Text("Branch Name") },
+                        placeholder = { Text("e.g. Noida Sector 62") },
+                        leadingIcon = { Icon(Icons.Default.Storefront, contentDescription = "Branch Name") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("setting_bank_branch_input"),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = bankIfsc,
+                        onValueChange = { bankIfsc = it },
+                        label = { Text("IFSC Code") },
+                        placeholder = { Text("e.g. ICIC0001234") },
+                        leadingIcon = { Icon(Icons.Default.Code, contentDescription = "IFSC Code") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("setting_bank_ifsc_input"),
+                        singleLine = true
+                    )
+                }
+            }
+
             // Beautiful Identity & Mascot Selector Card (Short Business Icon)
             Card(
                 modifier = Modifier.fillMaxWidth().testTag("business_identity_card"),
@@ -786,151 +953,17 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "Business Mascot & Short Icon",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    Text(
-                        text = "Customize a decorative symbol for your brand. This visual icon is featured on top dashboards, client cards, and directly inside generated PDF Invoice headers.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                            modifier = Modifier.size(52.dp)
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                Text(
-                                    text = shortIcon.ifBlank { "💼" },
-                                    fontSize = 26.sp
-                                )
-                            }
-                        }
-
-                        Column {
-                            Text(
-                                text = if (name.isNotBlank()) name else "Your Registered Business",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Active Short Logo Brand Signature",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                        }
-                    }
-
-                    val shortPresets = listOf("💼", "🛒", "🏭", "💻", "🛠️", "📦", "🏠", "⚡", "🩺", "🎨", "🌟", "🍳")
-
-                    Text(
-                        text = "Select Preset Symbol Mascot:",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        shortPresets.forEach { emoji ->
-                            val isSelected = shortIcon == emoji
-                            Box(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .padding(2.dp)
-                                    .clickable { shortIcon = emoji }
-                                    .background(
-                                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .border(
-                                        width = if (isSelected) 1.5.dp else 0.dp,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                        shape = RoundedCornerShape(8.dp)
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(text = emoji, fontSize = 18.sp)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    OutlinedTextField(
-                        value = shortIcon,
-                        onValueChange = {
-                            if (it.length <= 4) {
-                                shortIcon = it
-                            }
-                        },
-                        label = { Text("Or Type Custom Characters/Initials (Max 3 chars)") },
-                        placeholder = { Text("e.g. ⭐, AT, IND") },
-                        modifier = Modifier.fillMaxWidth().testTag("custom_short_icon_input"),
-                        singleLine = true
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = "Step 2: Premium Brand Logo Option",
+                        text = "Step 1: Premium Brand Logo Option",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "Choose a corporate asset emblem or paste a custom link path below to represent your business on the invoice document:",
+                        text = "Upload a brand image or paste a custom link path below to represent your business on the invoice document:",
                         style = MaterialTheme.typography.bodySmall,
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-
-                    val logoPresets = listOf(
-                        "preset_tech" to "⚡ Tech Pro",
-                        "preset_crest" to "🛡️ Shield Crest",
-                        "preset_leaf" to "🌿 Green Leaf",
-                        "preset_star" to "✨ Premium Star",
-                        "preset_gear" to "⚙️ Build Gear",
-                        "preset_cart" to "🛒 Hyper Depot"
-                    )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        logoPresets.forEach { (presetKey, displayName) ->
-                            val isSelected = logoUrl == presetKey
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { logoUrl = presetKey },
-                                label = { Text(displayName, fontSize = 11.sp) },
-                                leadingIcon = if (isSelected) {
-                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
-                                } else null
-                            )
-                        }
-                    }
 
                     Spacer(modifier = Modifier.height(6.dp))
                     
@@ -1048,118 +1081,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = "Step 4: Custom Print Font Style (.ttf / .otf)",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.testTag("custom_font_title")
-                    )
-                    Text(
-                        text = "Upload any TrueType (.ttf) or OpenType (.otf) font to render printed invoice PDFs with your custom typography brand style:",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    var fontSelectionMode by remember { mutableStateOf(if (customFontPath.isNotBlank()) "custom" else "system") }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilterChip(
-                            selected = fontSelectionMode == "system",
-                            onClick = {
-                                fontSelectionMode = "system"
-                                customFontPath = ""
-                                customFontName = ""
-                                prefs.edit()
-                                    .putString("custom_font_path", "")
-                                    .putString("custom_font_name", "")
-                                    .apply()
-                                Toast.makeText(context, "Switched to standard system font", Toast.LENGTH_SHORT).show()
-                            },
-                            label = { Text("Default System Font", fontSize = 11.sp) },
-                            leadingIcon = if (fontSelectionMode == "system") {
-                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
-                            } else null,
-                            modifier = Modifier.testTag("system_font_chip")
-                        )
-
-                        FilterChip(
-                            selected = fontSelectionMode == "custom",
-                            onClick = {
-                                if (customFontPath.isNotBlank()) {
-                                    fontSelectionMode = "custom"
-                                } else {
-                                    selectFontLauncher.launch("*/*")
-                                }
-                            },
-                            label = {
-                                Text(
-                                    text = if (customFontName.isNotBlank()) customFontName else "Custom Uploaded Font",
-                                    fontSize = 11.sp
-                                )
-                            },
-                            leadingIcon = if (fontSelectionMode == "custom") {
-                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
-                            } else null,
-                            modifier = Modifier.testTag("custom_font_chip")
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Button(
-                            onClick = { selectFontLauncher.launch("*/*") },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            ),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f).testTag("select_local_font_button")
-                        ) {
-                            Icon(Icons.Default.UploadFile, contentDescription = "Upload custom font", modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Upload Custom Font (.ttf / .otf)", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                        }
-
-                        if (customFontPath.isNotBlank()) {
-                            IconButton(
-                                onClick = {
-                                    customFontPath = ""
-                                    customFontName = ""
-                                    fontSelectionMode = "system"
-                                    prefs.edit()
-                                        .putString("custom_font_path", "")
-                                        .putString("custom_font_name", "")
-                                        .apply()
-                                    Toast.makeText(context, "Cleared custom font", Toast.LENGTH_SHORT).show()
-                                },
-                                modifier = Modifier.testTag("clear_font_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete custom font",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
@@ -1632,7 +1553,22 @@ fun SettingsScreen(
                         Toast.makeText(context, "Business Name cannot be empty", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-                    viewModel.saveBusinessProfile(name, address, phone, email, gstin, upiId, gmailId, shortIcon, logoUrl)
+                    viewModel.saveBusinessProfile(
+                        name = name,
+                        address = address,
+                        phone = phone,
+                        email = email,
+                        gstin = gstin,
+                        upiId = upiId,
+                        gmailId = gmailId,
+                        shortIcon = shortIcon,
+                        logoUrl = logoUrl,
+                        bankAccountName = bankAccountName,
+                        bankName = bankName,
+                        bankAccountNo = bankAccountNo,
+                        bankBranch = bankBranch,
+                        bankIfsc = bankIfsc
+                    )
                     prefs.edit().putString("pdf_theme", pdfTheme).apply()
                     Toast.makeText(context, "Business Metadata Saved Successfully!", Toast.LENGTH_SHORT).show()
                 },

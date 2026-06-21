@@ -5,7 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
 import com.example.util.BackupRestoreHelper
+import android.content.Context
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +24,19 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         database.businessProfileDao(),
         database.savedBusinessProfileDao()
     )
+
+    private val prefs = application.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE)
+
+    // Low stock threshold
+    private val _lowStockThreshold = MutableStateFlow(prefs.getFloat("low_stock_threshold", 5.0f))
+    val lowStockThreshold: StateFlow<Float> = _lowStockThreshold
+
+    fun updateLowStockThreshold(value: Float) {
+        viewModelScope.launch {
+            prefs.edit().putFloat("low_stock_threshold", value).apply()
+            _lowStockThreshold.value = value
+        }
+    }
 
     init {
         viewModelScope.launch {
@@ -59,15 +74,48 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     val outstandingAmount: StateFlow<Double?> = repository.outstandingAmount
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    // Support generation: YYYY-MM-DD-0001
+    // Support sequential generation: INV-YYYY-MMM-DD-XXXX with progressive suffix logic
     fun generateNextInvoiceNumber(): String {
-        val count = invoices.value.size
-        val dateString = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
-        return "$dateString-${String.format(java.util.Locale.US, "%04d", count + 1)}"
+        val existingInvoices = invoices.value
+        val dateString = java.text.SimpleDateFormat("yyyy-MMM-dd", java.util.Locale.US).format(java.util.Date()).uppercase()
+        
+        var maxSuffix = 0
+        val regex = Regex("\\d+$")
+        for (inv in existingInvoices) {
+            val numStr = inv.invoice.invoiceNumber
+            val matchResult = regex.find(numStr)
+            if (matchResult != null) {
+                try {
+                    val suffixVal = matchResult.value.toInt()
+                    if (suffixVal > maxSuffix) {
+                        maxSuffix = suffixVal
+                    }
+                } catch (e: Exception) {
+                    // Ignore parsing issues
+                }
+            }
+        }
+        val nextSuffix = maxSuffix + 1
+        return "INV-$dateString-${String.format(java.util.Locale.US, "%04d", nextSuffix)}"
     }
 
     // ------------------ BUSINESS OPERATIONS ------------------
-    fun saveBusinessProfile(name: String, address: String, phone: String, email: String, gstin: String, upiId: String, gmailId: String, shortIcon: String, logoUrl: String = "") {
+    fun saveBusinessProfile(
+        name: String,
+        address: String,
+        phone: String,
+        email: String,
+        gstin: String,
+        upiId: String,
+        gmailId: String,
+        shortIcon: String,
+        logoUrl: String = "",
+        bankAccountName: String = "",
+        bankName: String = "",
+        bankAccountNo: String = "",
+        bankBranch: String = "",
+        bankIfsc: String = ""
+    ) {
         viewModelScope.launch {
             if (name.isBlank()) {
                 _uiEvents.emit(UiEvent.ShowError("Business Name cannot be empty"))
@@ -83,7 +131,12 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 upiId = upiId.trim(),
                 gmailId = gmailId.trim(),
                 shortIcon = shortIcon.trim(),
-                logoUrl = logoUrl.trim()
+                logoUrl = logoUrl.trim(),
+                bankAccountName = bankAccountName.trim(),
+                bankName = bankName.trim(),
+                bankAccountNo = bankAccountNo.trim(),
+                bankBranch = bankBranch.trim(),
+                bankIfsc = bankIfsc.trim()
             )
             repository.saveBusinessProfile(profile)
             _uiEvents.emit(UiEvent.ShowSuccess("Business profile updated successfully!"))
@@ -226,6 +279,32 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun deleteInvoicesBulk(invoiceIds: List<Int>) {
+        viewModelScope.launch {
+            try {
+                for (id in invoiceIds) {
+                    repository.deleteInvoice(id)
+                }
+                _uiEvents.emit(UiEvent.ShowSuccess("Successfully deleted ${invoiceIds.size} invoices"))
+            } catch (e: Exception) {
+                _uiEvents.emit(UiEvent.ShowError("Invoices bulk delete failed: ${e.message}"))
+            }
+        }
+    }
+
+    fun deleteCustomersBulk(customersList: List<Customer>) {
+        viewModelScope.launch {
+            try {
+                for (cust in customersList) {
+                    repository.deleteCustomer(cust)
+                }
+                _uiEvents.emit(UiEvent.ShowSuccess("Successfully deleted ${customersList.size} clients"))
+            } catch (e: Exception) {
+                _uiEvents.emit(UiEvent.ShowError("Clients bulk delete failed: ${e.message}"))
+            }
+        }
+    }
+
     fun updateInvoiceStatus(invoiceId: Int, newStatus: String) {
         viewModelScope.launch {
             val scopeInvoices = invoices.value
@@ -282,7 +361,12 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     gstin = "07AAAAA1111A1Z1",
                     upiId = "apextech@ybl",
                     gmailId = "apextech.solutions@gmail.com",
-                    shortIcon = "⚡"
+                    shortIcon = "⚡",
+                    bankAccountName = "Apex Tech Solutions",
+                    bankName = "ICICI Bank",
+                    bankAccountNo = "9160635224",
+                    bankBranch = "Noida",
+                    bankIfsc = "ICICI1234"
                 )
                 repository.saveBusinessProfile(sampleProfile)
 
@@ -295,7 +379,12 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     gstin = "07AAAAA1111A1Z1",
                     upiId = "apextech@ybl",
                     gmailId = "apextech.solutions@gmail.com",
-                    shortIcon = "⚡"
+                    shortIcon = "⚡",
+                    bankAccountName = "Apex Tech Solutions",
+                    bankName = "ICICI Bank",
+                    bankAccountNo = "9160635224",
+                    bankBranch = "Noida",
+                    bankIfsc = "ICICI1234"
                 )
                 val saved2 = SavedBusinessProfile(
                     businessName = "Zenith Hardware & Spares",
@@ -304,7 +393,12 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     email = "orders@zenithhardware.com",
                     gstin = "09BBBBB2222B2Z2",
                     upiId = "zenith@okaxis",
-                    shortIcon = "🛠️"
+                    shortIcon = "🛠️",
+                    bankAccountName = "Zenith Hardware Pvt Ltd",
+                    bankName = "HDFC Bank",
+                    bankAccountNo = "501004392120",
+                    bankBranch = "New Delhi Okhla",
+                    bankIfsc = "HDFC0000120"
                 )
                 repository.saveSavedBusinessProfile(saved1)
                 repository.saveSavedBusinessProfile(saved2)
@@ -332,11 +426,12 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 val custId3 = repository.insertCustomer(c3).toInt()
 
                 // Seed Invoices
+                val fmt = java.text.SimpleDateFormat("yyyy-MMM-dd", java.util.Locale.US)
                 // Invoice 1 - Paid
                 val inv1_date = System.currentTimeMillis() - (3 * 24 * 3600 * 1000L) // 3 days ago
                 val inv1 = Invoice(
                     id = 0,
-                    invoiceNumber = "INV-2026-0001",
+                    invoiceNumber = "INV-${fmt.format(java.util.Date(inv1_date)).uppercase()}-0001",
                     customerId = custId1,
                     dateTimestamp = inv1_date,
                     status = "Paid",
@@ -378,7 +473,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 val inv2_date = System.currentTimeMillis() - (1 * 24 * 3600 * 1000L) // 1 day ago
                 val inv2 = Invoice(
                     id = 0,
-                    invoiceNumber = "INV-2026-0002",
+                    invoiceNumber = "INV-${fmt.format(java.util.Date(inv2_date)).uppercase()}-0002",
                     customerId = custId2,
                     dateTimestamp = inv2_date,
                     status = "Sent",
@@ -405,7 +500,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 // Invoice 3 - Draft (Outstanding)
                 val inv3 = Invoice(
                     id = 0,
-                    invoiceNumber = "INV-2026-0003",
+                    invoiceNumber = "INV-${fmt.format(java.util.Date()).uppercase()}-0003",
                     customerId = custId3,
                     dateTimestamp = System.currentTimeMillis(),
                     status = "Draft",

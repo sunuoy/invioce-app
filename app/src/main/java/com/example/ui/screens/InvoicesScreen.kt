@@ -37,11 +37,13 @@ import java.util.*
 @Composable
 fun InvoicesScreen(
     viewModel: InvoiceViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onMenuClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
     val profile by viewModel.businessProfile.collectAsStateWithLifecycle()
+    val clients by viewModel.customers.collectAsStateWithLifecycle()
 
     var selectedFilter by remember { mutableStateOf("All") }
     var searchQuery by remember { mutableStateOf("") }
@@ -51,6 +53,11 @@ fun InvoicesScreen(
     // Navigation inside screener: List or Create Invoice
     var isCreatingInvoice by remember { mutableStateOf(false) }
     var editingInvoice by remember { mutableStateOf<InvoiceWithDetails?>(null) }
+
+    // Multi-selection states
+    var isSelectionMode by remember { mutableStateOf(false) }
+    val selectedInvoices = remember { mutableStateListOf<InvoiceWithDetails>() }
+    var showBulkDeleteConfirm by remember { mutableStateOf(false) }
 
     // Filter invoices
     val filteredInvoices = remember(invoices, selectedFilter, searchQuery) {
@@ -74,26 +81,121 @@ fun InvoicesScreen(
     } else {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Invoice Catalog", fontWeight = FontWeight.Bold) },
-                    actions = {
-                        IconButton(onClick = { isCreatingInvoice = true }) {
-                            Icon(Icons.Default.Add, contentDescription = "Add New Billings")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
+                if (isSelectionMode) {
+                    TopAppBar(
+                        title = { Text("${selectedInvoices.size} Selected", fontWeight = FontWeight.Bold) },
+                        navigationIcon = {
+                            IconButton(onClick = {
+                                isSelectionMode = false
+                                selectedInvoices.clear()
+                            }) {
+                                Icon(Icons.Default.Close, contentDescription = "Cancel bulk selection")
+                            }
+                        },
+                        actions = {
+                            // Select All / Deselect All trigger
+                            IconButton(onClick = {
+                                if (selectedInvoices.size == filteredInvoices.size) {
+                                    selectedInvoices.clear()
+                                } else {
+                                    selectedInvoices.clear()
+                                    selectedInvoices.addAll(filteredInvoices)
+                                }
+                            }) {
+                                Icon(Icons.Default.SelectAll, contentDescription = "Toggle Select All Invoices")
+                            }
+
+                            // Excel spreading export
+                            IconButton(
+                                onClick = {
+                                    if (selectedInvoices.isNotEmpty()) {
+                                        val csvFile = com.example.util.ExcelExporter.generateAccountingReportCsv(context, selectedInvoices.toList(), clients)
+                                        if (csvFile != null) {
+                                            com.example.util.ExcelExporter.shareCsvFile(context, csvFile)
+                                            Toast.makeText(context, "Accounting spreadsheet generated for selected items!", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Export error", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        Toast.makeText(context, "No invoices selected to export", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            ) {
+                                Icon(Icons.Default.TableView, contentDescription = "Spreadsheet export chosen bills", tint = MaterialTheme.colorScheme.primary)
+                            }
+                            
+                            // Bulk remove action
+                            IconButton(
+                                onClick = {
+                                    if (selectedInvoices.isNotEmpty()) {
+                                        showBulkDeleteConfirm = true
+                                    } else {
+                                        Toast.makeText(context, "No invoices selected", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.testTag("bulk_delete_invoices_btn")
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Bulk Delete selected invoices", tint = MaterialTheme.colorScheme.error)
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                        )
                     )
-                )
+                } else {
+                    TopAppBar(
+                        title = { Text("Invoice Catalog", fontWeight = FontWeight.Bold) },
+                        navigationIcon = {
+                            if (onMenuClick != null) {
+                                IconButton(onClick = onMenuClick, modifier = Modifier.testTag("invoices_menu_btn")) {
+                                    Icon(Icons.Default.Menu, contentDescription = "Open navigation menu")
+                                }
+                            }
+                        },
+                        actions = {
+                            // Enable bulk deletion modes
+                            IconButton(onClick = {
+                                isSelectionMode = true
+                                selectedInvoices.clear()
+                            }, modifier = Modifier.testTag("enter_bulk_select_invoices")) {
+                                Icon(Icons.Default.List, contentDescription = "Enable Bulk Delete selection")
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    val csvFile = com.example.util.ExcelExporter.generateAccountingReportCsv(context, invoices, clients)
+                                    if (csvFile != null) {
+                                        com.example.util.ExcelExporter.shareCsvFile(context, csvFile)
+                                        Toast.makeText(context, "Accounting sheet loaded", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "Share failure", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.testTag("invoices_catalog_excel_btn")
+                            ) {
+                                Icon(Icons.Default.TableView, contentDescription = "Excel spreadsheet accounting export", tint = MaterialTheme.colorScheme.primary)
+                            }
+
+                            IconButton(onClick = { isCreatingInvoice = true }) {
+                                Icon(Icons.Default.Add, contentDescription = "Add New Billings")
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background
+                        )
+                    )
+                }
             },
             floatingActionButton = {
-                FloatingActionButton(
-                    onClick = { isCreatingInvoice = true },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.testTag("add_invoice_fab")
-                ) {
-                    Icon(Icons.Default.PostAdd, contentDescription = "New Invoice")
+                if (!isSelectionMode) {
+                    FloatingActionButton(
+                        onClick = { isCreatingInvoice = true },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.testTag("add_invoice_fab")
+                    ) {
+                        Icon(Icons.Default.PostAdd, contentDescription = "New Invoice")
+                    }
                 }
             },
             modifier = modifier
@@ -177,8 +279,18 @@ fun InvoicesScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(filteredInvoices, key = { it.invoice.id }) { billing ->
-                            RecentInvoiceItemRow(
+                            val isSelected = selectedInvoices.contains(billing)
+                            CatalogInvoiceItemRow(
                                 item = billing,
+                                isSelectionMode = isSelectionMode,
+                                isSelected = isSelected,
+                                onSelectedChange = { selected ->
+                                    if (selected) {
+                                        if (!selectedInvoices.contains(billing)) selectedInvoices.add(billing)
+                                    } else {
+                                        selectedInvoices.remove(billing)
+                                    }
+                                },
                                 onViewClicked = { activeInvoiceDetails = billing }
                             )
                         }
@@ -186,6 +298,35 @@ fun InvoicesScreen(
                 }
             }
         }
+    }
+
+    // Modal dialogue confirming bulk deletion
+    if (showBulkDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showBulkDeleteConfirm = false },
+            icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Confirm Bulk Deletion") },
+            text = { Text("Are you sure you want to permanently delete these ${selectedInvoices.size} selected invoices? Product stock values subtracted during save will NOT be restored automatically unless products are separately updated.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val idsToDelete = selectedInvoices.map { it.invoice.id }
+                        viewModel.deleteInvoicesBulk(idsToDelete)
+                        isSelectionMode = false
+                        selectedInvoices.clear()
+                        showBulkDeleteConfirm = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete ${selectedInvoices.size} Invoices")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBulkDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // Invoice Detail Sheet Dialog
@@ -951,8 +1092,16 @@ fun CreateInvoiceScreen(
                         ) {
                             Column(modifier = Modifier.weight(1.5f)) {
                                 Text(lineItem.productName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                val origSub = lineItem.price * lineItem.quantity
+                                val discountVal = maxOf(0.0, origSub - lineItem.subtotal)
                                 Text(
-                                    "${lineItem.quantity} ${lineItem.unit} @ ₹${lineItem.price} (GST Tax: ${lineItem.taxRate}%)",
+                                    buildString {
+                                        append("${lineItem.quantity} ${lineItem.unit} @ ₹${lineItem.price}")
+                                        if (discountVal > 0.0) {
+                                            append(" (-₹${String.format(Locale.US, "%.2f", discountVal)})")
+                                        }
+                                        append(" (GST: ${lineItem.taxRate}%)")
+                                    },
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -989,6 +1138,18 @@ fun CreateInvoiceScreen(
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Subtotal", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(String.format(Locale.US, "₹%.2f", subtotal))
+                        }
+                        val totalAmountBeforeDisc = addedItems.sumOf { it.price * it.quantity }
+                        val totalDiscountValue = maxOf(0.0, totalAmountBeforeDisc - subtotal)
+                        if (totalDiscountValue > 0.0) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Total Discount", color = MaterialTheme.colorScheme.error)
+                                Text(
+                                    String.format(Locale.US, "-₹%.2f", totalDiscountValue),
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("GST Tax total", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1417,6 +1578,8 @@ fun CreateInvoiceScreen(
         var inputUnit by remember { mutableStateOf("pcs") }
         var inputQty by remember { mutableStateOf("1") }
         var inputHsnSac by remember { mutableStateOf("") }
+        var inputDiscountVal by remember { mutableStateOf("") }
+        var inputDiscountPercent by remember { mutableStateOf("") }
 
         // Autocomplete helper from products inventory lists
         var chosenInventoryProd by remember { mutableStateOf<Product?>(null) }
@@ -1548,6 +1711,35 @@ fun CreateInvoiceScreen(
                         )
                     }
 
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = inputDiscountVal,
+                            onValueChange = {
+                                inputDiscountVal = it
+                                if (it.isNotBlank() && it != "0") {
+                                    inputDiscountPercent = ""
+                                }
+                            },
+                            label = { Text("Discount (₹)") },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            placeholder = { Text("0") },
+                            modifier = Modifier.weight(1f).testTag("discount_rupees_input")
+                        )
+                        OutlinedTextField(
+                            value = inputDiscountPercent,
+                            onValueChange = {
+                                inputDiscountPercent = it
+                                if (it.isNotBlank() && it != "0") {
+                                    inputDiscountVal = ""
+                                }
+                            },
+                            label = { Text("Discount (%)") },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            placeholder = { Text("0") },
+                            modifier = Modifier.weight(1f).testTag("discount_percent_input")
+                        )
+                    }
+
                     OutlinedTextField(
                         value = inputHsnSac,
                         onValueChange = { inputHsnSac = it },
@@ -1564,6 +1756,8 @@ fun CreateInvoiceScreen(
                     val qty = inputQty.toDoubleOrNull() ?: 1.0
                     val rate = inputPrice.toDoubleOrNull() ?: 0.0
                     val tax = inputTaxRate.toDoubleOrNull() ?: 0.0
+                    val discValue = inputDiscountVal.toDoubleOrNull() ?: 0.0
+                    val discPercent = inputDiscountPercent.toDoubleOrNull() ?: 0.0
 
                     if (finalName.isBlank()) {
                         Toast.makeText(context, "Product name cannot be blank", Toast.LENGTH_SHORT).show()
@@ -1577,8 +1771,22 @@ fun CreateInvoiceScreen(
                         Toast.makeText(context, "Quantity must be greater than 0", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
+                    if (discValue < 0 || discPercent < 0) {
+                        Toast.makeText(context, "Discount cannot be negative", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    if (discPercent > 100) {
+                        Toast.makeText(context, "Discount percentage cannot exceed 100%", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
 
-                    val amounts = com.example.util.InvoiceCalculator.calculateLineItem(rate, qty, tax)
+                    val amounts = com.example.util.InvoiceCalculator.calculateLineItem(
+                        price = rate,
+                        quantity = qty,
+                        taxRate = tax,
+                        discountAmount = discValue,
+                        discountPercent = discPercent
+                    )
                     val sub = amounts.subtotal
                     val computedTax = amounts.tax
                     val total = amounts.total
@@ -1643,6 +1851,131 @@ fun UpiQrImage(upiId: String, businessName: String, amount: Double) {
                 .background(androidx.compose.ui.graphics.Color.White, shape = RoundedCornerShape(8.dp))
                 .padding(8.dp)
         )
+    }
+}
+
+@Composable
+fun CatalogInvoiceItemRow(
+    item: InvoiceWithDetails,
+    isSelectionMode: Boolean,
+    isSelected: Boolean,
+    onSelectedChange: (Boolean) -> Unit,
+    onViewClicked: () -> Unit
+) {
+    val dFormatter = remember { SimpleDateFormat("dd-MM-yyyy", Locale.US) }
+    val statusColor = when (item.invoice.status) {
+        "Paid" -> Color(0xFF10B981)
+        "Sent" -> Color(0xFF3B82F6)
+        "Draft" -> Color(0xFF6B7280)
+        else -> Color(0xFFF59E0B)
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                if (isSelectionMode) {
+                    onSelectedChange(!isSelected)
+                } else {
+                    onViewClicked()
+                }
+            }
+            .testTag("invoice_card_${item.invoice.id}"),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(2.dp),
+        border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isSelectionMode) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = onSelectedChange,
+                    modifier = Modifier.padding(end = 12.dp).testTag("invoice_checkbox_${item.invoice.id}")
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Invoice #${item.invoice.invoiceNumber}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = statusColor.copy(alpha = 0.15f),
+                        contentColor = statusColor
+                    ) {
+                        Text(
+                            text = item.invoice.status,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = item.customer?.name ?: "No Client Information",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Billed Date: ${dFormatter.format(Date(item.invoice.dateTimestamp))}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                    Text(
+                        text = String.format(Locale.US, "₹%.2f", item.invoice.grandTotal),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                if (item.invoice.downloadCount > 0) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = "Downloaded count logo",
+                            tint = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Text(
+                            text = "Exported/Shared ${item.invoice.downloadCount} times",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

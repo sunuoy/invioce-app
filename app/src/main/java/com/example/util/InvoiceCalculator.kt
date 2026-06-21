@@ -23,8 +23,20 @@ object InvoiceCalculator {
     /**
      * Helper to compute single line item subtotal, tax, and total safely.
      */
-    fun calculateLineItem(price: Double, quantity: Double, taxRate: Double): LineAmounts {
-        val subtotal = price * quantity
+    fun calculateLineItem(
+        price: Double,
+        quantity: Double,
+        taxRate: Double,
+        discountAmount: Double = 0.0,
+        discountPercent: Double = 0.0
+    ): LineAmounts {
+        val originalSubtotal = price * quantity
+        val discValue = if (discountPercent > 0.0) {
+            originalSubtotal * (discountPercent / 100.0)
+        } else {
+            discountAmount
+        }
+        val subtotal = maxOf(0.0, originalSubtotal - discValue)
         val tax = (subtotal * taxRate) / 100.0
         val total = subtotal + tax
         return LineAmounts(subtotal, tax, total)

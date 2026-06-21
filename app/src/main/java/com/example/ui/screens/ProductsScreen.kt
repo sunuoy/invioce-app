@@ -35,14 +35,17 @@ import java.util.Locale
 @Composable
 fun ProductsScreen(
     viewModel: InvoiceViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onMenuClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val products by viewModel.products.collectAsStateWithLifecycle()
+    val lowStockThreshold by viewModel.lowStockThreshold.collectAsStateWithLifecycle()
 
     var searchQuery by remember { mutableStateOf("") }
     var activeEditorProduct by remember { mutableStateOf<Product?>(null) }
     var showCreatorDialog by remember { mutableStateOf(false) }
+    var isThresholdExpanded by remember { mutableStateOf(false) }
 
     val filteredProducts = remember(products, searchQuery) {
         products.filter {
@@ -54,6 +57,13 @@ fun ProductsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Inventory (Stock & Tax)", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    if (onMenuClick != null) {
+                        IconButton(onClick = onMenuClick, modifier = Modifier.testTag("products_menu_btn")) {
+                            Icon(Icons.Default.Menu, contentDescription = "Open navigation menu")
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )
@@ -90,6 +100,130 @@ fun ProductsScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp)
             )
+
+            // Dynamic Threshold Configuration Panel
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.clickable { isThresholdExpanded = !isThresholdExpanded }.testTag("threshold_settings_trigger")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = "Configure stock threshold",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Low Stock Threshold: ${lowStockThreshold.toInt()} units",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Icon(
+                        imageVector = if (isThresholdExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                
+                val criticallyLowCount = products.count { it.stock <= lowStockThreshold }
+                if (criticallyLowCount > 0) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    ) {
+                        Text(
+                            text = "$criticallyLowCount alerts",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = isThresholdExpanded) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "Configure the threshold value triggers low-stock alerts & highlights below critical balance quantities:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Slider(
+                                value = lowStockThreshold,
+                                onValueChange = { viewModel.updateLowStockThreshold(it) },
+                                valueRange = 0f..50f,
+                                steps = 50,
+                                modifier = Modifier.weight(1f).testTag("threshold_slider")
+                            )
+                            Text(
+                                text = "${lowStockThreshold.toInt()} units",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.width(60.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Automated Notification Banner UI
+            val lowStockProducts = products.filter { it.stock <= lowStockThreshold }
+            if (lowStockProducts.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
+                        .testTag("low_stock_notification_banner"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = "Warning",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Automated Inventory Alert",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text(
+                                text = "${lowStockProducts.size} items are critically below threshold of ${lowStockThreshold.toInt()} units.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+            }
 
             if (filteredProducts.isEmpty()) {
                 Column(
@@ -128,6 +262,7 @@ fun ProductsScreen(
                     items(filteredProducts, key = { it.id }) { item ->
                         ProductItemRow(
                             product = item,
+                            lowStockThreshold = lowStockThreshold,
                             onEditClicked = { activeEditorProduct = item },
                             onDeleteClicked = {
                                 viewModel.deleteProduct(item)
@@ -167,13 +302,19 @@ fun ProductsScreen(
 @Composable
 fun ProductItemRow(
     product: Product,
+    lowStockThreshold: Float,
     onEditClicked: () -> Unit,
     onDeleteClicked: () -> Unit
 ) {
+    val isCritical = product.stock <= lowStockThreshold
+    val cardBg = if (isCritical) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface
+    val cardBorder = if (isCritical) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)) else null
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(2.dp)
+        modifier = Modifier.fillMaxWidth().testTag("product_item_${product.id}"),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        elevation = CardDefaults.cardElevation(2.dp),
+        border = cardBorder
     ) {
         Row(
             modifier = Modifier
@@ -230,7 +371,7 @@ fun ProductItemRow(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 // Inventory stock visualization
-                StockIndicatorTracker(stockValue = product.stock, unitStr = product.unit)
+                StockIndicatorTracker(stockValue = product.stock, unitStr = product.unit, lowStockThreshold = lowStockThreshold)
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -254,10 +395,11 @@ fun ProductItemRow(
 }
 
 @Composable
-fun StockIndicatorTracker(stockValue: Double, unitStr: String) {
+fun StockIndicatorTracker(stockValue: Double, unitStr: String, lowStockThreshold: Float) {
+    val isCritical = stockValue <= lowStockThreshold
     val stockColor = when {
         stockValue <= 0f -> Color(0xFFEF4444)     // Red / Out
-        stockValue <= 10f -> Color(0xFFF59E0B)    // Amber / Warn
+        isCritical -> Color(0xFFF59E0B)           // Amber / Warn
         else -> Color(0xFF10B981)                 // Green / Healthy
     }
 
@@ -274,12 +416,12 @@ fun StockIndicatorTracker(stockValue: Double, unitStr: String) {
         Text(
             text = when {
                 stockValue <= 0f -> "Out of Stock"
-                stockValue <= 10f -> "Low Stock: $stockValue $unitStr left"
+                isCritical -> "Low stock: $stockValue $unitStr (Threshold: ${lowStockThreshold.toInt()})"
                 else -> "In Stock: $stockValue $unitStr available"
             },
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
-            color = if (stockValue <= 0f) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (isCritical) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

@@ -24,6 +24,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,7 +44,8 @@ fun DashboardScreen(
     viewModel: InvoiceViewModel,
     onCreateInvoiceClicked: () -> Unit,
     onViewInvoiceDetails: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onMenuClick: (() -> Unit)? = null
 ) {
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
     val totalSales by viewModel.totalSales.collectAsStateWithLifecycle()
@@ -56,6 +60,13 @@ fun DashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    if (onMenuClick != null) {
+                        IconButton(onClick = onMenuClick, modifier = Modifier.testTag("dashboard_menu_btn")) {
+                            Icon(Icons.Default.Menu, contentDescription = "Open navigation menu")
+                        }
+                    }
+                },
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -67,9 +78,11 @@ fun DashboardScreen(
                             modifier = Modifier.size(36.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = profile?.shortIcon?.takeIf { it.isNotBlank() } ?: "💼",
-                                    fontSize = 20.sp
+                                Icon(
+                                    imageVector = Icons.Default.Business,
+                                    contentDescription = "Business Logo",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
@@ -263,6 +276,262 @@ fun DashboardScreen(
                                 invoices = invoices,
                                 primaryColor = MaterialTheme.colorScheme.primary,
                                 secondaryColor = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 2.2. Interactive Tax / GST summary dashboard
+            item {
+                var taxStartDate by remember { mutableStateOf(System.currentTimeMillis() - 30L * 24L * 60L * 60L * 1000L) } // 30 days ago
+                var taxEndDate by remember { mutableStateOf(System.currentTimeMillis()) } // today
+                val context = LocalContext.current
+                
+                // Format dates for display
+                val dFormatter = SimpleDateFormat("dd-MM-yyyy", Locale.US)
+                
+                // Aggregate figures on the fly
+                val filteredInvoicesForTax = remember(invoices, taxStartDate, taxEndDate) {
+                    invoices.filter {
+                        val timestamp = it.invoice.dateTimestamp
+                        timestamp in taxStartDate..taxEndDate
+                    }
+                }
+                
+                val totalTaxableTurnover = remember(filteredInvoicesForTax) {
+                    filteredInvoicesForTax.sumOf { it.invoice.subtotal }
+                }
+                val totalGstCollected = remember(filteredInvoicesForTax) {
+                    filteredInvoicesForTax.sumOf { it.invoice.taxTotal }
+                }
+                val totalGrossSales = remember(filteredInvoicesForTax) {
+                    filteredInvoicesForTax.sumOf { it.invoice.grandTotal }
+                }
+                
+                // GST Rates Breakdown
+                val gstBreakdown = remember(filteredInvoicesForTax) {
+                    val map = mutableMapOf<Double, Double>()
+                    for (inf in filteredInvoicesForTax) {
+                        for (item in inf.lineItems) {
+                            val rate = item.taxRate
+                            map[rate] = map.getOrDefault(rate, 0.0) + item.tax
+                        }
+                    }
+                    map.toList().sortedBy { it.first }
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth().testTag("tax_summary_dashboard_card"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.15f)
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Header
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Assessment,
+                                contentDescription = "GST Tax Filing Report logo",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = "GST Fiscal Tax Summary",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+
+                        Text(
+                            text = "Aggregates tax values (CGST/SGST/IGST components) for easy bookkeeping and corporate/individual GSTR returns.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        // Date Selectors
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Start Date
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        val cal = Calendar.getInstance().apply { timeInMillis = taxStartDate }
+                                        android.app.DatePickerDialog(
+                                            context,
+                                            { _, y, m, d ->
+                                                val resCal = Calendar.getInstance().apply {
+                                                    set(Calendar.YEAR, y)
+                                                    set(Calendar.MONTH, m)
+                                                    set(Calendar.DAY_OF_MONTH, d)
+                                                    set(Calendar.HOUR_OF_DAY, 0)
+                                                    set(Calendar.MINUTE, 0)
+                                                    set(Calendar.SECOND, 0)
+                                                }
+                                                taxStartDate = resCal.timeInMillis
+                                            },
+                                            cal.get(Calendar.YEAR),
+                                            cal.get(Calendar.MONTH),
+                                            cal.get(Calendar.DAY_OF_MONTH)
+                                        ).show()
+                                    }
+                                    .background(
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .border(androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(8.dp))
+                                    .padding(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("From date", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                Text(
+                                    text = dFormatter.format(Date(taxStartDate)),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            // End Date
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        val cal = Calendar.getInstance().apply { timeInMillis = taxEndDate }
+                                        android.app.DatePickerDialog(
+                                            context,
+                                            { _, y, m, d ->
+                                                val resCal = Calendar.getInstance().apply {
+                                                    set(Calendar.YEAR, y)
+                                                    set(Calendar.MONTH, m)
+                                                    set(Calendar.DAY_OF_MONTH, d)
+                                                    set(Calendar.HOUR_OF_DAY, 23)
+                                                    set(Calendar.MINUTE, 59)
+                                                    set(Calendar.SECOND, 59)
+                                                }
+                                                taxEndDate = resCal.timeInMillis
+                                            },
+                                            cal.get(Calendar.YEAR),
+                                            cal.get(Calendar.MONTH),
+                                            cal.get(Calendar.DAY_OF_MONTH)
+                                        ).show()
+                                    }
+                                    .background(
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .border(androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(8.dp))
+                                    .padding(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("To date", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                Text(
+                                    text = dFormatter.format(Date(taxEndDate)),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        // Summary Statistics
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Invoices matched in range", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${filteredInvoicesForTax.size} bills", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                }
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Taxable turnover (Subtotal)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(String.format(Locale.US, "₹%.2f", totalTaxableTurnover), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Aggregated GST Collected", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                                    Text(String.format(Locale.US, "₹%.2f", totalGstCollected), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Total gross business sales", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(String.format(Locale.US, "₹%.2f", totalGrossSales), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+
+                        // GST Rate Categories Breakdown
+                        if (gstBreakdown.isNotEmpty()) {
+                            Text(
+                                text = "Taxes Breakdown by GST rate tier:",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                for ((rate, taxVal) in gstBreakdown) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(
+                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                                shape = RoundedCornerShape(4.dp)
+                                            )
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "@ $rate% GST rate",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = String.format(Locale.US, "₹%.2f", taxVal),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = "No item-wise taxes were collected for the selected period range.",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                color = MaterialTheme.colorScheme.outline
                             )
                         }
                     }

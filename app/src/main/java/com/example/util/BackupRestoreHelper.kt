@@ -26,6 +26,11 @@ object BackupRestoreHelper {
                 put("upiId", profile.upiId)
                 put("gmailId", profile.gmailId)
                 put("shortIcon", profile.shortIcon)
+                put("bankAccountName", profile.bankAccountName)
+                put("bankName", profile.bankName)
+                put("bankAccountNo", profile.bankAccountNo)
+                put("bankBranch", profile.bankBranch)
+                put("bankIfsc", profile.bankIfsc)
             }
             root.put("businessProfile", profJson)
         }
@@ -124,7 +129,12 @@ object BackupRestoreHelper {
                 logoUrl = profJson.optString("logoUrl", ""),
                 upiId = profJson.optString("upiId", ""),
                 gmailId = profJson.optString("gmailId", ""),
-                shortIcon = profJson.optString("shortIcon", "💼")
+                shortIcon = profJson.optString("shortIcon", "💼"),
+                bankAccountName = profJson.optString("bankAccountName", ""),
+                bankName = profJson.optString("bankName", ""),
+                bankAccountNo = profJson.optString("bankAccountNo", ""),
+                bankBranch = profJson.optString("bankBranch", ""),
+                bankIfsc = profJson.optString("bankIfsc", "")
             )
         } else null
 

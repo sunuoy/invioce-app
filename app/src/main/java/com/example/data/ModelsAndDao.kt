@@ -17,7 +17,12 @@ data class BusinessProfile(
     val logoUrl: String = "",
     val upiId: String = "",
     val gmailId: String = "",
-    val shortIcon: String = "💼"
+    val shortIcon: String = "💼",
+    val bankAccountName: String = "",
+    val bankName: String = "",
+    val bankAccountNo: String = "",
+    val bankBranch: String = "",
+    val bankIfsc: String = ""
 )
 
 @Entity(tableName = "saved_business_profile")
@@ -31,7 +36,12 @@ data class SavedBusinessProfile(
     val logoUrl: String = "",
     val upiId: String = "",
     val gmailId: String = "",
-    val shortIcon: String = "💼"
+    val shortIcon: String = "💼",
+    val bankAccountName: String = "",
+    val bankName: String = "",
+    val bankAccountNo: String = "",
+    val bankBranch: String = "",
+    val bankIfsc: String = ""
 )
 
 @Entity(tableName = "products")
@@ -152,7 +162,7 @@ interface InvoiceDao {
     @Query("SELECT SUM(grandTotal) FROM invoices WHERE status = 'Paid'")
     fun getTotalSales(): Flow<Double?>
 
-    @Query("SELECT SUM(grandTotal) FROM invoices WHERE status != 'Paid'")
+    @Query("SELECT SUM(grandTotal) FROM invoices WHERE status != 'Paid' AND status != 'Closed'")
     fun getOutstandingAmount(): Flow<Double?>
 }
 
@@ -245,7 +255,7 @@ interface SavedBusinessProfileDao {
         Invoice::class,
         InvoiceLineItem::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class InvoiceDatabase : RoomDatabase() {
