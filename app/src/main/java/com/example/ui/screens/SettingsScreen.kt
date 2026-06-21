@@ -82,7 +82,7 @@ fun SettingsScreen(
     }
 
     val isBankAccountNoError = remember(bankAccountNo) {
-        bankAccountNo.isNotEmpty() && (!bankAccountNo.all { it.isDigit() } || bankAccountNo.length < 10 || bankAccountNo.length > 14)
+        bankAccountNo.isNotEmpty() && (!bankAccountNo.all { it.isDigit() } || bankAccountNo.length < 9 || bankAccountNo.length > 16)
     }
 
     var pendingLogoUri by remember { mutableStateOf<android.net.Uri?>(null) }
@@ -249,7 +249,7 @@ fun SettingsScreen(
                             } else if (isBankNameError) {
                                 Toast.makeText(context, "Bank Name must contain text only", Toast.LENGTH_SHORT).show()
                             } else if (isBankAccountNoError) {
-                                Toast.makeText(context, "Bank Account number must be 10 to 14 digits only", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Bank Account number must be 9 to 16 digits only", Toast.LENGTH_SHORT).show()
                             } else {
                                 viewModel.saveBusinessProfile(
                                     name = name,
@@ -370,7 +370,7 @@ fun SettingsScreen(
                                 } else if (isBankNameError) {
                                     Toast.makeText(context, "Bank Name must contain text only", Toast.LENGTH_SHORT).show()
                                 } else if (isBankAccountNoError) {
-                                    Toast.makeText(context, "Bank Account number must be 10 to 14 digits only", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Bank Account number must be 9 to 16 digits only", Toast.LENGTH_SHORT).show()
                                 } else {
                                     val newTemplate = SavedBusinessProfile(
                                         businessName = name.trim(),
@@ -650,105 +650,6 @@ fun SettingsScreen(
                         singleLine = true
                     )
 
-                    // Secure Gmail ID Integration Component block
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-                    Text(
-                        text = "Gmail Account Secure Integration",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    if (gmailId.isBlank()) {
-                        Button(
-                            onClick = { showGoogleAccountChooser = true },
-                            modifier = Modifier.fillMaxWidth().testTag("sync_gmail_button"),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                            ),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CloudSync,
-                                contentDescription = "Un-synced Gmail status indicator icon",
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Connect & Sync Gmail Account", fontSize = 13.sp)
-                        }
-                    } else {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                            ),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(100.dp),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                text = gmailId.take(1).uppercase(),
-                                                color = MaterialTheme.colorScheme.onPrimary,
-                                                fontWeight = FontWeight.Bold,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                        }
-                                    }
-
-                                    Column {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Text(
-                                                text = gmailId,
-                                                fontWeight = FontWeight.Bold,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Default.CheckCircle,
-                                                contentDescription = "Verified status badge indicator",
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                        }
-                                        Text(
-                                            text = "Secure Gmail Integration Active",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.outline
-                                        )
-                                    }
-                                }
-
-                                TextButton(
-                                    onClick = { 
-                                        gmailId = "" 
-                                        Toast.makeText(context, "Gmail integration disconnected", Toast.LENGTH_SHORT).show()
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 8.dp)
-                                ) {
-                                    Text("Disconnect", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
-                                }
-                            }
-                        }
-                    }
-
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                     OutlinedTextField(
@@ -842,19 +743,19 @@ fun SettingsScreen(
                     OutlinedTextField(
                         value = bankAccountNo,
                         onValueChange = { input ->
-                            if (input.all { it.isDigit() } && input.length <= 14) {
+                            if (input.all { it.isDigit() } && input.length <= 16) {
                                 bankAccountNo = input
                             }
                         },
                         label = { Text("A/c No") },
-                        placeholder = { Text("e.g. 9160635224") },
+                        placeholder = { Text("e.g. 123456789") },
                         leadingIcon = { Icon(Icons.Default.CreditCard, contentDescription = "Account Number") },
                         isError = isBankAccountNoError,
                         supportingText = {
                             if (isBankAccountNoError) {
-                                Text("Bank Account must be 10 to 14 digits (numbers only)", color = MaterialTheme.colorScheme.error)
+                                Text("Bank Account must be 9 to 16 digits (numbers only)", color = MaterialTheme.colorScheme.error)
                             } else {
-                                Text("Minimum 10 to 14 digit numbers only", style = MaterialTheme.typography.labelSmall)
+                                Text("Minimum 9 to 16 digit numbers only", style = MaterialTheme.typography.labelSmall)
                             }
                         },
                         modifier = Modifier
@@ -1203,122 +1104,6 @@ fun SettingsScreen(
                     text = "* Fields with star indicators are mandatory for invoice generation.",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.outline
-                )
-            }
-
-            // Interactive Google GmailChooser Dialog Simulator
-            if (showGoogleAccountChooser) {
-                AlertDialog(
-                    onDismissRequest = { showGoogleAccountChooser = false },
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.VerifiedUser,
-                                contentDescription = "Secured authorization title",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Text("Secure Google Account Sign-In", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                        }
-                    },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Text(
-                                "Choose a Gmail account to secure your invoice transmissions, back up records automatically, and send verified PDF links through Google Workspace ecosystem.",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-
-                            if (isGmailSyncing) {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().height(80.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                                        Text("Retrieving Google security keys...", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
-                                    }
-                                }
-                            } else {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    // Row 1: The user email from metadata
-                                    ListItem(
-                                        headlineContent = { Text("younusM33@gmail.com", fontWeight = FontWeight.Bold, fontSize = 13.sp) },
-                                        supportingContent = { Text("Active Developer Account", fontSize = 10.sp) },
-                                        leadingContent = {
-                                            Surface(
-                                                shape = RoundedCornerShape(100.dp),
-                                                color = MaterialTheme.colorScheme.primaryContainer,
-                                                modifier = Modifier.size(32.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Text("Y", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                                                }
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .clickable {
-                                                isGmailSyncing = true
-                                                // Simulate secured sync
-                                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                                    gmailId = "younusM33@gmail.com"
-                                                    isGmailSyncing = false
-                                                    showGoogleAccountChooser = false
-                                                    Toast.makeText(context, "Synced successfully with younusM33@gmail.com!", Toast.LENGTH_SHORT).show()
-                                                }, 1500)
-                                            }
-                                            .background(
-                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                                shape = RoundedCornerShape(8.dp)
-                                            )
-                                    )
-
-                                    // Row 2: Standard custom entry placeholder option
-                                    ListItem(
-                                        headlineContent = { Text("Use another commercial account", fontSize = 13.sp) },
-                                        supportingContent = { Text("Workspace / Business Gmail Address", fontSize = 10.sp) },
-                                        leadingContent = {
-                                            Surface(
-                                                shape = RoundedCornerShape(100.dp),
-                                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                                modifier = Modifier.size(32.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Add,
-                                                    contentDescription = "Add Google Account icon",
-                                                    modifier = Modifier.padding(6.dp),
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .clickable {
-                                                gmailId = "invoice.billing@gmail.com"
-                                                Toast.makeText(context, "Synced with invoice.billing@gmail.com", Toast.LENGTH_SHORT).show()
-                                                showGoogleAccountChooser = false
-                                            }
-                                            .background(
-                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                                shape = RoundedCornerShape(8.dp)
-                                            )
-                                    )
-                                }
-                            }
-                        }
-                    },
-                    confirmButton = {},
-                    dismissButton = {
-                        TextButton(
-                            onClick = { showGoogleAccountChooser = false },
-                            enabled = !isGmailSyncing
-                        ) {
-                            Text("Cancel")
-                        }
-                    }
                 )
             }
 

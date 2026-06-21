@@ -364,7 +364,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     shortIcon = "⚡",
                     bankAccountName = "Apex Tech Solutions",
                     bankName = "ICICI Bank",
-                    bankAccountNo = "9160635224",
+                    bankAccountNo = "123456789",
                     bankBranch = "Noida",
                     bankIfsc = "ICICI1234"
                 )
@@ -382,7 +382,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     shortIcon = "⚡",
                     bankAccountName = "Apex Tech Solutions",
                     bankName = "ICICI Bank",
-                    bankAccountNo = "9160635224",
+                    bankAccountNo = "123456789",
                     bankBranch = "Noida",
                     bankIfsc = "ICICI1234"
                 )

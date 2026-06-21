@@ -38,7 +38,9 @@ import java.util.*
 fun InvoicesScreen(
     viewModel: InvoiceViewModel,
     modifier: Modifier = Modifier,
-    onMenuClick: (() -> Unit)? = null
+    onMenuClick: (() -> Unit)? = null,
+    startInCreateMode: Boolean = false,
+    onClearCreateMode: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
@@ -53,6 +55,13 @@ fun InvoicesScreen(
     // Navigation inside screener: List or Create Invoice
     var isCreatingInvoice by remember { mutableStateOf(false) }
     var editingInvoice by remember { mutableStateOf<InvoiceWithDetails?>(null) }
+
+    LaunchedEffect(startInCreateMode) {
+        if (startInCreateMode) {
+            isCreatingInvoice = true
+            onClearCreateMode?.invoke()
+        }
+    }
 
     // Multi-selection states
     var isSelectionMode by remember { mutableStateOf(false) }
@@ -161,7 +170,7 @@ fun InvoicesScreen(
                                 Icon(Icons.Default.List, contentDescription = "Enable Bulk Delete selection")
                             }
 
-                            IconButton(
+                             IconButton(
                                 onClick = {
                                     val csvFile = com.example.util.ExcelExporter.generateAccountingReportCsv(context, invoices, clients)
                                     if (csvFile != null) {
@@ -174,10 +183,6 @@ fun InvoicesScreen(
                                 modifier = Modifier.testTag("invoices_catalog_excel_btn")
                             ) {
                                 Icon(Icons.Default.TableView, contentDescription = "Excel spreadsheet accounting export", tint = MaterialTheme.colorScheme.primary)
-                            }
-
-                            IconButton(onClick = { isCreatingInvoice = true }) {
-                                Icon(Icons.Default.Add, contentDescription = "Add New Billings")
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -573,7 +578,7 @@ fun InvoiceDetailLayout(
             }
         }
 
-        // WhatsApp / Email Share & PDF Preview Row
+        // WhatsApp Share & PDF Preview Row
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -591,27 +596,15 @@ fun InvoiceDetailLayout(
             }
 
             Button(
-                onClick = onShareEmail,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                onClick = onPreviewPdf,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(6.dp),
                 contentPadding = PaddingValues(vertical = 4.dp)
             ) {
-                Icon(Icons.Default.Email, contentDescription = "Email Share", modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.PictureAsPdf, contentDescription = "Preview", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer)
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Email PDF", fontSize = 11.sp)
-            }
-
-            Button(
-                onClick = onPreviewPdf,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
-                modifier = Modifier.weight(1.2f),
-                shape = RoundedCornerShape(6.dp),
-                contentPadding = PaddingValues(vertical = 4.dp)
-            ) {
-                Icon(Icons.Default.PictureAsPdf, contentDescription = "Preview", modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("PDF Preview", fontSize = 11.sp)
+                Text("PDF Preview", fontSize = 11.sp, color = MaterialTheme.colorScheme.onTertiaryContainer)
             }
         }
 
@@ -641,7 +634,8 @@ fun InvoiceDetailLayout(
                         Button(
                             onClick = {
                                 try {
-                                    val upiUri = "upi://pay?pa=${businessProfile.upiId}&pn=${businessProfile.businessName}&am=${item.invoice.grandTotal}&cu=INR"
+                                    val encodedPn = android.net.Uri.encode(businessProfile.businessName)
+                                    val upiUri = "upi://pay?pa=${businessProfile.upiId}&pn=$encodedPn&am=${item.invoice.grandTotal}&cu=INR"
                                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
                                         putExtra(Intent.EXTRA_TEXT, "Hello, please pay ₹${String.format(Locale.US, "%.2f", item.invoice.grandTotal)} to ${businessProfile.businessName} via UPI ID: ${businessProfile.upiId}\nPayment Link: $upiUri")
@@ -1017,9 +1011,9 @@ fun CreateInvoiceScreen(
                         ) {
                             OutlinedTextField(
                                 value = vehicleNumber,
-                                onValueChange = { vehicleNumber = it },
+                                onValueChange = { vehicleNumber = formatVehicleNumber(it) },
                                 label = { Text("Vehicle Number") },
-                                placeholder = { Text("e.g. GJ-01-XX-9999") },
+                                placeholder = { Text("e.g. DL-67-AB-3672") },
                                 modifier = Modifier.weight(1f),
                                 singleLine = true
                             )
@@ -1823,7 +1817,8 @@ fun CreateInvoiceScreen(
 @Composable
 fun UpiQrImage(upiId: String, businessName: String, amount: Double) {
     val upiUri = remember(upiId, businessName, amount) {
-        "upi://pay?pa=$upiId&pn=$businessName&am=$amount&cu=INR"
+        val encodedPn = android.net.Uri.encode(businessName)
+        "upi://pay?pa=$upiId&pn=$encodedPn&am=$amount&cu=INR"
     }
     val qrBitmap = remember(upiUri) {
         try {
@@ -1975,6 +1970,22 @@ fun CatalogInvoiceItemRow(
                     }
                 }
             }
+        }
+    }
+}
+
+fun formatVehicleNumber(input: String): String {
+    val clean = input.filter { it.isLetterOrDigit() }.uppercase()
+    return when {
+        clean.length <= 2 -> clean
+        clean.length <= 4 -> {
+            "${clean.substring(0, 2)}-${clean.substring(2)}"
+        }
+        clean.length <= 6 -> {
+            "${clean.substring(0, 2)}-${clean.substring(2, 4)}-${clean.substring(4)}"
+        }
+        else -> {
+            "${clean.substring(0, 2)}-${clean.substring(2, 4)}-${clean.substring(4, 6)}-${clean.substring(6)}"
         }
     }
 }
