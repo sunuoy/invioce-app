@@ -228,6 +228,77 @@ fun AppSettingsScreen(
                 }
             }
 
+            // 1.25. Dashboard Configuration Preferences Card
+            val generatorPrefs = remember { context.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE) }
+            var showTaxSummarySetting by remember {
+                mutableStateOf(generatorPrefs.getBoolean("show_tax_summary", true))
+            }
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier.fillMaxWidth().testTag("dashboard_settings_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Dashboard,
+                            contentDescription = "Dashboard settings icon",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Text(
+                            text = "Dashboard Configuration",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Text(
+                        text = "Toggle visibility of elements displayed on the main report overview and dashboard home page:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "GST Fiscal Tax Summary",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Show/Hide interactive tax calculation widgets on dashboard.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = showTaxSummarySetting,
+                            onCheckedChange = { isChecked ->
+                                showTaxSummarySetting = isChecked
+                                generatorPrefs.edit().putBoolean("show_tax_summary", isChecked).apply()
+                                Toast.makeText(context, if (isChecked) "GST Fiscal Tax Summary Enabled!" else "GST Fiscal Tax Summary Disabled!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.testTag("tax_summary_toggle_settings")
+                        )
+                    }
+                }
+            }
+
             // 1.5. Demo & Dummy Data Seeding Card
             Card(
                 modifier = Modifier.fillMaxWidth().testTag("demo_seeding_card_settings"),

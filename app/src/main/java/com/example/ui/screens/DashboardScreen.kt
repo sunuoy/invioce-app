@@ -47,6 +47,24 @@ fun DashboardScreen(
     modifier: Modifier = Modifier,
     onMenuClick: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences("invoice_generator_prefs", android.content.Context.MODE_PRIVATE) }
+    var showTaxSummary by remember(prefs) {
+        mutableStateOf(prefs.getBoolean("show_tax_summary", true))
+    }
+
+    DisposableEffect(prefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "show_tax_summary") {
+                showTaxSummary = prefs.getBoolean("show_tax_summary", true)
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
     val totalSales by viewModel.totalSales.collectAsStateWithLifecycle()
     val outstandingAmount by viewModel.outstandingAmount.collectAsStateWithLifecycle()
@@ -283,8 +301,9 @@ fun DashboardScreen(
             }
 
             // 2.2. Interactive Tax / GST summary dashboard
-            item {
-                var taxStartDate by remember { mutableStateOf(System.currentTimeMillis() - 30L * 24L * 60L * 60L * 1000L) } // 30 days ago
+            if (showTaxSummary) {
+                item {
+                    var taxStartDate by remember { mutableStateOf(System.currentTimeMillis() - 30L * 24L * 60L * 60L * 1000L) } // 30 days ago
                 var taxEndDate by remember { mutableStateOf(System.currentTimeMillis()) } // today
                 val context = LocalContext.current
                 
@@ -536,6 +555,7 @@ fun DashboardScreen(
                         }
                     }
                 }
+            }
             }
 
             // Recent Invoices Header

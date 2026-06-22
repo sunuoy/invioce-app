@@ -30,7 +30,7 @@ object PdfGenerator {
     }
 
     private fun getItalicTypeface(): Typeface {
-        return Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
+        return Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
     }
 
     private fun englishNumberToWords(number: Long): String {
@@ -398,33 +398,53 @@ object PdfGenerator {
         // Columns definition with exact mathematical mappings to span right Border Box nicely
         val tableColsX = floatArrayOf(
             leftBorder,        // Sr (20)
-            leftBorder + 20f,  // Item Description (180)
-            leftBorder + 200f, // HSN/SAC (45)
-            leftBorder + 245f, // Qty (30)
-            leftBorder + 275f, // Unit (30)
-            leftBorder + 305f, // List Price (50)
-            leftBorder + 355f, // Disc (40)
-            leftBorder + 395f, // CGST % (40)
-            leftBorder + 435f, // SGST % (40)
-            leftBorder + 475f  // Amount (90) -> up to right border
+            leftBorder + 20f,  // Item Description (170)
+            leftBorder + 190f, // HSN/SAC (50)
+            leftBorder + 240f, // Qty (30)
+            leftBorder + 270f, // Unit (30)
+            leftBorder + 300f, // List Price (50)
+            leftBorder + 350f, // Disc (35)
+            leftBorder + 385f, // CGST % (40)
+            leftBorder + 425f, // SGST % (40)
+            leftBorder + 465f  // Amount (100) -> up to right border
         )
-        val tableColsWidths = floatArrayOf(20f, 180f, 45f, 30f, 30f, 50f, 40f, 40f, 40f, 90f)
+        val tableColsWidths = floatArrayOf(20f, 170f, 50f, 30f, 30f, 50f, 35f, 40f, 40f, 100f)
+
+        // Table-specific dedicated text paints to ensure high precision alignment and zero overlap
+        val tableTextPaint = Paint().apply {
+            color = textDarkColor
+            textSize = 8.2f
+            typeface = getNormalTypeface()
+            isAntiAlias = true
+        }
+        val tableBoldTextPaint = Paint().apply {
+            color = textDarkColor
+            textSize = 8.2f
+            typeface = getBoldTypeface()
+            isAntiAlias = true
+        }
+        val tableWhiteTextPaint = Paint().apply {
+            color = Color.WHITE
+            textSize = 8.2f
+            typeface = getBoldTypeface()
+            isAntiAlias = true
+        }
 
         // Draw Table Header Fill block with Primary solid color
         canvas.drawRect(leftBorder + 0.5f, 255.5f, rightBorder - 0.5f, 275f, primaryFillPaint)
         canvas.drawLine(leftBorder, 275f, rightBorder, 275f, borderPaint)
 
         // Draw Header Titles inside Column Block
-        canvas.drawText("Sr.", tableColsX[0] + 3f, 269f, whiteTextPaint)
-        canvas.drawText("Item Description", tableColsX[1] + 4f, 269f, whiteTextPaint)
-        canvas.drawText("HSN/SAC", tableColsX[2] + 4f, 269f, whiteTextPaint)
-        canvas.drawText("Qty", tableColsX[3] + 4f, 269f, whiteTextPaint)
-        canvas.drawText("Unit", tableColsX[4] + 4f, 269f, whiteTextPaint)
-        canvas.drawText("List Price", tableColsX[5] + 4f, 269f, whiteTextPaint)
-        canvas.drawText("Disc.", tableColsX[6] + 4f, 269f, whiteTextPaint)
-        canvas.drawText("CGST %", tableColsX[7] + 4f, 269f, whiteTextPaint)
-        canvas.drawText("SGST %", tableColsX[8] + 4f, 269f, whiteTextPaint)
-        canvas.drawText("Amount (₹)", tableColsX[9] + 4f, 269f, whiteTextPaint)
+        canvas.drawText("Sr.", tableColsX[0] + 3f, 269f, tableWhiteTextPaint)
+        canvas.drawText("Item Description", tableColsX[1] + 4f, 269f, tableWhiteTextPaint)
+        canvas.drawText("HSN/SAC", tableColsX[2] + 4f, 269f, tableWhiteTextPaint)
+        canvas.drawText("Qty", tableColsX[3] + 4f, 269f, tableWhiteTextPaint)
+        canvas.drawText("Unit", tableColsX[4] + 4f, 269f, tableWhiteTextPaint)
+        canvas.drawText("List Price", tableColsX[5] + 4f, 269f, tableWhiteTextPaint)
+        canvas.drawText("Disc.", tableColsX[6] + 4f, 269f, tableWhiteTextPaint)
+        canvas.drawText("CGST %", tableColsX[7] + 4f, 269f, tableWhiteTextPaint)
+        canvas.drawText("SGST %", tableColsX[8] + 4f, 269f, tableWhiteTextPaint)
+        canvas.drawText("Amount (₹)", tableColsX[9] + 4f, 269f, tableWhiteTextPaint)
 
         val rowShadingPaint = Paint().apply {
             color = Color.parseColor(themeBgHex) // Theme unified soft color tint
@@ -438,7 +458,7 @@ object PdfGenerator {
         for (idx in items.indices) {
             val item = items[idx]
             if (tableRowY > 495f) {
-                canvas.drawText("... Extra items content omitted (fits 1 page) ...", tableColsX[1] + 10f, tableRowY + 12f, boldTextPaint)
+                canvas.drawText("... Extra items content omitted (fits 1 page) ...", tableColsX[1] + 10f, tableRowY + 12f, tableBoldTextPaint)
                 break
             }
 
@@ -453,12 +473,12 @@ object PdfGenerator {
             val displayName = if (item.productName.length > 32) item.productName.take(29) + "..." else item.productName
             val hsnSacVal = item.hsnSac.takeIf { it.isNotBlank() } ?: "9983"
 
-            canvas.drawText("${idx + 1}", tableColsX[0] + 5f, tableRowY, textPaint)
-            canvas.drawText(displayName, tableColsX[1] + 5f, tableRowY, textPaint)
-            canvas.drawText(hsnSacVal, tableColsX[2] + 4f, tableRowY, textPaint)
-            canvas.drawText(String.format(Locale.US, "%.2f", item.quantity), tableColsX[3] + 4f, tableRowY, textPaint)
-            canvas.drawText(item.unit.takeIf { it.isNotBlank() } ?: "N.A.", tableColsX[4] + 4f, tableRowY, textPaint)
-            canvas.drawText(String.format(Locale.US, "%.2f", item.price), tableColsX[5] + 4f, tableRowY, textPaint)
+            canvas.drawText("${idx + 1}", tableColsX[0] + 5f, tableRowY, tableTextPaint)
+            canvas.drawText(displayName, tableColsX[1] + 5f, tableRowY, tableTextPaint)
+            canvas.drawText(hsnSacVal, tableColsX[2] + 4f, tableRowY, tableTextPaint)
+            canvas.drawText(String.format(Locale.US, "%.2f", item.quantity), tableColsX[3] + 4f, tableRowY, tableTextPaint)
+            canvas.drawText(item.unit.takeIf { it.isNotBlank() } ?: "N.A.", tableColsX[4] + 4f, tableRowY, tableTextPaint)
+            canvas.drawText(String.format(Locale.US, "%.2f", item.price), tableColsX[5] + 4f, tableRowY, tableTextPaint)
             
             // Computed discount representation
             val lineTotalOriginal = item.price * item.quantity
@@ -471,15 +491,15 @@ object PdfGenerator {
             } else {
                 "0.00"
             }
-            canvas.drawText(discStr, tableColsX[6] + 4f, tableRowY, textPaint)
+            canvas.drawText(discStr, tableColsX[6] + 4f, tableRowY, tableTextPaint)
             
             // CGST & SGST are split evenly from total tax rate
             val modelTaxRate = item.taxRate
             val cgstRate = modelTaxRate / 2.0
             val sgstRate = modelTaxRate / 2.0
-            canvas.drawText(String.format(Locale.US, "%.2f", cgstRate), tableColsX[7] + 4f, tableRowY, textPaint)
-            canvas.drawText(String.format(Locale.US, "%.2f", sgstRate), tableColsX[8] + 4f, tableRowY, textPaint)
-            canvas.drawText(String.format(Locale.US, "%.2f", item.total), tableColsX[9] + 6f, tableRowY, textPaint)
+            canvas.drawText(String.format(Locale.US, "%.2f", cgstRate), tableColsX[7] + 4f, tableRowY, tableTextPaint)
+            canvas.drawText(String.format(Locale.US, "%.2f", sgstRate), tableColsX[8] + 4f, tableRowY, tableTextPaint)
+            canvas.drawText(String.format(Locale.US, "%.2f", item.total), tableColsX[9] + 6f, tableRowY, tableTextPaint)
 
             tableRowY += 16f
         }
