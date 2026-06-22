@@ -629,53 +629,63 @@ fun SettingsScreen(
                         singleLine = true
                     )
 
-                    OutlinedTextField(
-                        value = phone,
-                        onValueChange = { phone = it },
-                        label = { Text("Support Telephone Contact") },
-                        placeholder = { Text("e.g. +91 9876543210") },
-                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = "Business Contact number") },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        singleLine = true
-                    )
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = phone,
+                            onValueChange = { phone = it },
+                            label = { Text("Phone") },
+                            placeholder = { Text("e.g. +91...") },
+                            leadingIcon = { Icon(Icons.Default.Phone, contentDescription = "Business Contact number", modifier = Modifier.size(20.dp)) },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            singleLine = true
+                        )
 
-                    OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
-                        label = { Text("Commercial Email Address") },
-                        placeholder = { Text("e.g. invoice@apextech.com") },
-                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = "Contact email") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Email),
-                        singleLine = true
-                    )
+                        OutlinedTextField(
+                            value = email,
+                            onValueChange = { email = it },
+                            label = { Text("Email") },
+                            placeholder = { Text("e.g. invoice...") },
+                            leadingIcon = { Icon(Icons.Default.Email, contentDescription = "Contact email", modifier = Modifier.size(20.dp)) },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Email),
+                            singleLine = true
+                        )
+                    }
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                    OutlinedTextField(
-                        value = gstin,
-                        onValueChange = { gstin = it },
-                        label = { Text("Taxpayer ID / GSTIN") },
-                        placeholder = { Text("e.g. 07AAAAA1111A1Z1") },
-                        leadingIcon = { Icon(Icons.Default.AssignmentInd, contentDescription = "GST Details identification") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("setting_biz_tax_input"),
-                        singleLine = true
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = gstin,
+                            onValueChange = { gstin = it },
+                            label = { Text("GSTIN") },
+                            placeholder = { Text("e.g. 07...") },
+                            leadingIcon = { Icon(Icons.Default.AssignmentInd, contentDescription = "GST Details identification", modifier = Modifier.size(20.dp)) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("setting_biz_tax_input"),
+                            singleLine = true
+                        )
 
-                    OutlinedTextField(
-                        value = upiId,
-                        onValueChange = { upiId = it },
-                        label = { Text("UPI ID (Payments)") },
-                        placeholder = { Text("e.g. apextech@ybl") },
-                        leadingIcon = { Icon(Icons.Default.QrCode, contentDescription = "UPI payments identifier") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("setting_biz_upi_input"),
-                        singleLine = true
-                    )
+                        OutlinedTextField(
+                            value = upiId,
+                            onValueChange = { upiId = it },
+                            label = { Text("UPI ID") },
+                            placeholder = { Text("e.g. apex...") },
+                            leadingIcon = { Icon(Icons.Default.QrCode, contentDescription = "UPI payments identifier", modifier = Modifier.size(20.dp)) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("setting_biz_upi_input"),
+                            singleLine = true
+                        )
+                    }
 
                     OutlinedTextField(
                         value = address,
@@ -707,63 +717,73 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.primary
                     )
 
-                    OutlinedTextField(
-                        value = bankAccountName,
-                        onValueChange = { bankAccountName = it },
-                        label = { Text("Account Holder Name") },
-                        placeholder = { Text("e.g. Apex Tech Solutions") },
-                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = "Bank Beneficiary Name") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("setting_bank_acc_name_input"),
-                        singleLine = true
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = bankName,
+                            onValueChange = { input ->
+                                if (input.all { it.isLetter() || it.isWhitespace() }) {
+                                    bankName = input
+                                }
+                            },
+                            label = { Text("Bank Name") },
+                            placeholder = { Text("e.g. ICICI") },
+                            leadingIcon = { Icon(Icons.Default.AccountBalance, contentDescription = "Bank Name", modifier = Modifier.size(20.dp)) },
+                            isError = isBankNameError,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("setting_bank_name_input"),
+                            singleLine = true
+                        )
 
-                    OutlinedTextField(
-                        value = bankName,
-                        onValueChange = { input ->
-                            if (input.all { it.isLetter() || it.isWhitespace() }) {
-                                bankName = input
-                            }
-                        },
-                        label = { Text("Bank Name") },
-                        placeholder = { Text("e.g. ICICI Bank") },
-                        leadingIcon = { Icon(Icons.Default.AccountBalance, contentDescription = "Bank Name") },
-                        isError = isBankNameError,
-                        supportingText = {
-                            if (isBankNameError) {
-                                Text("Bank Name must be text only", color = MaterialTheme.colorScheme.error)
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("setting_bank_name_input"),
-                        singleLine = true
-                    )
+                        OutlinedTextField(
+                            value = bankAccountName,
+                            onValueChange = { bankAccountName = it },
+                            label = { Text("Holder Name") },
+                            placeholder = { Text("e.g. Apex Tech") },
+                            leadingIcon = { Icon(Icons.Default.Person, contentDescription = "Bank Beneficiary Name", modifier = Modifier.size(20.dp)) },
+                            modifier = Modifier
+                                .weight(1.2f)
+                                .testTag("setting_bank_acc_name_input"),
+                            singleLine = true
+                        )
+                    }
 
-                    OutlinedTextField(
-                        value = bankAccountNo,
-                        onValueChange = { input ->
-                            if (input.all { it.isDigit() } && input.length <= 16) {
-                                bankAccountNo = input
-                            }
-                        },
-                        label = { Text("A/c No") },
-                        placeholder = { Text("e.g. 123456789") },
-                        leadingIcon = { Icon(Icons.Default.CreditCard, contentDescription = "Account Number") },
-                        isError = isBankAccountNoError,
-                        supportingText = {
-                            if (isBankAccountNoError) {
-                                Text("Bank Account must be 9 to 16 digits (numbers only)", color = MaterialTheme.colorScheme.error)
-                            } else {
-                                Text("Minimum 9 to 16 digit numbers only", style = MaterialTheme.typography.labelSmall)
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("setting_bank_acc_no_input"),
-                        singleLine = true
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = bankAccountNo,
+                            onValueChange = { input ->
+                                if (input.all { it.isDigit() } && input.length <= 16) {
+                                    bankAccountNo = input
+                                }
+                            },
+                            label = { Text("A/c No") },
+                            placeholder = { Text("e.g. 12345...") },
+                            leadingIcon = { Icon(Icons.Default.CreditCard, contentDescription = "Account Number", modifier = Modifier.size(20.dp)) },
+                            isError = isBankAccountNoError,
+                            modifier = Modifier
+                                .weight(1.2f)
+                                .testTag("setting_bank_acc_no_input"),
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = bankIfsc,
+                            onValueChange = { bankIfsc = it },
+                            label = { Text("IFSC Code") },
+                            placeholder = { Text("e.g. ICIC0001234") },
+                            leadingIcon = { Icon(Icons.Default.Code, contentDescription = "IFSC Code", modifier = Modifier.size(20.dp)) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("setting_bank_ifsc_input"),
+                            singleLine = true
+                        )
+                    }
 
                     OutlinedTextField(
                         value = bankBranch,
@@ -774,18 +794,6 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("setting_bank_branch_input"),
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = bankIfsc,
-                        onValueChange = { bankIfsc = it },
-                        label = { Text("IFSC Code") },
-                        placeholder = { Text("e.g. ICIC0001234") },
-                        leadingIcon = { Icon(Icons.Default.Code, contentDescription = "IFSC Code") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("setting_bank_ifsc_input"),
                         singleLine = true
                     )
                 }
