@@ -133,7 +133,10 @@ fun MainAppNavigation(
                 ) { targetTab ->
                     val screenModifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding)
+                        .padding(
+                            top = 0.dp,
+                            bottom = innerPadding.calculateBottomPadding()
+                        )
 
                     val menuAction: () -> Unit = { scope.launch { drawerState.open() } }
 
