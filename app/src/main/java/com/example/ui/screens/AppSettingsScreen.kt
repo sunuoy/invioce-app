@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -41,6 +42,7 @@ fun AppSettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    BackHandler(onBack = onBackToApp)
     val prefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
     
     // Theme options state
@@ -55,6 +57,7 @@ fun AppSettingsScreen(
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
     
     var showRestoreConfirmation by remember { mutableStateOf<String?>(null) }
+    var showClearDataConfirmation by remember { mutableStateOf(false) }
     
     // Setup file importing
     val importLauncher = rememberLauncherForActivityResult(
@@ -119,11 +122,7 @@ fun AppSettingsScreen(
                         Icon(Icons.Default.Menu, contentDescription = "Open navigation menu")
                     }
                 },
-                actions = {
-                    IconButton(onClick = onBackToApp, modifier = Modifier.testTag("app_settings_close_btn")) {
-                        Icon(Icons.Default.Close, contentDescription = "Return to Billing Hub")
-                    }
-                },
+
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )
@@ -233,6 +232,9 @@ fun AppSettingsScreen(
             var showTaxSummarySetting by remember {
                 mutableStateOf(generatorPrefs.getBoolean("show_tax_summary", true))
             }
+            var showSalesTrendSetting by remember {
+                mutableStateOf(generatorPrefs.getBoolean("show_sales_trend", true))
+            }
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -296,6 +298,37 @@ fun AppSettingsScreen(
                             modifier = Modifier.testTag("tax_summary_toggle_settings")
                         )
                     }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Sales Trend Projection",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Show/Hide revenue projection charts on dashboard home page.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = showSalesTrendSetting,
+                            onCheckedChange = { isChecked ->
+                                showSalesTrendSetting = isChecked
+                                generatorPrefs.edit().putBoolean("show_sales_trend", isChecked).apply()
+                                Toast.makeText(context, if (isChecked) "Sales Trend Projection Enabled!" else "Sales Trend Projection Disabled!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.testTag("sales_trend_toggle_settings")
+                        )
+                    }
                 }
             }
 
@@ -348,6 +381,56 @@ fun AppSettingsScreen(
                         Icon(Icons.Default.Refresh, contentDescription = "Repopulate", modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Seed & Populate Demo Data", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            // 1.75. Danger Zone - Wipe Database Card
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("danger_zone_card_settings"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteForever,
+                            contentDescription = "Danger Zone Icon",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Text(
+                            text = "Danger Zone",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
+                    Text(
+                        text = "Permanently wipe all database records including your business profiles, products stock, customer registry, and invoices. This action is irreversible.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Button(
+                        onClick = { showClearDataConfirmation = true },
+                        modifier = Modifier.fillMaxWidth().testTag("clear_all_data_button_settings"),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "Clear All Data", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Wipe All Database Data", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -643,6 +726,37 @@ fun AppSettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showRestoreConfirmation = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Confirm clear data dialog
+    if (showClearDataConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showClearDataConfirmation = false },
+            title = { Text("Wipe All Application Data?") },
+            text = {
+                Text(
+                    "This will permanently delete all your invoices, clients, products, and profile configurations. This cannot be undone.",
+                    color = MaterialTheme.colorScheme.error
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showClearDataConfirmation = false
+                        viewModel.clearAllData()
+                        Toast.makeText(context, "All database records have been deleted.", Toast.LENGTH_LONG).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete Everything")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDataConfirmation = false }) {
                     Text("Cancel")
                 }
             }

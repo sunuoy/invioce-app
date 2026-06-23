@@ -52,11 +52,20 @@ fun DashboardScreen(
     var showTaxSummary by remember(prefs) {
         mutableStateOf(prefs.getBoolean("show_tax_summary", true))
     }
+    var showSalesTrend by remember(prefs) {
+        mutableStateOf(prefs.getBoolean("show_sales_trend", true))
+    }
+
+    var taxStartDate by remember { mutableStateOf(System.currentTimeMillis() - 30L * 24L * 60L * 60L * 1000L) } // 30 days ago
+    var taxEndDate by remember { mutableStateOf(System.currentTimeMillis()) } // today
+
 
     DisposableEffect(prefs) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == "show_tax_summary") {
                 showTaxSummary = prefs.getBoolean("show_tax_summary", true)
+            } else if (key == "show_sales_trend") {
+                showSalesTrend = prefs.getBoolean("show_sales_trend", true)
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -272,7 +281,7 @@ fun DashboardScreen(
             }
 
             // Canvas Revenue Trend mini-chart (Only render if we have invoices)
-            if (invoices.isNotEmpty()) {
+            if (showSalesTrend && invoices.isNotEmpty()) {
                 item {
                     Text(
                         text = "Sales Trend Projection",
@@ -303,8 +312,6 @@ fun DashboardScreen(
             // 2.2. Interactive Tax / GST summary dashboard
             if (showTaxSummary) {
                 item {
-                    var taxStartDate by remember { mutableStateOf(System.currentTimeMillis() - 30L * 24L * 60L * 60L * 1000L) } // 30 days ago
-                var taxEndDate by remember { mutableStateOf(System.currentTimeMillis()) } // today
                 val context = LocalContext.current
                 
                 // Format dates for display

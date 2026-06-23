@@ -40,7 +40,9 @@ fun InvoicesScreen(
     modifier: Modifier = Modifier,
     onMenuClick: (() -> Unit)? = null,
     startInCreateMode: Boolean = false,
-    onClearCreateMode: (() -> Unit)? = null
+    onClearCreateMode: (() -> Unit)? = null,
+    viewInvoiceId: Int? = null,
+    onClearViewInvoiceId: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
@@ -60,6 +62,16 @@ fun InvoicesScreen(
         if (startInCreateMode) {
             isCreatingInvoice = true
             onClearCreateMode?.invoke()
+        }
+    }
+
+    LaunchedEffect(viewInvoiceId, invoices) {
+        if (viewInvoiceId != null) {
+            val matchingInvoice = invoices.find { it.invoice.id == viewInvoiceId }
+            if (matchingInvoice != null) {
+                activeInvoiceDetails = matchingInvoice
+                onClearViewInvoiceId?.invoke()
+            }
         }
     }
 
@@ -636,13 +648,13 @@ fun InvoiceDetailLayout(
                                 try {
                                     val encodedPn = android.net.Uri.encode(businessProfile.businessName)
                                     val upiUri = "upi://pay?pa=${businessProfile.upiId}&pn=$encodedPn&am=${item.invoice.grandTotal}&cu=INR"
-                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, "Hello, please pay ₹${String.format(Locale.US, "%.2f", item.invoice.grandTotal)} to ${businessProfile.businessName} via UPI ID: ${businessProfile.upiId}\nPayment Link: $upiUri")
-                                    }
-                                    val chooser = Intent.createChooser(shareIntent, "Share Payment Link")
-                                    chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    context.startActivity(chooser)
+                                    PdfGenerator.shareUpiQrAndLink(
+                                        context = context,
+                                        upiUri = upiUri,
+                                        amount = item.invoice.grandTotal,
+                                        businessName = businessProfile.businessName,
+                                        upiId = businessProfile.upiId
+                                    )
                                 } catch (e: Exception) {
                                     Toast.makeText(context, "Cannot share UPI link", Toast.LENGTH_SHORT).show()
                                 }
@@ -819,6 +831,7 @@ fun CreateInvoiceScreen(
     var vehicleNumber by remember { mutableStateOf(editingInvoice?.invoice?.vehicleNumber ?: "") }
     var brokerageBy by remember { mutableStateOf(editingInvoice?.invoice?.brokerageBy ?: "") }
     var placeOfSupply by remember { mutableStateOf(editingInvoice?.invoice?.placeOfSupply ?: "") }
+    var dueDateTimestamp by remember { mutableStateOf(editingInvoice?.invoice?.dueDateTimestamp ?: 0L) }
 
     // List of active line items currently added
     val addedItems = remember { mutableStateListOf<InvoiceLineItem>() }
@@ -828,6 +841,7 @@ fun CreateInvoiceScreen(
         editingInvoice?.let {
             addedItems.clear()
             addedItems.addAll(it.lineItems)
+            dueDateTimestamp = it.invoice.dueDateTimestamp
         }
     }
 
@@ -868,7 +882,8 @@ fun CreateInvoiceScreen(
                                     notes = notes,
                                     vehicleNumber = vehicleNumber,
                                     brokerageBy = brokerageBy,
-                                    placeOfSupply = placeOfSupply
+                                    placeOfSupply = placeOfSupply,
+                                    dueDateTimestamp = dueDateTimestamp
                                 )
                                 Toast.makeText(context, "Invoice Saved Successfully!", Toast.LENGTH_SHORT).show()
                                 onBack()
@@ -975,6 +990,76 @@ fun CreateInvoiceScreen(
                                     },
                                     modifier = Modifier.weight(1f)
                                 )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Due Date Picker
+                        val dFormatter = remember { SimpleDateFormat("dd-MM-yyyy", Locale.US) }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                OutlinedTextField(
+                                    value = if (dueDateTimestamp != 0L) dFormatter.format(Date(dueDateTimestamp)) else "Not set (Default 5 days)",
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Due Date") },
+                                    trailingIcon = { Icon(Icons.Default.DateRange, "Select due date") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    enabled = false
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .clickable {
+                                            val cal = Calendar.getInstance().apply {
+                                                if (dueDateTimestamp != 0L) {
+                                                    timeInMillis = dueDateTimestamp
+                                                } else {
+                                                    timeInMillis = System.currentTimeMillis() + (5L * 24 * 60 * 60 * 1000)
+                                                }
+                                            }
+                                            android.app.DatePickerDialog(
+                                                context,
+                                                { _, y, m, d ->
+                                                    val resCal = Calendar.getInstance().apply {
+                                                        set(Calendar.YEAR, y)
+                                                        set(Calendar.MONTH, m)
+                                                        set(Calendar.DAY_OF_MONTH, d)
+                                                        set(Calendar.HOUR_OF_DAY, 23)
+                                                        set(Calendar.MINUTE, 59)
+                                                        set(Calendar.SECOND, 59)
+                                                    }
+                                                    dueDateTimestamp = resCal.timeInMillis
+                                                },
+                                                cal.get(Calendar.YEAR),
+                                                cal.get(Calendar.MONTH),
+                                                cal.get(Calendar.DAY_OF_MONTH)
+                                            ).show()
+                                        }
+                                )
+                            }
+                            if (dueDateTimestamp != 0L) {
+                                IconButton(
+                                    onClick = { dueDateTimestamp = 0L },
+                                    modifier = Modifier.padding(top = 8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Clear Due Date",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
                         }
                     }
@@ -1220,7 +1305,8 @@ fun CreateInvoiceScreen(
                             notes = notes,
                             vehicleNumber = vehicleNumber,
                             brokerageBy = brokerageBy,
-                            placeOfSupply = placeOfSupply
+                            placeOfSupply = placeOfSupply,
+                            dueDateTimestamp = dueDateTimestamp
                         )
                         Toast.makeText(context, "Invoice Saved Successfully!", Toast.LENGTH_SHORT).show()
                         onBack()

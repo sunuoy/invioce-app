@@ -30,6 +30,7 @@ fun MainAppNavigation(
     var currentTab by remember { mutableStateOf(AppTab.DASHBOARD) }
     var showSeparateSettingsPage by remember { mutableStateOf(false) }
     var startInvoicesInCreateMode by remember { mutableStateOf(false) }
+    var viewInvoiceId by remember { mutableStateOf<Int?>(null) }
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -149,6 +150,7 @@ fun MainAppNavigation(
                                     currentTab = AppTab.INVOICES
                                 },
                                 onViewInvoiceDetails = { invoiceId ->
+                                    viewInvoiceId = invoiceId
                                     currentTab = AppTab.INVOICES
                                 },
                                 onMenuClick = menuAction,
@@ -161,6 +163,8 @@ fun MainAppNavigation(
                                 onMenuClick = menuAction,
                                 startInCreateMode = startInvoicesInCreateMode,
                                 onClearCreateMode = { startInvoicesInCreateMode = false },
+                                viewInvoiceId = viewInvoiceId,
+                                onClearViewInvoiceId = { viewInvoiceId = null },
                                 modifier = screenModifier
                             )
                         }

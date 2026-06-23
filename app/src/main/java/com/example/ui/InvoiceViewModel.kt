@@ -40,11 +40,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         viewModelScope.launch {
-            val prof = repository.getBusinessProfileSync()
-            if (prof == null) {
-                // First boot placeholder seeding
-                populateDummyData()
-            }
+            // First boot placeholder seeding disabled
         }
     }
 
@@ -240,7 +236,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         notes: String,
         vehicleNumber: String = "",
         brokerageBy: String = "",
-        placeOfSupply: String = ""
+        placeOfSupply: String = "",
+        dueDateTimestamp: Long = 0L
     ) {
         viewModelScope.launch {
             if (invoiceNumber.isBlank()) {
@@ -264,7 +261,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 notes = notes.trim(),
                 vehicleNumber = vehicleNumber.trim(),
                 brokerageBy = brokerageBy.trim(),
-                placeOfSupply = placeOfSupply.trim()
+                placeOfSupply = placeOfSupply.trim(),
+                dueDateTimestamp = dueDateTimestamp
             )
 
             val invoiceId = repository.saveInvoice(invoice, items)
@@ -348,8 +346,26 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun clearAllData() {
+        viewModelScope.launch {
+            try {
+                repository.restoreData(
+                    profile = null,
+                    products = emptyList(),
+                    customers = emptyList(),
+                    invoices = emptyList(),
+                    lineItems = emptyList()
+                )
+                _uiEvents.emit(UiEvent.ShowSuccess("All database data cleared!"))
+            } catch (e: Exception) {
+                _uiEvents.emit(UiEvent.ShowError("Failed to clear data: ${e.message}"))
+            }
+        }
+    }
+
     fun populateDummyData() {
         viewModelScope.launch {
+            println("=== InvoiceViewModel: Seeding dummy data started ===")
             try {
                 // Seed Business Profile
                 val sampleProfile = BusinessProfile(
@@ -437,7 +453,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     status = "Paid",
                     notes = "Thank you for shopping with Apex Tech!",
                     vehicleNumber = "DL-3C-AQ-1234",
-                    placeOfSupply = "09-Uttar Pradesh"
+                    placeOfSupply = "09-Uttar Pradesh",
+                    dueDateTimestamp = inv1_date + (5L * 24 * 3600 * 1000L)
                 )
                 val item1 = InvoiceLineItem(
                     id = 0,
@@ -479,7 +496,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     status = "Sent",
                     notes = "Due immediately upon receipt of invoice.",
                     brokerageBy = "Direct Sales Team",
-                    placeOfSupply = "27-Maharashtra"
+                    placeOfSupply = "27-Maharashtra",
+                    dueDateTimestamp = inv2_date + (10L * 24 * 3600 * 1000L)
                 )
                 val item3 = InvoiceLineItem(
                     id = 0,
@@ -505,7 +523,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     dateTimestamp = System.currentTimeMillis(),
                     status = "Draft",
                     notes = "Self pickup by client.",
-                    placeOfSupply = "07-Delhi"
+                    placeOfSupply = "07-Delhi",
+                    dueDateTimestamp = System.currentTimeMillis() + (7L * 24 * 3600 * 1000L)
                 )
                 val item4 = InvoiceLineItem(
                     id = 0,
@@ -537,8 +556,11 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 )
                 repository.saveInvoice(inv3, listOf(item4, item5))
 
+                println("=== InvoiceViewModel: Seeding dummy data completed successfully ===")
                 _uiEvents.emit(UiEvent.ShowSuccess("Sample Demo Data Loaded successfully!"))
             } catch (e: Exception) {
+                println("=== InvoiceViewModel: Seeding dummy data FAILED ===")
+                e.printStackTrace()
                 _uiEvents.emit(UiEvent.ShowError("Failed to seed data: ${e.message}"))
             }
         }

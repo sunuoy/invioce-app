@@ -117,7 +117,7 @@ object PdfGenerator {
         val items = invoiceWithDetails.lineItems
 
         val pdfDocument = PdfDocument()
-        val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 Size: 595 x 842 points
+        val pageInfo = PdfDocument.PageInfo.Builder(730, 842, 1).create() // Adjusted Page width: 730 x 842 points
         val page = pdfDocument.startPage(pageInfo)
         val canvas: Canvas = page.canvas
 
@@ -130,6 +130,8 @@ object PdfGenerator {
             "Burgundy" -> "#881337"
             "Charcoal" -> "#1E293B"
             "Sunset Indigo" -> "#4338CA"
+            "Burnt sienna" -> "#E35336"
+            "Blooming romance" -> "#660033"
             else -> "#1E3A8A" // "Classic Navy"
         }
         val secondaryColorHex = when (selectedTheme) {
@@ -137,6 +139,8 @@ object PdfGenerator {
             "Burgundy" -> "#E11D48"
             "Charcoal" -> "#64748B"
             "Sunset Indigo" -> "#6366F1"
+            "Burnt sienna" -> "#F4A460"
+            "Blooming romance" -> "#469110"
             else -> "#2563EB" // "Classic Navy"
         }
         val themeBgHex = when (selectedTheme) {
@@ -144,12 +148,19 @@ object PdfGenerator {
             "Burgundy" -> "#FFF1F2"
             "Charcoal" -> "#F8FAFC"
             "Sunset Indigo" -> "#EEF2FF"
+            "Burnt sienna" -> "#F5F5DC"
+            "Blooming romance" -> "#E673AC"
             else -> "#F1F5F9"
+        }
+        val dividerColorHex = when (selectedTheme) {
+            "Burnt sienna" -> "#A0522D"
+            "Blooming romance" -> "#00520A"
+            else -> "#94A3B8"
         }
 
         val primaryColor = Color.parseColor(primaryColorHex)
         val secondaryColor = Color.parseColor(secondaryColorHex)
-        val dividerColor = Color.parseColor("#94A3B8") // Slate Border Frame Color (94A3B8)
+        val dividerColor = Color.parseColor(dividerColorHex) // Dynamic frame color
         val textDarkColor = Color.parseColor("#0F172A") // Charcoal/Dark Slate (on-surface)
         val textMutedColor = Color.parseColor("#475569") // Cool Muted Slate Grey
 
@@ -224,15 +235,15 @@ object PdfGenerator {
 
         val footerSmallPaint = Paint().apply {
             color = textMutedColor
-            textSize = 7.5f
+            textSize = 12.0f
             typeface = getItalicTypeface()
             isAntiAlias = true
         }
 
         // --- 1. OUTER DOCUMENT FRAME ---
         val leftBorder = 15f
-        val rightBorder = 580f
-        val topBorder = 15f
+        val rightBorder = 715f
+        val topBorder = 30f
         val bottomBorder = 827f
 
         // Draw outer box
@@ -249,8 +260,8 @@ object PdfGenerator {
                 textAlign = Paint.Align.CENTER
                 isAntiAlias = true
             }
-            canvas.rotate(-35f, 297f, 421f) // rotate 35 degrees under central A4 point (297, 421)
-            canvas.drawText("DUPLICATE COPY", 297f, 421f, watermarkPaint)
+            canvas.rotate(-35f, 365f, 421f) // rotate 35 degrees under central point (365, 421)
+            canvas.drawText("DUPLICATE COPY", 365f, 421f, watermarkPaint)
             canvas.restore()
         }
 
@@ -260,8 +271,8 @@ object PdfGenerator {
             style = Paint.Style.FILL
             isAntiAlias = true
         }
-        canvas.drawRect(leftBorder + 0.5f, topBorder + 0.5f, rightBorder - 0.5f, 38f, headerBarPaint)
-        canvas.drawLine(leftBorder, 38f, rightBorder, 38f, borderPaint)
+        canvas.drawRect(leftBorder + 0.5f, topBorder + 0.5f, rightBorder - 0.5f, topBorder + 23f, headerBarPaint)
+        canvas.drawLine(leftBorder, topBorder + 23f, rightBorder, topBorder + 23f, borderPaint)
 
         // Document Info Title Type
         val docTitle = if (invoice.taxTotal > 0.0) "TAX INVOICE" else "BILL OF SUPPLY"
@@ -279,26 +290,26 @@ object PdfGenerator {
             isAntiAlias = true
         }
         
-        canvas.drawText("Page No. 1 of 1", 22f, 28f, headerTextPaint)
+        canvas.drawText("Page No. 1 of 1", 22f, topBorder + 13f, headerTextPaint)
         
         // Centered document title
         val titleWidth = headerBoldTextPaint.measureText(docTitle)
         val titleCenter = leftBorder + ((rightBorder - leftBorder) - titleWidth) / 2f
-        canvas.drawText(docTitle, titleCenter, 28f, headerBoldTextPaint)
+        canvas.drawText(docTitle, titleCenter, topBorder + 13f, headerBoldTextPaint)
 
         val rightHeaderLabel = if (invoice.downloadCount >= 3) "DUPLICATE COPY" else "ORIGINAL COPY"
         val rightHeaderWidth = headerTextPaint.measureText(rightHeaderLabel)
         val rightHeaderX = (rightBorder - 22f) - rightHeaderWidth
-        canvas.drawText(rightHeaderLabel, rightHeaderX, 28f, headerTextPaint)
+        canvas.drawText(rightHeaderLabel, rightHeaderX, topBorder + 13f, headerTextPaint)
 
         // --- 3. COMPANY / SELLER PROFILE BOX (y: 38 to 125) ---
-        canvas.drawLine(leftBorder, 125f, rightBorder, 125f, borderPaint)
+        canvas.drawLine(leftBorder, topBorder + 110f, rightBorder, topBorder + 110f, borderPaint)
 
         // Logo image / short icon placeholder box
         val logoLeft = 22f
-        val logoTop = 45f
+        val logoTop = topBorder + 30f
         val logoRight = 82f
-        val logoBottom = 115f
+        val logoBottom = topBorder + 100f
 
         // Draw stylized custom vector or monogram brand logo
         drawBrandLogo(canvas, logoLeft, logoTop, logoRight, logoBottom, profile, primaryColor, borderPaint)
@@ -311,18 +322,21 @@ object PdfGenerator {
         val bUpi = if (profile?.upiId.isNullOrBlank()) "company@upi" else profile.upiId
 
         // Draw Business Details
-        canvas.drawText(bName, 95f, 58f, titlePaint)
-        canvas.drawText(bAddr, 95f, 74f, textPaint)
-        canvas.drawText("Mobile: $bPhone | Email: $bEmail", 95f, 90f, textPaint)
+        canvas.drawText(bName, 95f, topBorder + 43f, titlePaint.apply { textSize = 16.0f })
+        titlePaint.textSize = 14.0f // reset
+        canvas.drawText(bAddr, 95f, topBorder + 59f, textPaint.apply { textSize = 12.5f })
+        canvas.drawText("Mobile: $bPhone | Email: $bEmail", 95f, topBorder + 75f, textPaint)
+        textPaint.textSize = 10.5f // reset
         
         val gstinAndPan = "GSTIN - $bGstin | PAN - ${bGstin.take(10)}"
-        canvas.drawText(gstinAndPan, 95f, 106f, boldTextPaint.apply { color = primaryColor })
+        canvas.drawText(gstinAndPan, 95f, topBorder + 91f, boldTextPaint.apply { color = primaryColor; textSize = 12.5f })
         boldTextPaint.color = textDarkColor // reset
+        boldTextPaint.textSize = 10.5f // reset
 
         // --- 4. BILLING DETAILS & INVOICE META BLOCK (y: 125 to 245) ---
-        val midX = 297f
-        canvas.drawLine(leftBorder, 245f, rightBorder, 245f, borderPaint)
-        canvas.drawLine(midX, 125f, midX, 245f, borderPaint)
+        val midX = 365f
+        canvas.drawLine(leftBorder, topBorder + 230f, rightBorder, topBorder + 230f, borderPaint)
+        canvas.drawLine(midX, topBorder + 110f, midX, topBorder + 230f, borderPaint)
 
         val subHeadingFillPaint = Paint().apply {
             color = Color.parseColor(themeBgHex)
@@ -337,12 +351,12 @@ object PdfGenerator {
         }
 
         // Shaded headers inside boxes
-        canvas.drawRect(leftBorder + 0.5f, 125.5f, midX - 0.5f, 142f, subHeadingFillPaint)
-        canvas.drawRect(midX + 0.5f, 125.5f, rightBorder - 0.5f, 142f, subHeadingFillPaint)
-        canvas.drawLine(leftBorder, 142f, rightBorder, 142f, borderPaint)
+        canvas.drawRect(leftBorder + 0.5f, topBorder + 110.5f, midX - 0.5f, topBorder + 127f, subHeadingFillPaint)
+        canvas.drawRect(midX + 0.5f, topBorder + 110.5f, rightBorder - 0.5f, topBorder + 127f, subHeadingFillPaint)
+        canvas.drawLine(leftBorder, topBorder + 127f, rightBorder, topBorder + 127f, borderPaint)
 
-        canvas.drawText("BILL TO (RECIPIENT)", leftBorder + 10f, 137.5f, subHeadingTextPaint)
-        canvas.drawText("INVOICE METADATA", midX + 10f, 137.5f, subHeadingTextPaint)
+        canvas.drawText("BILL TO (RECIPIENT)", leftBorder + 10f, topBorder + 122.5f, subHeadingTextPaint)
+        canvas.drawText("INVOICE METADATA", midX + 10f, topBorder + 122.5f, subHeadingTextPaint)
 
         // Draw Recipient profile details
         val cName = customer?.name ?: "Walking Customer"
@@ -351,64 +365,68 @@ object PdfGenerator {
         val cEmail = customer?.email?.takeIf { it.isNotBlank() } ?: "N.A."
         val cAddr = customer?.address?.takeIf { it.isNotBlank() } ?: "Add Address"
 
-        canvas.drawText("Name", leftBorder + 10f, 158f, headerLabelPaint)
-        canvas.drawText(": $cName", leftBorder + 65f, 158f, boldTextPaint)
+        canvas.drawText("Name", leftBorder + 10f, topBorder + 143f, textPaint)
+        canvas.drawText(": $cName", leftBorder + 65f, topBorder + 143f, boldTextPaint)
         
-        canvas.drawText("GSTIN", leftBorder + 10f, 175f, textPaint)
-        canvas.drawText(": $cGstin", leftBorder + 65f, 175f, textPaint)
+        canvas.drawText("GSTIN", leftBorder + 10f, topBorder + 160f, textPaint)
+        canvas.drawText(": $cGstin", leftBorder + 65f, topBorder + 160f, textPaint)
         
-        canvas.drawText("Mobile", leftBorder + 10f, 192f, textPaint)
-        canvas.drawText(": $cPhone", leftBorder + 65f, 192f, textPaint)
+        canvas.drawText("Mobile", leftBorder + 10f, topBorder + 177f, textPaint)
+        canvas.drawText(": $cPhone", leftBorder + 65f, topBorder + 177f, textPaint)
 
-        canvas.drawText("Email", leftBorder + 10f, 209f, textPaint)
-        canvas.drawText(": $cEmail", leftBorder + 65f, 209f, textPaint)
+        canvas.drawText("Email", leftBorder + 10f, topBorder + 194f, textPaint)
+        canvas.drawText(": $cEmail", leftBorder + 65f, topBorder + 194f, textPaint)
 
-        canvas.drawText("Address", leftBorder + 10f, 226f, textPaint)
-        canvas.drawText(": $cAddr", leftBorder + 65f, 226f, textPaint)
+        canvas.drawText("Address", leftBorder + 10f, topBorder + 211f, textPaint)
+        canvas.drawText(": $cAddr", leftBorder + 65f, topBorder + 211f, textPaint)
 
         // Draw Invoice Details
         val sfd = SimpleDateFormat("dd-MMM-yy", Locale.US)
         val invoiceDate = sfd.format(Date(invoice.dateTimestamp))
-        val dueDate = sfd.format(Date(invoice.dateTimestamp + (5L * 24 * 60 * 60 * 1000))) // Simple 5 days fallback
+        val dueDate = if (invoice.dueDateTimestamp != 0L) {
+            sfd.format(Date(invoice.dueDateTimestamp))
+        } else {
+            sfd.format(Date(invoice.dateTimestamp + (5L * 24 * 60 * 60 * 1000))) // Simple 5 days fallback
+        }
 
-        canvas.drawText("Invoice No.", midX + 10f, 158f, headerLabelPaint)
-        canvas.drawText(" : ${invoice.invoiceNumber}", midX + 115f, 158f, boldTextPaint)
+        canvas.drawText("Invoice No.", midX + 10f, topBorder + 143f, textPaint)
+        canvas.drawText(" : ${invoice.invoiceNumber}", midX + 115f, topBorder + 143f, boldTextPaint)
 
-        canvas.drawText("Invoice Date", midX + 10f, 175f, textPaint)
-        canvas.drawText(" : $invoiceDate", midX + 115f, 175f, textPaint)
+        canvas.drawText("Invoice Date", midX + 10f, topBorder + 160f, textPaint)
+        canvas.drawText(" : $invoiceDate", midX + 115f, topBorder + 160f, textPaint)
 
-        canvas.drawText("Due Date", midX + 10f, 192f, textPaint)
-        canvas.drawText(" : $dueDate", midX + 115f, 192f, textPaint)
+        canvas.drawText("Due Date", midX + 10f, topBorder + 177f, textPaint)
+        canvas.drawText(" : $dueDate", midX + 115f, topBorder + 177f, textPaint)
 
         val placeSupplyVal = invoice.placeOfSupply.takeIf { it.isNotBlank() } ?: "N.A."
-        canvas.drawText("Place of Supply", midX + 10f, 209f, textPaint)
-        canvas.drawText(" : $placeSupplyVal", midX + 115f, 209f, textPaint)
+        canvas.drawText("Place of Supply", midX + 10f, topBorder + 194f, textPaint)
+        canvas.drawText(" : $placeSupplyVal", midX + 115f, topBorder + 194f, textPaint)
 
         val vehicleVal = invoice.vehicleNumber.takeIf { it.isNotBlank() } ?: "N.A."
-        canvas.drawText("Vehicle Number", midX + 10f, 226f, textPaint)
-        canvas.drawText(" : $vehicleVal", midX + 115f, 226f, textPaint)
+        canvas.drawText("Vehicle Number", midX + 10f, topBorder + 211f, textPaint)
+        canvas.drawText(" : $vehicleVal", midX + 115f, topBorder + 211f, textPaint)
 
         val brokerageVal = invoice.brokerageBy.takeIf { it.isNotBlank() } ?: "N.A."
-        canvas.drawText("Brokerage By", midX + 10f, 241f, textPaint)
-        canvas.drawText(" : $brokerageVal", midX + 115f, 241f, textPaint)
+        canvas.drawText("Brokerage By", midX + 10f, topBorder + 226f, textPaint)
+        canvas.drawText(" : $brokerageVal", midX + 115f, topBorder + 226f, textPaint)
 
         // --- 5. PRODUCTS / SERVICES TABLE (y: 255 to 550) ---
-        canvas.drawLine(leftBorder, 255f, rightBorder, 255f, borderPaint)
+        canvas.drawLine(leftBorder, topBorder + 240f, rightBorder, topBorder + 240f, borderPaint)
 
         // Columns definition with exact mathematical mappings to span right Border Box nicely
         val tableColsX = floatArrayOf(
             leftBorder,        // Sr (20)
-            leftBorder + 20f,  // Item Description (170)
-            leftBorder + 190f, // HSN/SAC (50)
-            leftBorder + 240f, // Qty (30)
-            leftBorder + 270f, // Unit (30)
-            leftBorder + 300f, // List Price (50)
-            leftBorder + 350f, // Disc (35)
-            leftBorder + 385f, // CGST % (40)
-            leftBorder + 425f, // SGST % (40)
-            leftBorder + 465f  // Amount (100) -> up to right border
+            leftBorder + 20f,  // Item Description (185)
+            leftBorder + 205f, // HSN/SAC (65)
+            leftBorder + 270f, // Qty (45)
+            leftBorder + 315f, // Unit (45)
+            leftBorder + 360f, // List Price (65)
+            leftBorder + 425f, // Disc (50)
+            leftBorder + 475f, // Central GST % (55)
+            leftBorder + 530f, // State GST % (55)
+            leftBorder + 585f  // Amount (115) -> up to right border
         )
-        val tableColsWidths = floatArrayOf(20f, 170f, 50f, 30f, 30f, 50f, 35f, 40f, 40f, 100f)
+        val tableColsWidths = floatArrayOf(20f, 185f, 65f, 45f, 45f, 65f, 50f, 55f, 55f, 115f)
 
         // Table-specific dedicated text paints to ensure high precision alignment and zero overlap
         val tableTextPaint = Paint().apply {
@@ -431,20 +449,20 @@ object PdfGenerator {
         }
 
         // Draw Table Header Fill block with Primary solid color
-        canvas.drawRect(leftBorder + 0.5f, 255.5f, rightBorder - 0.5f, 275f, primaryFillPaint)
-        canvas.drawLine(leftBorder, 275f, rightBorder, 275f, borderPaint)
+        canvas.drawRect(leftBorder + 0.5f, topBorder + 240.5f, rightBorder - 0.5f, topBorder + 260f, primaryFillPaint)
+        canvas.drawLine(leftBorder, topBorder + 260f, rightBorder, topBorder + 260f, borderPaint)
 
         // Draw Header Titles inside Column Block
-        canvas.drawText("Sr.", tableColsX[0] + 3f, 269f, tableWhiteTextPaint)
-        canvas.drawText("Item Description", tableColsX[1] + 4f, 269f, tableWhiteTextPaint)
-        canvas.drawText("HSN/SAC", tableColsX[2] + 4f, 269f, tableWhiteTextPaint)
-        canvas.drawText("Qty", tableColsX[3] + 4f, 269f, tableWhiteTextPaint)
-        canvas.drawText("Unit", tableColsX[4] + 4f, 269f, tableWhiteTextPaint)
-        canvas.drawText("List Price", tableColsX[5] + 4f, 269f, tableWhiteTextPaint)
-        canvas.drawText("Disc.", tableColsX[6] + 4f, 269f, tableWhiteTextPaint)
-        canvas.drawText("CGST %", tableColsX[7] + 4f, 269f, tableWhiteTextPaint)
-        canvas.drawText("SGST %", tableColsX[8] + 4f, 269f, tableWhiteTextPaint)
-        canvas.drawText("Amount (₹)", tableColsX[9] + 4f, 269f, tableWhiteTextPaint)
+        canvas.drawText("Sr.", tableColsX[0] + 3f, topBorder + 254f, tableWhiteTextPaint)
+        canvas.drawText("Item Description", tableColsX[1] + 4f, topBorder + 254f, tableWhiteTextPaint)
+        canvas.drawText("HSN/SAC", tableColsX[2] + 4f, topBorder + 254f, tableWhiteTextPaint)
+        canvas.drawText("Qty", tableColsX[3] + 4f, topBorder + 254f, tableWhiteTextPaint)
+        canvas.drawText("Unit", tableColsX[4] + 4f, topBorder + 254f, tableWhiteTextPaint)
+        canvas.drawText("List Price", tableColsX[5] + 4f, topBorder + 254f, tableWhiteTextPaint)
+        canvas.drawText("Disc.", tableColsX[6] + 4f, topBorder + 254f, tableWhiteTextPaint)
+        canvas.drawText("CGST %", tableColsX[7] + 4f, topBorder + 254f, tableWhiteTextPaint)
+        canvas.drawText("SGST %", tableColsX[8] + 4f, topBorder + 254f, tableWhiteTextPaint)
+        canvas.drawText("Amount (₹)", tableColsX[9] + 4f, topBorder + 254f, tableWhiteTextPaint)
 
         val rowShadingPaint = Paint().apply {
             color = Color.parseColor(themeBgHex) // Theme unified soft color tint
@@ -452,7 +470,7 @@ object PdfGenerator {
             isAntiAlias = true
         }
 
-        var tableRowY = 287f
+        var tableRowY = topBorder + 272f
         var totalAmountBeforeDisc = 0.0
 
         for (idx in items.indices) {
@@ -508,9 +526,9 @@ object PdfGenerator {
         val tableBottomY = 514f
         canvas.drawLine(leftBorder, tableBottomY, rightBorder, tableBottomY, borderPaint)
         for (colXValue in tableColsX) {
-            canvas.drawLine(colXValue, 255f, colXValue, tableBottomY, borderPaint)
+            canvas.drawLine(colXValue, topBorder + 240f, colXValue, tableBottomY, borderPaint)
         }
-        canvas.drawLine(rightBorder, 255f, rightBorder, tableBottomY, borderPaint) // Outer right boundary line
+        canvas.drawLine(rightBorder, topBorder + 240f, rightBorder, tableBottomY, borderPaint) // Outer right boundary line
 
         // --- 6. TABLE FOOTER CALCULATIONS (y: 514 to 624) ---
         val totalDiscountValue = maxOf(0.0, totalAmountBeforeDisc - invoice.subtotal)
@@ -577,39 +595,39 @@ object PdfGenerator {
         boldTextPaint.textSize = 10.5f // reset
 
         // --- 7. THREE-PANE LOWER FOOTER BLOCK (y: 624 to 827) ---
-        val footerPaneWidth = 188f
+        val footerPaneWidth = 233.33f
         val pane1X = leftBorder // 15
-        val pane2X = leftBorder + footerPaneWidth // 203
-        val pane3X = pane2X + footerPaneWidth // 391
+        val pane2X = leftBorder + footerPaneWidth // 248.33
+        val pane3X = pane2X + footerPaneWidth // 481.66
         
         canvas.drawLine(pane2X, 624f, pane2X, bottomBorder, borderPaint)
         canvas.drawLine(pane3X, 624f, pane3X, bottomBorder, borderPaint)
 
         // 7A: PANEL ONE - TERMS AND CONDITIONS (Left Column)
-        canvas.drawText("Terms and Conditions", pane1X + 8f, 642f, boldTextPaint.apply { textSize = 10.5f })
+        canvas.drawText("Terms and Conditions", pane1X + 8f, 642f, boldTextPaint.apply { textSize = 13.5f })
         boldTextPaint.textSize = 10.5f // reset
         
-        canvas.drawText("E & O.E", pane1X + 8f, 656f, footerSmallPaint)
-        canvas.drawText("1. Goods once sold will not be taken", pane1X + 8f, 672f, textPaint.apply { textSize = 7.5f })
-        canvas.drawText("   back.", pane1X + 8f, 683f, textPaint)
+        canvas.drawText("E & O.E", pane1X + 8f, 658f, footerSmallPaint)
+        canvas.drawText("1. Goods once sold will not be taken", pane1X + 8f, 676f, textPaint.apply { textSize = 12.0f })
+        canvas.drawText("   back.", pane1X + 8f, 690f, textPaint)
         
-        canvas.drawText("2. Interest @ 18% p.a. will be charged if", pane1X + 8f, 699f, textPaint)
-        canvas.drawText("   payment is not made on time.", pane1X + 8f, 710f, textPaint)
+        canvas.drawText("2. Interest @ 18% p.a. will be charged if", pane1X + 8f, 708f, textPaint)
+        canvas.drawText("   payment is not made on time.", pane1X + 8f, 722f, textPaint)
         
-        canvas.drawText("3. Subject to 'Delhi' Jurisdiction only.", pane1X + 8f, 726f, textPaint)
+        canvas.drawText("3. Subject to 'Delhi' Jurisdiction only.", pane1X + 8f, 740f, textPaint)
         textPaint.textSize = 10.5f // reset
 
         // Note details printed below terms & conditions
         if (invoice.notes.isNotBlank()) {
-            canvas.drawText("Note:", pane1X + 8f, 745f, boldTextPaint.apply { textSize = 7.5f })
+            canvas.drawText("Note:", pane1X + 8f, 762f, boldTextPaint.apply { textSize = 12.0f })
             boldTextPaint.textSize = 10.5f // reset
             
             val notesText = invoice.notes
             val maxNotesWidth = footerPaneWidth - 16f
             val words = notesText.split("\\s+".toRegex())
             var currentLine = StringBuilder()
-            var currentY = 756f
-            val notePaint = Paint(textPaint).apply { textSize = 7.0f }
+            var currentY = 776f
+            val notePaint = Paint(textPaint).apply { textSize = 11.5f }
             
             for (word in words) {
                 if (word.isBlank()) continue
@@ -620,7 +638,7 @@ object PdfGenerator {
                 } else {
                     if (currentY <= bottomBorder - 8f) {
                         canvas.drawText(currentLine.toString(), pane1X + 8f, currentY, notePaint)
-                        currentY += 9f
+                        currentY += 13f
                     }
                     currentLine = StringBuilder(word)
                 }
@@ -632,9 +650,9 @@ object PdfGenerator {
 
         // 7B: PANEL TWO - QR CODE & BANK INFORMATION (Middle Column)
         // Draw REAL dynamically sized Dynamic UPI QR Code containing exact bill total
-        val qrSizeInt = 128
+        val qrSizeInt = 120
         val qrX = pane2X + ((pane3X - pane2X) - qrSizeInt.toFloat()) / 2f
-        val qrY = 628f
+        val qrY = 624f
 
         val qrBlackPaint = Paint().apply { color = Color.BLACK; style = Paint.Style.FILL }
 
@@ -662,8 +680,8 @@ object PdfGenerator {
         val displayBranch = if (!profile?.bankBranch.isNullOrBlank()) profile!!.bankBranch else "Noida"
         val displayIfsc = if (!profile?.bankIfsc.isNullOrBlank()) profile!!.bankIfsc else "ICICI1234"
 
-        textPaint.textSize = 7.5f
-        boldTextPaint.textSize = 7.5f
+        textPaint.textSize = 14.0f
+        boldTextPaint.textSize = 14.0f
 
         // Draw with Key bold and Value normal for ultra high quality output styling
         fun drawKeyValue(label: String, value: String, x: Float, y: Float) {
@@ -672,10 +690,10 @@ object PdfGenerator {
             canvas.drawText(value, x + labelWidth, y, textPaint)
         }
 
-        drawKeyValue("Name: ", displayAccountName, pane2X + 8f, 766f)
-        drawKeyValue("Bank: ", displayBank, pane2X + 8f, 778f)
-        drawKeyValue("A/c No: ", displayAccountNo, pane2X + 8f, 790f)
-        drawKeyValue("Branch Name: ", displayBranch, pane2X + 8f, 802f)
+        drawKeyValue("Name: ", displayAccountName, pane2X + 8f, 754f)
+        drawKeyValue("Bank: ", displayBank, pane2X + 8f, 769f)
+        drawKeyValue("A/c No: ", displayAccountNo, pane2X + 8f, 784f)
+        drawKeyValue("Branch Name: ", displayBranch, pane2X + 8f, 799f)
         drawKeyValue("IFSC Code: ", displayIfsc, pane2X + 8f, 814f)
 
         textPaint.textSize = 10.5f // reset
@@ -683,8 +701,10 @@ object PdfGenerator {
 
         // 7C: PANEL THREE - SIGNATURES & CLOSE (Right Column)
         val companySignatureLabel = "For $bName"
+        boldTextPaint.textSize = 11.5f
         val centerSigX = pane3X + ((rightBorder - pane3X) - boldTextPaint.measureText(companySignatureLabel)) / 2f
         canvas.drawText(companySignatureLabel, centerSigX, 642f, boldTextPaint)
+        boldTextPaint.textSize = 10.5f // reset
 
         // Draw optional digital signature if configured and enabled
         val isSigEnabled = prefs.getBoolean("authorized_signature_enabled", false)
@@ -730,8 +750,10 @@ object PdfGenerator {
         canvas.drawLine(signatureLineStartX, lineSignatureY, signatureLineEndX, lineSignatureY, borderPaint)
 
         val sigText = "Authorized Signatory"
+        boldTextPaint.textSize = 11.5f
         val centerSigLabelX = pane3X + ((rightBorder - pane3X) - boldTextPaint.measureText(sigText)) / 2f
         canvas.drawText(sigText, centerSigLabelX, 800f, boldTextPaint)
+        boldTextPaint.textSize = 10.5f // reset
 
         // --- 8. CENTRED BRAND CREATION FOOTER REMOVED ---
 
@@ -754,7 +776,7 @@ object PdfGenerator {
     fun shareInvoicePdf(context: Context, pdfFile: File) {
         val uri = FileProvider.getUriForFile(
             context,
-            "com.aistudio.invoicegenerator.gqtwv.fileprovider",
+            "${context.packageName}.fileprovider",
             pdfFile
         )
         val intent = Intent(Intent.ACTION_SEND).apply {
@@ -813,7 +835,7 @@ object PdfGenerator {
         try {
             val uri = FileProvider.getUriForFile(
                 context,
-                "com.aistudio.invoicegenerator.gqtwv.fileprovider",
+                "${context.packageName}.fileprovider",
                 pdfFile
             )
             val intent = Intent(Intent.ACTION_SEND).apply {
@@ -829,7 +851,7 @@ object PdfGenerator {
         } catch (e: Exception) {
             val uri = FileProvider.getUriForFile(
                 context,
-                "com.aistudio.invoicegenerator.gqtwv.fileprovider",
+                "${context.packageName}.fileprovider",
                 pdfFile
             )
             try {
@@ -853,7 +875,7 @@ object PdfGenerator {
         try {
             val uri = FileProvider.getUriForFile(
                 context,
-                "com.aistudio.invoicegenerator.gqtwv.fileprovider",
+                "${context.packageName}.fileprovider",
                 pdfFile
             )
             val intent = Intent(Intent.ACTION_SEND).apply {
@@ -887,7 +909,7 @@ object PdfGenerator {
         try {
             val uri = FileProvider.getUriForFile(
                 context,
-                "com.aistudio.invoicegenerator.gqtwv.fileprovider",
+                "${context.packageName}.fileprovider",
                 pdfFile
             )
             val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -978,4 +1000,64 @@ object PdfGenerator {
         }
         canvas.drawRoundRect(logoLeft, logoTop, logoRight, logoBottom, 6f, 6f, borderOutlinePaint)
     }
+
+    fun shareUpiQrAndLink(
+        context: Context,
+        upiUri: String,
+        amount: Double,
+        businessName: String,
+        upiId: String
+    ) {
+        try {
+            // 1. Generate QR Code Bitmap
+            val size = 512
+            val qrBitmap = generateQrCodeBitmap(upiUri, size)
+
+            // 2. Save to cache directory
+            val cacheFile = File(context.cacheDir, "UPI_Payment_QR.png")
+            if (cacheFile.exists()) {
+                cacheFile.delete()
+            }
+            java.io.FileOutputStream(cacheFile).use { out ->
+                qrBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+            }
+
+            // 3. Get FileProvider URI
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                cacheFile
+            )
+
+            // 4. Create Share Intent
+            val shareText = "Hello, please pay ₹${String.format(Locale.US, "%.2f", amount)} to $businessName via UPI ID: $upiId\nPayment Link: $upiUri"
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_TEXT, shareText)
+                putExtra(Intent.EXTRA_SUBJECT, "UPI Payment QR Code")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
+            val chooser = Intent.createChooser(shareIntent, "Share Payment Link & QR Code")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(chooser)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // Fallback to text-only share
+            try {
+                val shareText = "Hello, please pay ₹${String.format(Locale.US, "%.2f", amount)} to $businessName via UPI ID: $upiId\nPayment Link: $upiUri"
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, shareText)
+                }
+                val chooser = Intent.createChooser(shareIntent, "Share Payment Link")
+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(chooser)
+            } catch (ex: Exception) {
+                Toast.makeText(context, "Cannot share payment link", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 }
+
