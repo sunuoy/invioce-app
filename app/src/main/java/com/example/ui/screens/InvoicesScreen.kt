@@ -1751,7 +1751,7 @@ fun CreateInvoiceScreen(
                             value = inputUnit,
                             onValueChange = { inputUnit = it },
                             label = { Text("Unit") },
-                            placeholder = { Text("pcs, hrs, kg") },
+                            placeholder = { Text("kg, bags, QT, box") },
                             modifier = Modifier.weight(1.2f)
                         )
                     }
@@ -1761,7 +1761,7 @@ fun CreateInvoiceScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        listOf("kg", "bags", "pcs", "box").forEach { suggestion ->
+                        listOf("kg", "bags", "QT", "box").forEach { suggestion ->
                             val isSelected = inputUnit.lowercase(Locale.ROOT) == suggestion
                             SuggestionChip(
                                 onClick = { inputUnit = suggestion },

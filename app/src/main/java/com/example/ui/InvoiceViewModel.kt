@@ -173,7 +173,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 return@launch
             }
             if (unit.isBlank()) {
-                _uiEvents.emit(UiEvent.ShowError("Please set a unit (e.g. pieces, hours)"))
+                _uiEvents.emit(UiEvent.ShowError("Please set a unit (e.g. kg, bags, QT, box)"))
                 return@launch
             }
 

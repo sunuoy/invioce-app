@@ -438,7 +438,7 @@ fun ProductDialogEditor(
     var name by remember { mutableStateOf(product?.name ?: "") }
     var priceStr by remember { mutableStateOf(product?.price?.toString() ?: "") }
     var taxStr by remember { mutableStateOf(product?.taxRate?.toString() ?: "18") } // default GST is 18%
-    var unit by remember { mutableStateOf(product?.unit ?: "pcs") }
+    var unit by remember { mutableStateOf(product?.unit ?: "kg") }
     var stockStr by remember { mutableStateOf(product?.stock?.toString() ?: "50") }
     var hsnSac by remember { mutableStateOf(product?.hsnSac ?: "") }
 
@@ -475,9 +475,25 @@ fun ProductDialogEditor(
                         value = unit,
                         onValueChange = { unit = it },
                         label = { Text("Billing Unit") },
-                        placeholder = { Text("pcs, hrs, kg") },
+                        placeholder = { Text("kg, bags, QT, box") },
                         modifier = Modifier.weight(1f)
                     )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf("kg", "bags", "QT", "box").forEach { suggestion ->
+                        val isSelected = unit.lowercase(Locale.ROOT) == suggestion.lowercase(Locale.ROOT)
+                        SuggestionChip(
+                            onClick = { unit = suggestion },
+                            label = { Text(suggestion, fontSize = 10.sp) },
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    }
                 }
 
                 OutlinedTextField(
