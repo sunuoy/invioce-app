@@ -4,6 +4,8 @@ import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -449,6 +451,7 @@ fun ProductDialogEditor(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -475,19 +478,6 @@ fun ProductDialogEditor(
                         placeholder = { Text("pcs, hrs, kg") },
                         modifier = Modifier.weight(1f)
                     )
-                }
-
-                // Quick unit suggestions
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    listOf("kg", "bags", "pcs", "hrs", "box").forEach { sug ->
-                        SuggestionChip(
-                            onClick = { unit = sug },
-                            label = { Text(sug, fontSize = 11.sp) }
-                        )
-                    }
                 }
 
                 OutlinedTextField(

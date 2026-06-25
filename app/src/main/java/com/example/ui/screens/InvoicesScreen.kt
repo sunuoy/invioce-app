@@ -1096,7 +1096,7 @@ fun CreateInvoiceScreen(
                         ) {
                             OutlinedTextField(
                                 value = vehicleNumber,
-                                onValueChange = { vehicleNumber = formatVehicleNumber(it) },
+                                onValueChange = { vehicleNumber = it.uppercase() },
                                 label = { Text("Vehicle Number") },
                                 placeholder = { Text("e.g. DL-67-AB-3672") },
                                 modifier = Modifier.weight(1f),
@@ -2060,19 +2060,4 @@ fun CatalogInvoiceItemRow(
     }
 }
 
-fun formatVehicleNumber(input: String): String {
-    val clean = input.filter { it.isLetterOrDigit() }.uppercase()
-    return when {
-        clean.length <= 2 -> clean
-        clean.length <= 4 -> {
-            "${clean.substring(0, 2)}-${clean.substring(2)}"
-        }
-        clean.length <= 6 -> {
-            "${clean.substring(0, 2)}-${clean.substring(2, 4)}-${clean.substring(4)}"
-        }
-        else -> {
-            "${clean.substring(0, 2)}-${clean.substring(2, 4)}-${clean.substring(4, 6)}-${clean.substring(6)}"
-        }
-    }
-}
 
