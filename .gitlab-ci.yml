@@ -1,0 +1,44 @@
+image: openjdk:17-jdk-slim
+
+variables:
+  ANDROID_COMPILE_SDK: "36"
+  ANDROID_BUILD_TOOLS: "36.0.0"
+  ANDROID_SDK_TOOLS: "11076708"
+
+before_script:
+  - apt-get --quiet update --yes
+  - apt-get --quiet install --yes wget tar unzip curl
+  - wget --quiet --output-document=android-sdk.zip https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS}_latest.zip
+  - unzip -d android-sdk android-sdk.zip
+  - mkdir -p sdk/cmdline-tools
+  - mv android-sdk/cmdline-tools sdk/cmdline-tools/latest
+  - export ANDROID_HOME=$PWD/sdk
+  - export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+  - yes | sdkmanager --licenses || true
+  - sdkmanager "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${ANDROID_BUILD_TOOLS}"
+
+stages:
+  - build
+  - deploy
+
+build_job:
+  stage: build
+  script:
+    - chmod +x ./gradlew
+    - ./gradlew assembleDebug
+  artifacts:
+    paths:
+      - app/build/outputs/apk/debug/app-debug.apk
+    expire_in: 1 week
+
+publish_package:
+  stage: deploy
+  dependencies:
+    - build_job
+  script:
+    - |
+      curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+        --upload-file app/build/outputs/apk/debug/app-debug.apk \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/invoice-generator/1.1/InvoiceGenerator_v1.1_debug.apk"
+  only:
+    - main
