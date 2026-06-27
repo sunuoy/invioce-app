@@ -684,7 +684,7 @@ fun AppSettingsScreen(
                         color = MaterialTheme.colorScheme.outline
                     )
                     Text(
-                        text = "v1.2.5 • Developed in Google AI Studio",
+                        text = "v${com.example.BuildConfig.VERSION_NAME} • Developed in Google AI Studio",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.8f)
                     )
