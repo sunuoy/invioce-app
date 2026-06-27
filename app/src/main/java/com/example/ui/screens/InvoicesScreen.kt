@@ -361,8 +361,13 @@ fun InvoicesScreen(
                     activeInvoiceDetails = billing.copy(invoice = billing.invoice.copy(status = st))
                 },
                 onEdit = {
-                    editingInvoice = billing
-                    activeInvoiceDetails = null
+                    if (billing.invoice.status != "Closed" && billing.invoice.status != "Paid") {
+                        editingInvoice = billing
+                        activeInvoiceDetails = null
+                    } else {
+                        val statusMsg = if (billing.invoice.status == "Paid") "Paid" else "Closed"
+                        Toast.makeText(context, "$statusMsg invoices cannot be edited", Toast.LENGTH_SHORT).show()
+                    }
                 },
                 onDelete = {
                     viewModel.deleteInvoice(billing.invoice.id)
@@ -563,17 +568,19 @@ fun InvoiceDetailLayout(
                 Text("Share", fontSize = 12.sp)
             }
 
-            IconButton(
-                onClick = onEdit,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = "Edit invoice details",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+            if (item.invoice.status != "Closed" && item.invoice.status != "Paid") {
+                IconButton(
+                    onClick = onEdit,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit invoice details",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             }
 
             IconButton(

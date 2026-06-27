@@ -1,0 +1,25 @@
+Categories:
+  - Office
+License: Apache-2.0
+WebSite: https://gitlab.com/sunuoy1-group/invioce-app
+SourceCode: https://gitlab.com/sunuoy1-group/invioce-app.git
+IssueTracker: https://gitlab.com/sunuoy1-group/invioce-app/-/issues
+
+Summary: Professional Billing Hub & Invoice Generator
+Description: |
+  A professional, offline-first Android application designed to streamline billing,
+  invoicing, client directory management, and stock tracking. Built entirely with
+  Kotlin, Jetpack Compose, Material 3, and Room Database, the app features dynamic,
+  beautiful PDF invoice generation with payment QR codes, multiple visual themes,
+  and robust backup capabilities.
+
+RepoType: git
+Repo: https://gitlab.com/sunuoy1-group/invioce-app.git
+
+Builds:
+  - versionCode: 8
+    versionName: '1.7'
+    commit: v1.7
+    subdir: app
+    gradle:
+      - yes
