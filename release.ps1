@@ -1,5 +1,6 @@
 param(
-    [switch]$Major
+    [switch]$Major,
+    [switch]$Git
 )
 
 $ErrorActionPreference = "Stop"
@@ -164,4 +165,47 @@ if (-not [string]::IsNullOrEmpty($gitlabToken) -and -not [string]::IsNullOrEmpty
     }
 } else {
     Write-Host "GitLab credentials not found (GITLAB_TOKEN & GITLAB_PROJECT_ID). Skipping Packages upload." -ForegroundColor DarkGray
+}
+
+# 8. Optional: Sync and release tag on GitHub
+if ($Git) {
+    Write-Host "Syncing new version to GitHub..." -ForegroundColor Yellow
+    try {
+        # Stage files
+        Write-Host "Staging files..." -ForegroundColor Yellow
+        $gitAddFiles = @(
+            "app/build.gradle.kts",
+            ".gitlab-ci.yml",
+            "GITLAB.md",
+            "releases/app-debug.zip",
+            "releases/InvoiceGenerator_v${newVersionName}_debug.apk"
+        )
+        foreach ($file in $gitAddFiles) {
+            if (Test-Path $file) {
+                Start-Process git -ArgumentList "add `"$file`"" -WorkingDirectory $PSScriptRoot -Wait
+            }
+        }
+        
+        # Commit
+        Write-Host "Committing changes..." -ForegroundColor Yellow
+        $commitMsg = "build: release version v$newVersionName"
+        $commitProc = Start-Process git -ArgumentList "commit -m `"$commitMsg`"" -WorkingDirectory $PSScriptRoot -PassThru -NoNewWindow -Wait
+        
+        # Push main
+        Write-Host "Pushing to GitHub remote repository..." -ForegroundColor Yellow
+        $pushProc = Start-Process git -ArgumentList "push origin main" -WorkingDirectory $PSScriptRoot -PassThru -NoNewWindow -Wait
+        
+        # Create tag
+        Write-Host "Creating tag v$newVersionName..." -ForegroundColor Yellow
+        $tagMsg = "Release version $newVersionName (Code $newVersionCode)"
+        $tagProc = Start-Process git -ArgumentList "tag -a `"v$newVersionName`" -m `"$tagMsg`"" -WorkingDirectory $PSScriptRoot -PassThru -NoNewWindow -Wait
+        
+        # Push tag
+        Write-Host "Pushing tag to GitHub..." -ForegroundColor Yellow
+        $pushTagProc = Start-Process git -ArgumentList "push origin `"v$newVersionName`"" -WorkingDirectory $PSScriptRoot -PassThru -NoNewWindow -Wait
+        
+        Write-Host "Successfully synchronized and tagged new version on GitHub!" -ForegroundColor Green
+    } catch {
+        Write-Warning "Failed to sync to GitHub: $_"
+    }
 }
