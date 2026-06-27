@@ -4,6 +4,19 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Load environment variables from .env file if it exists
+$envPath = Join-Path $PSScriptRoot ".env"
+if (Test-Path $envPath) {
+    Get-Content $envPath | Where-Object { $_ -match '=' -and -not $_.StartsWith('#') } | ForEach-Object {
+        $name, $value = $_.Split('=', 2)
+        $name = $name.Trim()
+        $value = $value.Trim()
+        if (-not [string]::IsNullOrEmpty($name)) {
+            [System.Environment]::SetEnvironmentVariable($name, $value, "Process")
+        }
+    }
+}
+
 Write-Host "Starting Version Bump and Build Release Automation..." -ForegroundColor Cyan
 
 # 1. File Paths
@@ -104,7 +117,7 @@ if (Test-Path "$gradlePath.bak") {
     Remove-Item "$gradlePath.bak" -Force
 }
 
-# 6. Compress/Zip the new APK and replace the old one
+# 6. Compress/Zip and copy the raw APK into releases
 Write-Host "Packaging build artifacts..." -ForegroundColor Yellow
 if (-not (Test-Path $releasesDir)) {
     New-Item -ItemType Directory -Path $releasesDir -Force | Out-Null
@@ -114,10 +127,41 @@ if (Test-Path $zipPath) {
     Remove-Item $zipPath -Force
 }
 
+# Clean old APKs from releases folder
+Get-ChildItem $releasesDir -Filter "InvoiceGenerator_v*_debug.apk" | Remove-Item -Force
+
 if (-not (Test-Path $apkPath)) {
     Write-Error "Could not find compiled APK at $apkPath"
 }
 
+# Copy raw APK to releases folder
+$targetApkPath = Join-Path $releasesDir "InvoiceGenerator_v${newVersionName}_debug.apk"
+Copy-Item $apkPath $targetApkPath -Force
+Write-Host "Copied raw APK to: releases/InvoiceGenerator_v${newVersionName}_debug.apk" -ForegroundColor Green
+
+# Compress APK to zip
 Compress-Archive -Path $apkPath -DestinationPath $zipPath
 
-Write-Host "Successfully released v$newVersionName (Code $newVersionCode) at 'releases/app-debug.zip'!" -ForegroundColor Green
+Write-Host ('Successfully released v' + $newVersionName + ' (Code ' + $newVersionCode + ') at ''releases/app-debug.zip''!') -ForegroundColor Green
+
+# 7. Optional: Upload to GitLab Package Registry (Packages section)
+$gitlabToken = $env:GITLAB_TOKEN
+$gitlabProjectId = $env:GITLAB_PROJECT_ID
+
+if (-not [string]::IsNullOrEmpty($gitlabToken) -and -not [string]::IsNullOrEmpty($gitlabProjectId)) {
+    Write-Host "Uploading APK to GitLab Package Registry (Packages section)..." -ForegroundColor Yellow
+    $uri = "https://gitlab.com/api/v4/projects/$gitlabProjectId/packages/generic/invoice-generator/$newVersionName/InvoiceGenerator_v${newVersionName}_debug.apk"
+    $headers = @{
+        "PRIVATE-TOKEN" = $gitlabToken
+    }
+    try {
+        $fileBytes = [System.IO.File]::ReadAllBytes($apkPath)
+        # Suppress output progress to speed up and prevent logs cluttering
+        $uploadResult = Invoke-RestMethod -Uri $uri -Headers $headers -Method Put -Body $fileBytes -ContentType "application/vnd.android.package-archive"
+        Write-Host "Successfully uploaded to GitLab Package Registry Packages section!" -ForegroundColor Green
+    } catch {
+        Write-Warning "Failed to upload to GitLab Package Registry: $_"
+    }
+} else {
+    Write-Host "GitLab credentials not found (GITLAB_TOKEN & GITLAB_PROJECT_ID). Skipping Packages upload." -ForegroundColor DarkGray
+}
