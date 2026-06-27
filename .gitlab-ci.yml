@@ -39,6 +39,6 @@ publish_package:
     - |
       curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
         --upload-file app/build/outputs/apk/debug/app-debug.apk \
-        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/invoice-generator/1.6/InvoiceGenerator_v1.6_debug.apk"
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/invoice-generator/1.7/InvoiceGenerator_v1.7_debug.apk"
   only:
     - main

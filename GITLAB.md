@@ -36,7 +36,7 @@ You can upload the APK from your local machine using the GitLab API with a **Per
 ```bash
 curl --header "PRIVATE-TOKEN: YOUR_PERSONAL_ACCESS_TOKEN" \
      --upload-file app/build/outputs/apk/debug/app-debug.apk \
-     "https://gitlab.com/api/v4/projects/YOUR_PROJECT_ID/packages/generic/invoice-generator/1.6/InvoiceGenerator_v1.6_debug.apk"
+     "https://gitlab.com/api/v4/projects/YOUR_PROJECT_ID/packages/generic/invoice-generator/1.7/InvoiceGenerator_v1.7_debug.apk"
 ```
 
 #### Using PowerShell:
@@ -44,7 +44,7 @@ curl --header "PRIVATE-TOKEN: YOUR_PERSONAL_ACCESS_TOKEN" \
 $token = "YOUR_PERSONAL_ACCESS_TOKEN"
 $projectId = "YOUR_PROJECT_ID"
 $filePath = "app/build/outputs/apk/debug/app-debug.apk"
-$uri = "https://gitlab.com/api/v4/projects/$projectId/packages/generic/invoice-generator/1.6/InvoiceGenerator_v1.6_debug.apk"
+$uri = "https://gitlab.com/api/v4/projects/$projectId/packages/generic/invoice-generator/1.7/InvoiceGenerator_v1.7_debug.apk"
 
 $headers = @{
     "PRIVATE-TOKEN" = $token
