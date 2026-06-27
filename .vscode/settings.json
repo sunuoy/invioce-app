@@ -1,5 +1,8 @@
 {
     "java.configuration.updateBuildConfiguration": "automatic",
+    "gradle.useGradleWrapper": true,
+    "java.import.gradle.wrapper.enabled": true,
+    "java.import.gradle.version": "9.3.1",
     "java.import.gradle.java.home": "C:\\Program Files\\Android\\Android Studio\\jbr",
     "gradle.java.home": "C:\\Program Files\\Android\\Android Studio\\jbr",
     "java.jdt.ls.java.home": "C:\\Program Files\\Android\\Android Studio\\jbr",
