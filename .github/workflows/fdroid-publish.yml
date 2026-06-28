@@ -1,0 +1,38 @@
+name: Publish to F-Droid Repository
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Download APK from release
+        uses: robinraju/release-downloader@v1.9
+        with:
+          release-tag: ${{ github.event.release.tag_name }}
+          file-name: "*.apk"
+          out-file-path: fdroid/repo
+          
+      - name: Build F-Droid repository
+        uses: docker://registry.gitlab.com/fdroid/fdroidserver:latest
+        with:
+          args: fdroid build --verbose
+          
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: fdroid/repo
+          destination_dir: .
+          
+      - name: Generate repository fingerprint
+        run: |
+          echo "Repository URL: https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/fdroid/repo"
+          echo "Add this to F-Droid app with the fingerprint shown in the build logs above"

@@ -1,0 +1,18 @@
+invoice-generator:
+  git: https://github.com/sunuoy/invioce-app
+  name: "Invoice Generator"
+  description: |
+    Professional mobile billing and stock tracking system. Create items with GST tax, manage clients, auto-calculate subtotals, track inventory, and generate professional PDFs to share instantly via email or WhatsApp.
+
+    <b>Features</b>
+
+    - Create and manage invoices with GST tax calculations
+    - Track inventory and stock levels
+    - Generate professional PDF invoices
+    - Share via email or WhatsApp
+    - Client management with detailed records
+    - Dashboard with sales analytics
+
+  categories:
+    - Business
+    - Office

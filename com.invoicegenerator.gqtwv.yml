@@ -23,3 +23,10 @@ Builds:
     subdir: app
     gradle:
       - yes
+
+  - versionCode: 9
+    versionName: '1.8'
+    commit: v1.8
+    subdir: app
+    gradle:
+      - yes
