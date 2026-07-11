@@ -616,6 +616,175 @@ fun AppSettingsScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // 2.75. GitHub Application Updates Card
+            val updateInfoState by viewModel.updateInfo.collectAsStateWithLifecycle()
+            val updateInfo = updateInfoState
+            val isCheckingForUpdates by viewModel.isCheckingForUpdates.collectAsStateWithLifecycle()
+
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("github_updates_card_settings"),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (updateInfo?.isUpdateAvailable == true) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    }
+                ),
+                border = BorderStroke(
+                    1.dp,
+                    if (updateInfo?.isUpdateAvailable == true) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    } else {
+                        MaterialTheme.colorScheme.outlineVariant
+                    }
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SystemUpdate,
+                            contentDescription = "App Update Checker Icon",
+                            tint = if (updateInfo?.isUpdateAvailable == true) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.secondary
+                            },
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Text(
+                            text = "Application Updates",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (updateInfo?.isUpdateAvailable == true) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.secondary
+                            }
+                        )
+                    }
+
+                    if (updateInfo == null) {
+                        Text(
+                            text = "Check if a newer version of Invoice Easy is available on GitHub.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else if (updateInfo.isUpdateAvailable) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = "New version available: ${updateInfo.latestVersion}",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Current version: ${updateInfo.currentVersion}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (updateInfo.releaseNotes.isNotBlank()) {
+                                Text(
+                                    text = "Release notes:\n${updateInfo.releaseNotes}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 4,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Up to date",
+                                tint = Color(0xFF2E7D32),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "App is up to date (v${updateInfo.currentVersion})",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF2E7D32)
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.checkForUpdates(silent = false) },
+                            enabled = !isCheckingForUpdates,
+                            modifier = Modifier.weight(1f).testTag("settings_check_update_btn"),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary,
+                                contentColor = MaterialTheme.colorScheme.onSecondary
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(vertical = 10.dp)
+                        ) {
+                            if (isCheckingForUpdates) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onSecondary
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Check now",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (isCheckingForUpdates) "Checking..." else "Check Now", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        if (updateInfo?.isUpdateAvailable == true) {
+                            Button(
+                                onClick = {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.downloadUrl))
+                                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Could not open browser: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.weight(1f).testTag("settings_download_update_btn"),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(vertical = 10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudDownload,
+                                    contentDescription = "Download release update",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Get Update", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             // 3. Billing Features Documentation & Help Guide
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),

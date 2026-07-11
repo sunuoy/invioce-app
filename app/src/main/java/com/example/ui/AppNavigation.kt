@@ -93,6 +93,20 @@ fun MainAppNavigation(
                         .padding(NavigationDrawerItemDefaults.ItemPadding)
                         .testTag("drawer_settings_item")
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.SystemUpdate, contentDescription = "Check for updates") },
+                    label = { Text("Check for Updates") },
+                    selected = false,
+                    onClick = {
+                        showSeparateSettingsPage = true
+                        viewModel.checkForUpdates(silent = false)
+                        scope.launch { drawerState.close() }
+                    },
+                    modifier = Modifier
+                        .padding(NavigationDrawerItemDefaults.ItemPadding)
+                        .testTag("drawer_update_item")
+                )
                 Spacer(modifier = Modifier.height(12.dp))
             }
         },

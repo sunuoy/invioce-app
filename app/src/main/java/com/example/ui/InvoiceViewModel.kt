@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
 import com.example.util.BackupRestoreHelper
+import com.example.util.UpdateHelper
 import android.content.Context
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,9 +39,33 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // Update checker state
+    private val _updateInfo = MutableStateFlow<UpdateHelper.UpdateInfo?>(null)
+    val updateInfo: StateFlow<UpdateHelper.UpdateInfo?> = _updateInfo
+
+    private val _isCheckingForUpdates = MutableStateFlow(false)
+    val isCheckingForUpdates: StateFlow<Boolean> = _isCheckingForUpdates
+
+    fun checkForUpdates(silent: Boolean = false) {
+        viewModelScope.launch {
+            if (!silent) _isCheckingForUpdates.value = true
+            val info = UpdateHelper.checkForUpdates()
+            _updateInfo.value = info
+            if (!silent) {
+                _isCheckingForUpdates.value = false
+                if (info != null && !info.isUpdateAvailable) {
+                    _uiEvents.emit(UiEvent.ShowSuccess("You are on the latest version!"))
+                } else if (info == null) {
+                    _uiEvents.emit(UiEvent.ShowError("Failed to check for updates. Check your connection."))
+                }
+            }
+        }
+    }
+
     init {
         viewModelScope.launch {
             // First boot placeholder seeding disabled
+            checkForUpdates(silent = true)
         }
     }
 
