@@ -298,14 +298,39 @@ fun SettingsScreen(
         },
         modifier = modifier
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .background(MaterialTheme.colorScheme.background)
+                .drawBehind {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFF6366F1).copy(alpha = 0.08f), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.2f),
+                            radius = size.maxDimension * 0.45f
+                        ),
+                        radius = size.maxDimension * 0.45f,
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.2f)
+                    )
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFFF43F5E).copy(alpha = 0.05f), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.75f),
+                            radius = size.maxDimension * 0.4f
+                        ),
+                        radius = size.maxDimension * 0.4f,
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.75f)
+                    )
+                }
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             // Visual Banner introduction Card
             Card(
                 modifier = Modifier
@@ -1334,6 +1359,7 @@ fun SettingsScreen(
                     }
                 )
             }
+        }
         }
     }
 }

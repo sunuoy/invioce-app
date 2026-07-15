@@ -221,12 +221,37 @@ fun InvoicesScreen(
             },
             modifier = modifier
         ) { innerPadding ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(horizontal = 16.dp)
+                    .background(MaterialTheme.colorScheme.background)
+                    .drawBehind {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF8B5CF6).copy(alpha = 0.07f), Color.Transparent),
+                                center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.3f),
+                                radius = size.maxDimension * 0.45f
+                            ),
+                            radius = size.maxDimension * 0.45f,
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.3f)
+                        )
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFFEC4899).copy(alpha = 0.05f), Color.Transparent),
+                                center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.8f),
+                                radius = size.maxDimension * 0.4f
+                            ),
+                            radius = size.maxDimension * 0.4f,
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.8f)
+                        )
+                    }
             ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                ) {
                 // Search Bar
                 OutlinedTextField(
                     value = searchQuery,
@@ -438,6 +463,7 @@ fun InvoicesScreen(
                 },
                 onDismiss = { activeInvoiceDetails = null }
             )
+        }
         }
     }
 }

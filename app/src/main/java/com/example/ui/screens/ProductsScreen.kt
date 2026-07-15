@@ -87,12 +87,37 @@ fun ProductsScreen(
         },
         modifier = modifier
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 16.dp)
+                .background(MaterialTheme.colorScheme.background)
+                .drawBehind {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFF06B6D4).copy(alpha = 0.08f), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.25f),
+                            radius = size.maxDimension * 0.45f
+                        ),
+                        radius = size.maxDimension * 0.45f,
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.25f)
+                    )
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFFF59E0B).copy(alpha = 0.05f), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.7f),
+                            radius = size.maxDimension * 0.4f
+                        ),
+                        radius = size.maxDimension * 0.4f,
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.7f)
+                    )
+                }
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+            ) {
             // Search Input
             OutlinedTextField(
                 value = searchQuery,
@@ -278,6 +303,7 @@ fun ProductsScreen(
                     }
                 }
             }
+        }
         }
     }
 

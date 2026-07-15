@@ -188,13 +188,37 @@ fun DashboardScreen(
         },
         modifier = modifier
     ) { innerPadding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-          ) {
+                .padding(innerPadding)
+                .background(MaterialTheme.colorScheme.background)
+                .drawBehind {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFF3B82F6).copy(alpha = 0.08f), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.2f),
+                            radius = size.maxDimension * 0.45f
+                        ),
+                        radius = size.maxDimension * 0.45f,
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.2f)
+                    )
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFF10B981).copy(alpha = 0.06f), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.75f),
+                            radius = size.maxDimension * 0.4f
+                        ),
+                        radius = size.maxDimension * 0.4f,
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.75f)
+                    )
+                }
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
             // Analytics Cards Block
             item {
                 Row(
@@ -765,6 +789,7 @@ fun DashboardScreen(
                 }
             }
         }
+        }
     }
 }
 
@@ -870,15 +895,28 @@ fun InvoiceTrendGraph(
     primaryColor: Color,
     secondaryColor: Color
 ) {
-    val lastSixMonths = remember(invoices) {
+    val barGradients = remember {
+        listOf(
+            listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8)), // Blue
+            listOf(Color(0xFF10B981), Color(0xFF047857)), // Emerald Green
+            listOf(Color(0xFF8B5CF6), Color(0xFF6D28D9)), // Purple
+            listOf(Color(0xFFEC4899), Color(0xFFBE185D)), // Pink
+            listOf(Color(0xFFF59E0B), Color(0xFFB45309)), // Amber
+            listOf(Color(0xFFEF4444), Color(0xFFB91C1C)), // Red
+            listOf(Color(0xFF06B6D4), Color(0xFF0891B2)), // Cyan
+            listOf(Color(0xFF6366F1), Color(0xFF4338CA))  // Indigo
+        )
+    }
+
+    val lastEightMonths = remember(invoices) {
         val calendar = Calendar.getInstance()
-        calendar.add(Calendar.MONTH, -5)
+        calendar.add(Calendar.MONTH, -7)
         
         val list = mutableListOf<Pair<String, Double>>()
         val labelSdf = SimpleDateFormat("MMM", Locale.US)
         val keySdf = SimpleDateFormat("yyyy-MM", Locale.US)
         
-        for (i in 0 until 6) {
+        for (i in 0 until 8) {
             val label = labelSdf.format(calendar.time)
             val key = keySdf.format(calendar.time)
             
@@ -899,7 +937,7 @@ fun InvoiceTrendGraph(
                 .fillMaxWidth()
                 .weight(1f)
         ) {
-            if (lastSixMonths.isEmpty()) return@Canvas
+            if (lastEightMonths.isEmpty()) return@Canvas
 
             // Draw grid lines for a technical look
             val gridLinesCount = 3
@@ -914,16 +952,20 @@ fun InvoiceTrendGraph(
                 )
             }
 
-            val maxVal = (lastSixMonths.maxOfOrNull { it.second } ?: 100.0).coerceAtLeast(100.0)
+            val maxVal = (lastEightMonths.maxOfOrNull { it.second } ?: 100.0).coerceAtLeast(100.0)
             val width = size.width
             val height = size.height
 
-            val stepX = width / lastSixMonths.size
+            val stepX = width / lastEightMonths.size
             val barWidth = stepX * 0.45f
             val depth = 6.dp.toPx() // 3D depth perspective skew
             val usableHeight = height - depth - 8.dp.toPx()
 
-            lastSixMonths.forEachIndexed { idx, pair ->
+            lastEightMonths.forEachIndexed { idx, pair ->
+                val gradient = barGradients[idx % barGradients.size]
+                val startColor = gradient[0]
+                val endColor = gradient[1]
+
                 val fraction = pair.second / maxVal
                 val x = idx * stepX + stepX * 0.275f
                 val barHeight = (fraction.toFloat() * usableHeight).coerceAtLeast(4.dp.toPx())
@@ -932,7 +974,7 @@ fun InvoiceTrendGraph(
                 // Front Face
                 drawRect(
                     brush = Brush.verticalGradient(
-                        colors = listOf(primaryColor, primaryColor.copy(alpha = 0.7f))
+                        colors = listOf(startColor, endColor)
                     ),
                     topLeft = androidx.compose.ui.geometry.Offset(x, yFront),
                     size = androidx.compose.ui.geometry.Size(barWidth, barHeight)
@@ -948,7 +990,7 @@ fun InvoiceTrendGraph(
                 }
                 drawPath(
                     path = topPath,
-                    color = primaryColor.copy(alpha = 0.9f)
+                    color = startColor.copy(alpha = 0.9f)
                 )
 
                 // Side Face (3D perspective slant)
@@ -961,7 +1003,7 @@ fun InvoiceTrendGraph(
                 }
                 drawPath(
                     path = sidePath,
-                    color = primaryColor.copy(alpha = 0.6f)
+                    color = endColor.copy(alpha = 0.65f)
                 )
             }
         }
@@ -973,7 +1015,7 @@ fun InvoiceTrendGraph(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceAround
         ) {
-            lastSixMonths.forEach { pair ->
+            lastEightMonths.forEach { pair ->
                 Text(
                     text = pair.first,
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
