@@ -11,6 +11,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.foundation.background
 import com.example.ui.screens.*
 import kotlinx.coroutines.launch
 
@@ -39,7 +43,49 @@ fun MainAppNavigation(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier.width(300.dp)
+                modifier = Modifier
+                    .width(300.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFF6366F1).copy(alpha = 0.04f),
+                                MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    )
+                    .drawBehind {
+                        // Orb 1 (Top Left) - Brand Violet/Indigo
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF6366F1).copy(alpha = 0.08f), Color.Transparent),
+                                center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.15f),
+                                radius = size.maxDimension * 0.5f
+                            ),
+                            radius = size.maxDimension * 0.5f,
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.15f)
+                        )
+                        // Orb 2 (Bottom Right) - Brand Blue
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF3B82F6).copy(alpha = 0.07f), Color.Transparent),
+                                center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.85f),
+                                radius = size.maxDimension * 0.4f
+                            ),
+                            radius = size.maxDimension * 0.4f,
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.85f)
+                        )
+                        // Orb 3 (Center Left) - Coral Pink
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFFEC4899).copy(alpha = 0.05f), Color.Transparent),
+                                center = androidx.compose.ui.geometry.Offset(size.width * 0.2f, size.height * 0.5f),
+                                radius = size.maxDimension * 0.35f
+                            ),
+                            radius = size.maxDimension * 0.35f,
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.2f, size.height * 0.5f)
+                        )
+                    },
+                drawerContainerColor = Color.Transparent
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Column(
