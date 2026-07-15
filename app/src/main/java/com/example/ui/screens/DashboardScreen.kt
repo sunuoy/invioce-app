@@ -192,25 +192,44 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF3B82F6).copy(alpha = 0.03f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
                 .drawBehind {
+                    // Orb 1 (Top Left) - Brand Blue
                     drawCircle(
                         brush = Brush.radialGradient(
-                            colors = listOf(Color(0xFF3B82F6).copy(alpha = 0.08f), Color.Transparent),
+                            colors = listOf(Color(0xFF3B82F6).copy(alpha = 0.12f), Color.Transparent),
                             center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.2f),
                             radius = size.maxDimension * 0.45f
                         ),
                         radius = size.maxDimension * 0.45f,
                         center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.2f)
                     )
+                    // Orb 2 (Bottom Right) - Emerald Green
                     drawCircle(
                         brush = Brush.radialGradient(
-                            colors = listOf(Color(0xFF10B981).copy(alpha = 0.06f), Color.Transparent),
+                            colors = listOf(Color(0xFF10B981).copy(alpha = 0.09f), Color.Transparent),
                             center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.75f),
                             radius = size.maxDimension * 0.4f
                         ),
                         radius = size.maxDimension * 0.4f,
                         center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.75f)
+                    )
+                    // Orb 3 (Center Right) - Violet Indigo
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFF6366F1).copy(alpha = 0.07f), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.8f, size.height * 0.4f),
+                            radius = size.maxDimension * 0.35f
+                        ),
+                        radius = size.maxDimension * 0.35f,
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.8f, size.height * 0.4f)
                     )
                 }
         ) {
@@ -450,10 +469,22 @@ fun DashboardScreen(
                             )
                         ),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                            containerColor = Color.Transparent
                         )
                     ) {
-                        Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.15f)
+                                        )
+                                    )
+                                )
+                                .padding(16.dp)
+                        ) {
                             InvoiceTrendGraph(
                                 invoices = invoices,
                                 primaryColor = MaterialTheme.colorScheme.primary,

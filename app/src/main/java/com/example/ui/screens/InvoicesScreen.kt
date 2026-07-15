@@ -225,25 +225,44 @@ fun InvoicesScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .background(MaterialTheme.colorScheme.background)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFF8B5CF6).copy(alpha = 0.03f),
+                                MaterialTheme.colorScheme.background
+                            )
+                        )
+                    )
                     .drawBehind {
+                        // Orb 1 (Top Left) - Violet
                         drawCircle(
                             brush = Brush.radialGradient(
-                                colors = listOf(Color(0xFF8B5CF6).copy(alpha = 0.07f), Color.Transparent),
+                                colors = listOf(Color(0xFF8B5CF6).copy(alpha = 0.12f), Color.Transparent),
                                 center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.3f),
                                 radius = size.maxDimension * 0.45f
                             ),
                             radius = size.maxDimension * 0.45f,
                             center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.3f)
                         )
+                        // Orb 2 (Bottom Right) - Pink
                         drawCircle(
                             brush = Brush.radialGradient(
-                                colors = listOf(Color(0xFFEC4899).copy(alpha = 0.05f), Color.Transparent),
+                                colors = listOf(Color(0xFFEC4899).copy(alpha = 0.08f), Color.Transparent),
                                 center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.8f),
                                 radius = size.maxDimension * 0.4f
                             ),
                             radius = size.maxDimension * 0.4f,
                             center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.8f)
+                        )
+                        // Orb 3 (Center Left) - Cyan
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF06B6D4).copy(alpha = 0.06f), Color.Transparent),
+                                center = androidx.compose.ui.geometry.Offset(size.width * 0.2f, size.height * 0.6f),
+                                radius = size.maxDimension * 0.35f
+                            ),
+                            radius = size.maxDimension * 0.35f,
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.2f, size.height * 0.6f)
                         )
                     }
             ) {
