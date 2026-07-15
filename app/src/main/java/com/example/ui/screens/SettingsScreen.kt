@@ -62,6 +62,25 @@ fun SettingsScreen(
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
     val savedProfiles by viewModel.savedBusinessProfiles.collectAsStateWithLifecycle()
 
+    // Google Drive States
+    val gdAccessToken by viewModel.googleDriveAccessToken.collectAsStateWithLifecycle()
+    val gdLastSyncTime by viewModel.googleDriveLastSyncTime.collectAsStateWithLifecycle()
+    val gdSyncing by viewModel.isGoogleDriveSyncing.collectAsStateWithLifecycle()
+
+    val googleAccountPickerLauncherForDrive = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val data = result.data
+            if (data != null) {
+                val accountName = data.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME)
+                if (!accountName.isNullOrEmpty()) {
+                    viewModel.fetchGoogleDriveTokenAutomatically(context, accountName)
+                }
+            }
+        }
+    }
+
     var name by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -1285,6 +1304,155 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.testTag("sales_trend_toggle_settings")
                         )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Google Drive Cloud Sync & Backup Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        rotationX = 2.5f
+                        rotationY = -3f
+                        cameraDistance = 14f * density
+                    }
+                    .drawBehind {
+                        drawCircle(
+                            color = Color(0xFF3B82F6).copy(alpha = 0.03f),
+                            radius = size.maxDimension * 0.4f,
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.8f)
+                        )
+                    },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                elevation = CardDefaults.cardElevation(4.dp),
+                border = BorderStroke(
+                    1.dp,
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.4f),
+                            Color.White.copy(alpha = 0.05f),
+                            Color.Black.copy(alpha = 0.15f)
+                        )
+                    )
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudQueue,
+                            contentDescription = "Cloud backup",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Text(
+                            text = "Google Drive Cloud Backup",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Text(
+                        text = "Auto-save your business profile, stock items, customer data, and invoices to your personal Google Drive account in the background.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Status: ${if (gdAccessToken.isNotEmpty()) "Connected (Auto-sync Active)" else "Disconnected"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (gdAccessToken.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                        )
+
+                        if (gdAccessToken.isNotEmpty()) {
+                            TextButton(
+                                onClick = { viewModel.disableGoogleDriveSync() },
+                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Text("Disconnect", fontSize = 11.sp)
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "Last Synced: $gdLastSyncTime",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+
+                    if (gdAccessToken.isEmpty()) {
+                        Button(
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            onClick = {
+                                val intent = android.accounts.AccountManager.newChooseAccountIntent(
+                                    null, null, arrayOf("com.google"), null, null, null, null
+                                )
+                                googleAccountPickerLauncherForDrive.launch(intent)
+                            }
+                        ) {
+                            Icon(Icons.Default.CloudQueue, contentDescription = "Connect Google Drive", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Connect Google Drive", fontSize = 12.sp)
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Button(
+                                modifier = Modifier.weight(1f).height(42.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                enabled = !gdSyncing,
+                                onClick = {
+                                    viewModel.backupToGoogleDrive { success, msg ->
+                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            ) {
+                                if (gdSyncing) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.CloudUpload, contentDescription = "Backup now", modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Backup Now", fontSize = 11.sp)
+                                }
+                            }
+
+                            OutlinedButton(
+                                modifier = Modifier.weight(1f).height(42.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                enabled = !gdSyncing,
+                                onClick = {
+                                    viewModel.restoreFromGoogleDrive { success, msg ->
+                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            ) {
+                                if (gdSyncing) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.CloudDownload, contentDescription = "Restore now", modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Restore Now", fontSize = 11.sp)
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -19,3 +19,12 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep database entities and DAOs
+-keep class com.example.data.** { *; }
+
+# Keep Room database and its builders
+-keep class androidx.room.** { *; }
+
+# Keep org.json models
+-keep class org.json.** { *; }
