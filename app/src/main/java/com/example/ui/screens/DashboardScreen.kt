@@ -63,6 +63,16 @@ fun DashboardScreen(
         label = "iconScale"
     )
 
+    val arrowOffset by infiniteTransition.animateFloat(
+        initialValue = 4f,
+        targetValue = -4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "arrowOffset"
+    )
+
     val prefs = remember(context) { context.getSharedPreferences("invoice_generator_prefs", android.content.Context.MODE_PRIVATE) }
     var showTaxSummary by remember(prefs) {
         mutableStateOf(prefs.getBoolean("show_tax_summary", true))
@@ -262,7 +272,11 @@ fun DashboardScreen(
                                             imageVector = Icons.Outlined.TrendingUp,
                                             contentDescription = "Sales Tracker",
                                             tint = Color.White,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier
+                                                .size(18.dp)
+                                                .graphicsLayer {
+                                                    translationY = arrowOffset * density
+                                                }
                                         )
                                     }
                                     Text(
@@ -875,55 +889,59 @@ fun InvoiceTrendGraph(
             )
         }
 
-        // Group invoice sales by day (or simply order chronologically up to 10 points)
-        val sortedList = invoices.sortedBy { it.invoice.dateTimestamp }.takeLast(10)
+        // Group invoice sales by day (or simply order chronologically up to 8 points for nice spacing)
+        val sortedList = invoices.sortedBy { it.invoice.dateTimestamp }.takeLast(8)
         val maxVal = (sortedList.maxOfOrNull { it.invoice.grandTotal } ?: 100.0).coerceAtLeast(100.0)
-
-        val strokePath = Path()
-        val fillPath = Path()
 
         val width = size.width
         val height = size.height
 
-        val stepX = width / (sortedList.size - 1).coerceAtLeast(1)
+        val stepX = width / sortedList.size.coerceAtLeast(1)
+        val barWidth = stepX * 0.5f // 50% width, 50% gap
+        val depth = 8.dp.toPx() // 3D depth perspective skew
+        val usableHeight = height - depth - 10.dp.toPx()
 
         sortedList.forEachIndexed { idx, item ->
-            // Normalise coordinate
             val fraction = item.invoice.grandTotal / maxVal
-            val x = idx * stepX
-            val y = height - (fraction.toFloat() * height)
+            val x = idx * stepX + stepX * 0.25f
+            val barHeight = (fraction.toFloat() * usableHeight).coerceAtLeast(4.dp.toPx())
+            val yFront = height - barHeight
 
-            if (idx == 0) {
-                strokePath.moveTo(x, y)
-                fillPath.moveTo(x, height)
-                fillPath.lineTo(x, y)
-            } else {
-                strokePath.lineTo(x, y)
-                fillPath.lineTo(x, y)
-            }
-
-            if (idx == sortedList.size - 1) {
-                fillPath.lineTo(x, height)
-                fillPath.close()
-            }
-        }
-
-        // Draw background gradient fill
-        drawPath(
-            path = fillPath,
-            brush = Brush.verticalGradient(
-                colors = listOf(primaryColor.copy(alpha = 0.3f), Color.Transparent),
-                startY = 0f,
-                endY = height
+            // Front Face
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(primaryColor, primaryColor.copy(alpha = 0.7f))
+                ),
+                topLeft = androidx.compose.ui.geometry.Offset(x, yFront),
+                size = androidx.compose.ui.geometry.Size(barWidth, barHeight)
             )
-        )
 
-        // Draw trend stroke line
-        drawPath(
-            path = strokePath,
-            color = primaryColor,
-            style = Stroke(width = 3.dp.toPx())
-        )
+            // Top Face (3D perspective slant)
+            val topPath = Path().apply {
+                moveTo(x, yFront)
+                lineTo(x + depth, yFront - depth)
+                lineTo(x + barWidth + depth, yFront - depth)
+                lineTo(x + barWidth, yFront)
+                close()
+            }
+            drawPath(
+                path = topPath,
+                color = primaryColor.copy(alpha = 0.9f)
+            )
+
+            // Side Face (3D perspective slant)
+            val sidePath = Path().apply {
+                moveTo(x + barWidth, yFront)
+                lineTo(x + barWidth + depth, yFront - depth)
+                lineTo(x + barWidth + depth, height - depth)
+                lineTo(x + barWidth, height)
+                close()
+            }
+            drawPath(
+                path = sidePath,
+                color = primaryColor.copy(alpha = 0.6f)
+            )
+        }
     }
 }
 
