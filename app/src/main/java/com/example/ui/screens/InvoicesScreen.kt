@@ -5,6 +5,10 @@ import android.content.Intent
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -1968,12 +1972,42 @@ fun CatalogInvoiceItemRow(
                     onViewClicked()
                 }
             }
-            .testTag("invoice_card_${item.invoice.id}"),
+            .testTag("invoice_card_${item.invoice.id}")
+            .graphicsLayer {
+                rotationX = 3f
+                rotationY = -4f
+                cameraDistance = 14f * density
+            }
+            .drawBehind {
+                drawCircle(
+                    color = statusColor.copy(alpha = 0.05f),
+                    radius = size.maxDimension * 0.35f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.8f)
+                )
+                drawCircle(
+                    color = statusColor.copy(alpha = 0.02f),
+                    radius = size.maxDimension * 0.5f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.8f)
+                )
+            },
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(2.dp),
-        border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
+        elevation = CardDefaults.cardElevation(4.dp),
+        border = BorderStroke(
+            1.dp,
+            if (isSelected) {
+                Brush.linearGradient(colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary))
+            } else {
+                Brush.linearGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.5f),
+                        Color.White.copy(alpha = 0.05f),
+                        Color.Black.copy(alpha = 0.1f)
+                    )
+                )
+            }
+        )
     ) {
         Row(
             modifier = Modifier
