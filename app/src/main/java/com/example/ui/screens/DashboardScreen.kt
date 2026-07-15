@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -49,6 +51,18 @@ fun DashboardScreen(
     onMenuClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    
+    val infiniteTransition = rememberInfiniteTransition(label = "iconPulse")
+    val iconScale by infiniteTransition.animateFloat(
+        initialValue = 0.92f,
+        targetValue = 1.12f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "iconScale"
+    )
+
     val prefs = remember(context) { context.getSharedPreferences("invoice_generator_prefs", android.content.Context.MODE_PRIVATE) }
     var showTaxSummary by remember(prefs) {
         mutableStateOf(prefs.getBoolean("show_tax_summary", true))
@@ -203,11 +217,29 @@ fun DashboardScreen(
                                 .background(
                                     Brush.linearGradient(
                                         colors = listOf(
-                                            Color(0xFF2563EB), // Royal Blue
-                                            Color(0xFF1D4ED8)  // Deep Royal Blue
+                                            Color(0xFF10B981), // Emerald Green
+                                            Color(0xFF047857)  // Deep Emerald/Forest Green
                                         )
                                     )
                                 )
+                                .drawBehind {
+                                    drawCircle(
+                                        color = Color.White.copy(alpha = 0.08f),
+                                        radius = size.maxDimension * 0.4f,
+                                        center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.1f)
+                                    )
+                                    drawCircle(
+                                        color = Color.White.copy(alpha = 0.04f),
+                                        radius = size.maxDimension * 0.6f,
+                                        center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.1f)
+                                    )
+                                    drawLine(
+                                        color = Color.White.copy(alpha = 0.06f),
+                                        start = androidx.compose.ui.geometry.Offset(0f, size.height * 0.8f),
+                                        end = androidx.compose.ui.geometry.Offset(size.width, size.height * 0.4f),
+                                        strokeWidth = 2.dp.toPx()
+                                    )
+                                }
                                 .padding(16.dp)
                         ) {
                             Column {
@@ -219,7 +251,11 @@ fun DashboardScreen(
                                         modifier = Modifier
                                             .size(32.dp)
                                             .clip(CircleShape)
-                                            .background(Color.White.copy(alpha = 0.2f)),
+                                            .background(Color.White.copy(alpha = 0.2f))
+                                            .graphicsLayer {
+                                                scaleX = iconScale
+                                                scaleY = iconScale
+                                            },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -277,11 +313,29 @@ fun DashboardScreen(
                                 .background(
                                     Brush.linearGradient(
                                         colors = listOf(
-                                            Color(0xFFEA580C), // Dark Orange
-                                            Color(0xFFD97706)  // Golden Amber
+                                            Color(0xFFEF4444), // Coral Red
+                                            Color(0xFFB91C1C)  // Ruby/Crimson Red
                                         )
                                     )
                                 )
+                                .drawBehind {
+                                    drawCircle(
+                                        color = Color.White.copy(alpha = 0.08f),
+                                        radius = size.maxDimension * 0.4f,
+                                        center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.9f)
+                                    )
+                                    drawCircle(
+                                        color = Color.White.copy(alpha = 0.04f),
+                                        radius = size.maxDimension * 0.6f,
+                                        center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.9f)
+                                    )
+                                    drawLine(
+                                        color = Color.White.copy(alpha = 0.06f),
+                                        start = androidx.compose.ui.geometry.Offset(0f, size.height * 0.2f),
+                                        end = androidx.compose.ui.geometry.Offset(size.width, size.height * 0.6f),
+                                        strokeWidth = 2.dp.toPx()
+                                    )
+                                }
                                 .padding(16.dp)
                         ) {
                             Column {
@@ -293,7 +347,11 @@ fun DashboardScreen(
                                         modifier = Modifier
                                             .size(32.dp)
                                             .clip(CircleShape)
-                                            .background(Color.White.copy(alpha = 0.2f)),
+                                            .background(Color.White.copy(alpha = 0.2f))
+                                            .graphicsLayer {
+                                                scaleX = iconScale
+                                                scaleY = iconScale
+                                            },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -803,6 +861,19 @@ fun InvoiceTrendGraph(
             .fillMaxSize()
     ) {
         if (invoices.isEmpty()) return@Canvas
+
+        // Draw grid lines for a technical look
+        val gridLinesCount = 3
+        val stepYGrid = size.height / (gridLinesCount + 1)
+        for (i in 1..gridLinesCount) {
+            val yGrid = i * stepYGrid
+            drawLine(
+                color = primaryColor.copy(alpha = 0.08f),
+                start = androidx.compose.ui.geometry.Offset(0f, yGrid),
+                end = androidx.compose.ui.geometry.Offset(size.width, yGrid),
+                strokeWidth = 1.dp.toPx()
+            )
+        }
 
         // Group invoice sales by day (or simply order chronologically up to 10 points)
         val sortedList = invoices.sortedBy { it.invoice.dateTimestamp }.takeLast(10)
