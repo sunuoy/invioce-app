@@ -64,6 +64,8 @@ fun getVersionNameFromGit(providers: ProviderFactory): String {
             patch = 0
         } else if (isPatch) {
             patch += 1
+        } else if (commits.any { it.isNotBlank() }) {
+            patch += 1
         }
 
         "$major.$minor.$patch"

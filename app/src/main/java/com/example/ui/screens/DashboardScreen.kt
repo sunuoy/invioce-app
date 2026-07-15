@@ -870,77 +870,117 @@ fun InvoiceTrendGraph(
     primaryColor: Color,
     secondaryColor: Color
 ) {
-    Canvas(
-        modifier = Modifier
-            .fillMaxSize()
-    ) {
-        if (invoices.isEmpty()) return@Canvas
+    val lastSixMonths = remember(invoices) {
+        val calendar = Calendar.getInstance()
+        calendar.add(Calendar.MONTH, -5)
+        
+        val list = mutableListOf<Pair<String, Double>>()
+        val labelSdf = SimpleDateFormat("MMM", Locale.US)
+        val keySdf = SimpleDateFormat("yyyy-MM", Locale.US)
+        
+        for (i in 0 until 6) {
+            val label = labelSdf.format(calendar.time)
+            val key = keySdf.format(calendar.time)
+            
+            val totalForMonth = invoices.filter {
+                val invCal = Calendar.getInstance().apply { timeInMillis = it.invoice.dateTimestamp }
+                keySdf.format(invCal.time) == key
+            }.sumOf { it.invoice.grandTotal }
+            
+            list.add(Pair(label, totalForMonth))
+            calendar.add(Calendar.MONTH, 1)
+        }
+        list
+    }
 
-        // Draw grid lines for a technical look
-        val gridLinesCount = 3
-        val stepYGrid = size.height / (gridLinesCount + 1)
-        for (i in 1..gridLinesCount) {
-            val yGrid = i * stepYGrid
-            drawLine(
-                color = primaryColor.copy(alpha = 0.08f),
-                start = androidx.compose.ui.geometry.Offset(0f, yGrid),
-                end = androidx.compose.ui.geometry.Offset(size.width, yGrid),
-                strokeWidth = 1.dp.toPx()
-            )
+    Column(modifier = Modifier.fillMaxSize()) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            if (lastSixMonths.isEmpty()) return@Canvas
+
+            // Draw grid lines for a technical look
+            val gridLinesCount = 3
+            val stepYGrid = size.height / (gridLinesCount + 1)
+            for (i in 1..gridLinesCount) {
+                val yGrid = i * stepYGrid
+                drawLine(
+                    color = primaryColor.copy(alpha = 0.08f),
+                    start = androidx.compose.ui.geometry.Offset(0f, yGrid),
+                    end = androidx.compose.ui.geometry.Offset(size.width, yGrid),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+
+            val maxVal = (lastSixMonths.maxOfOrNull { it.second } ?: 100.0).coerceAtLeast(100.0)
+            val width = size.width
+            val height = size.height
+
+            val stepX = width / lastSixMonths.size
+            val barWidth = stepX * 0.45f
+            val depth = 6.dp.toPx() // 3D depth perspective skew
+            val usableHeight = height - depth - 8.dp.toPx()
+
+            lastSixMonths.forEachIndexed { idx, pair ->
+                val fraction = pair.second / maxVal
+                val x = idx * stepX + stepX * 0.275f
+                val barHeight = (fraction.toFloat() * usableHeight).coerceAtLeast(4.dp.toPx())
+                val yFront = height - barHeight
+
+                // Front Face
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(primaryColor, primaryColor.copy(alpha = 0.7f))
+                    ),
+                    topLeft = androidx.compose.ui.geometry.Offset(x, yFront),
+                    size = androidx.compose.ui.geometry.Size(barWidth, barHeight)
+                )
+
+                // Top Face (3D perspective slant)
+                val topPath = Path().apply {
+                    moveTo(x, yFront)
+                    lineTo(x + depth, yFront - depth)
+                    lineTo(x + barWidth + depth, yFront - depth)
+                    lineTo(x + barWidth, yFront)
+                    close()
+                }
+                drawPath(
+                    path = topPath,
+                    color = primaryColor.copy(alpha = 0.9f)
+                )
+
+                // Side Face (3D perspective slant)
+                val sidePath = Path().apply {
+                    moveTo(x + barWidth, yFront)
+                    lineTo(x + barWidth + depth, yFront - depth)
+                    lineTo(x + barWidth + depth, height - depth)
+                    lineTo(x + barWidth, height)
+                    close()
+                }
+                drawPath(
+                    path = sidePath,
+                    color = primaryColor.copy(alpha = 0.6f)
+                )
+            }
         }
 
-        // Group invoice sales by day (or simply order chronologically up to 8 points for nice spacing)
-        val sortedList = invoices.sortedBy { it.invoice.dateTimestamp }.takeLast(8)
-        val maxVal = (sortedList.maxOfOrNull { it.invoice.grandTotal } ?: 100.0).coerceAtLeast(100.0)
+        Spacer(modifier = Modifier.height(4.dp))
 
-        val width = size.width
-        val height = size.height
-
-        val stepX = width / sortedList.size.coerceAtLeast(1)
-        val barWidth = stepX * 0.5f // 50% width, 50% gap
-        val depth = 8.dp.toPx() // 3D depth perspective skew
-        val usableHeight = height - depth - 10.dp.toPx()
-
-        sortedList.forEachIndexed { idx, item ->
-            val fraction = item.invoice.grandTotal / maxVal
-            val x = idx * stepX + stepX * 0.25f
-            val barHeight = (fraction.toFloat() * usableHeight).coerceAtLeast(4.dp.toPx())
-            val yFront = height - barHeight
-
-            // Front Face
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(primaryColor, primaryColor.copy(alpha = 0.7f))
-                ),
-                topLeft = androidx.compose.ui.geometry.Offset(x, yFront),
-                size = androidx.compose.ui.geometry.Size(barWidth, barHeight)
-            )
-
-            // Top Face (3D perspective slant)
-            val topPath = Path().apply {
-                moveTo(x, yFront)
-                lineTo(x + depth, yFront - depth)
-                lineTo(x + barWidth + depth, yFront - depth)
-                lineTo(x + barWidth, yFront)
-                close()
+        // Month Labels Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
+            lastSixMonths.forEach { pair ->
+                Text(
+                    text = pair.first,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    fontWeight = FontWeight.Medium
+                )
             }
-            drawPath(
-                path = topPath,
-                color = primaryColor.copy(alpha = 0.9f)
-            )
-
-            // Side Face (3D perspective slant)
-            val sidePath = Path().apply {
-                moveTo(x + barWidth, yFront)
-                lineTo(x + barWidth + depth, yFront - depth)
-                lineTo(x + barWidth + depth, height - depth)
-                lineTo(x + barWidth, height)
-                close()
-            }
-            drawPath(
-                path = sidePath,
-                color = primaryColor.copy(alpha = 0.6f)
-            )
         }
     }
 }

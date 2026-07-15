@@ -10,6 +10,8 @@ import java.io.File
 import com.example.util.BackupRestoreHelper
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -308,9 +310,32 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 8.dp)
+                    .graphicsLayer {
+                        rotationX = 2.5f
+                        rotationY = -3f
+                        cameraDistance = 14f * density
+                    }
+                    .drawBehind {
+                        drawCircle(
+                            color = Color(0xFF3B82F6).copy(alpha = 0.05f),
+                            radius = size.maxDimension * 0.4f,
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.1f)
+                        )
+                    },
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                ),
+                elevation = CardDefaults.cardElevation(4.dp),
+                border = BorderStroke(
+                    1.dp,
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.4f),
+                            Color.White.copy(alpha = 0.05f),
+                            Color.Black.copy(alpha = 0.15f)
+                        )
+                    )
                 )
             ) {
                 Row(
@@ -342,9 +367,33 @@ fun SettingsScreen(
 
             // Saved business profiles registry
             Card(
-                modifier = Modifier.fillMaxWidth().testTag("saved_headers_registry_card"),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("saved_headers_registry_card")
+                    .graphicsLayer {
+                        rotationX = 2.5f
+                        rotationY = -3f
+                        cameraDistance = 14f * density
+                    }
+                    .drawBehind {
+                        drawCircle(
+                            color = Color(0xFF10B981).copy(alpha = 0.03f),
+                            radius = size.maxDimension * 0.4f,
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.8f)
+                        )
+                    },
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                elevation = CardDefaults.cardElevation(4.dp),
+                border = BorderStroke(
+                    1.dp,
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.4f),
+                            Color.White.copy(alpha = 0.05f),
+                            Color.Black.copy(alpha = 0.15f)
+                        )
+                    )
+                )
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -548,9 +597,32 @@ fun SettingsScreen(
 
             // Input Fields Block
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        rotationX = 2.5f
+                        rotationY = -3f
+                        cameraDistance = 14f * density
+                    }
+                    .drawBehind {
+                        drawCircle(
+                            color = Color(0xFF6366F1).copy(alpha = 0.03f),
+                            radius = size.maxDimension * 0.4f,
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.8f)
+                        )
+                    },
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                border = BorderStroke(
+                    1.dp,
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.4f),
+                            Color.White.copy(alpha = 0.05f),
+                            Color.Black.copy(alpha = 0.15f)
+                        )
+                    )
+                )
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),

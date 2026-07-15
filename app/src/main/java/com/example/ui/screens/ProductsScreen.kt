@@ -20,7 +20,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -310,13 +314,45 @@ fun ProductItemRow(
 ) {
     val isCritical = product.stock <= lowStockThreshold
     val cardBg = if (isCritical) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface
-    val cardBorder = if (isCritical) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)) else null
 
     Card(
-        modifier = Modifier.fillMaxWidth().testTag("product_item_${product.id}"),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("product_item_${product.id}")
+            .graphicsLayer {
+                rotationX = 2.5f
+                rotationY = -3f
+                cameraDistance = 14f * density
+            }
+            .drawBehind {
+                val circleColor = if (isCritical) Color(0xFFEF4444) else Color(0xFF10B981)
+                drawCircle(
+                    color = circleColor.copy(alpha = 0.05f),
+                    radius = size.maxDimension * 0.35f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.8f)
+                )
+                drawCircle(
+                    color = circleColor.copy(alpha = 0.02f),
+                    radius = size.maxDimension * 0.5f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.8f)
+                )
+            },
         colors = CardDefaults.cardColors(containerColor = cardBg),
-        elevation = CardDefaults.cardElevation(2.dp),
-        border = cardBorder
+        elevation = CardDefaults.cardElevation(4.dp),
+        border = if (isCritical) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f))
+        } else {
+            BorderStroke(
+                1.dp,
+                Brush.linearGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.5f),
+                        Color.White.copy(alpha = 0.05f),
+                        Color.Black.copy(alpha = 0.1f)
+                    )
+                )
+            )
+        }
     ) {
         Row(
             modifier = Modifier

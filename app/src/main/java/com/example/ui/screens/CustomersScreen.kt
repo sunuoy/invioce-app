@@ -17,7 +17,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -290,12 +294,42 @@ fun CustomerItemCard(
                     onSelectedChange(!isSelected)
                 }
             }
-            .testTag("client_card_${customer.id}"),
+            .testTag("client_card_${customer.id}")
+            .graphicsLayer {
+                rotationX = 2.5f
+                rotationY = -3.5f
+                cameraDistance = 14f * density
+            }
+            .drawBehind {
+                drawCircle(
+                    color = Color(0xFF3B82F6).copy(alpha = 0.04f),
+                    radius = size.maxDimension * 0.35f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.8f)
+                )
+                drawCircle(
+                    color = Color(0xFF3B82F6).copy(alpha = 0.02f),
+                    radius = size.maxDimension * 0.5f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.8f)
+                )
+            },
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        border = BorderStroke(
+            1.dp,
+            if (isSelected) {
+                Brush.linearGradient(colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary))
+            } else {
+                Brush.linearGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.5f),
+                        Color.White.copy(alpha = 0.05f),
+                        Color.Black.copy(alpha = 0.1f)
+                    )
+                )
+            }
+        )
     ) {
         Row(
             modifier = Modifier
