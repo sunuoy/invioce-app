@@ -106,7 +106,7 @@ signingConfigs {
 
   buildTypes {
     release {
-      isCrunchPngs = false
+      isCrunchPngs = true
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
