@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -180,50 +181,73 @@ fun DashboardScreen(
                     Card(
                         modifier = Modifier
                             .weight(1f)
-                            .testTag("total_sales_card"),
+                            .testTag("total_sales_card")
+                            .floating3D(rotationX = 5f, rotationY = -8f),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.4f),
+                                    Color.White.copy(alpha = 0.05f),
+                                    Color.Black.copy(alpha = 0.15f)
+                                )
+                            )
+                        ),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                            containerColor = Color.Transparent
                         )
                     ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            Color(0xFF2563EB), // Royal Blue
+                                            Color(0xFF1D4ED8)  // Deep Royal Blue
+                                        )
+                                    )
+                                )
+                                .padding(16.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center
+                            Column {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.TrendingUp,
-                                        contentDescription = "Sales Tracker",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(18.dp)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.White.copy(alpha = 0.2f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.TrendingUp,
+                                            contentDescription = "Sales Tracker",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "Total Sales",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = Color.White.copy(alpha = 0.8f)
                                     )
                                 }
+                                Spacer(modifier = Modifier.height(12.dp))
                                 Text(
-                                    text = "Total Sales",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                    text = String.format(Locale.US, "₹%.2f", totalSales ?: 0.0),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "Paid invoices only",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White.copy(alpha = 0.6f)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = String.format(Locale.US, "₹%.2f", totalSales ?: 0.0),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = "Paid invoices only",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
-                            )
                         }
                     }
 
@@ -231,50 +255,73 @@ fun DashboardScreen(
                     Card(
                         modifier = Modifier
                             .weight(1f)
-                            .testTag("outstanding_sales_card"),
+                            .testTag("outstanding_sales_card")
+                            .floating3D(rotationX = 5f, rotationY = -8f),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.4f),
+                                    Color.White.copy(alpha = 0.05f),
+                                    Color.Black.copy(alpha = 0.15f)
+                                )
+                            )
+                        ),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            containerColor = Color.Transparent
                         )
                     ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            Color(0xFFEA580C), // Dark Orange
+                                            Color(0xFFD97706)  // Golden Amber
+                                        )
+                                    )
+                                )
+                                .padding(16.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center
+                            Column {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.AccountBalanceWallet,
-                                        contentDescription = "Pending Payments",
-                                        tint = MaterialTheme.colorScheme.secondary,
-                                        modifier = Modifier.size(18.dp)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.White.copy(alpha = 0.2f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.AccountBalanceWallet,
+                                            contentDescription = "Pending Payments",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "Outstanding",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = Color.White.copy(alpha = 0.8f)
                                     )
                                 }
+                                Spacer(modifier = Modifier.height(12.dp))
                                 Text(
-                                    text = "Outstanding",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                                    text = String.format(Locale.US, "₹%.2f", outstandingAmount ?: 0.0),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "Draft / Sent statuses",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White.copy(alpha = 0.6f)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = String.format(Locale.US, "₹%.2f", outstandingAmount ?: 0.0),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Text(
-                                text = "Draft / Sent statuses",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f)
-                            )
                         }
                     }
                 }
@@ -293,7 +340,19 @@ fun DashboardScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(120.dp),
+                            .height(130.dp)
+                            .floating3D(rotationX = 4f, rotationY = -4f),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.2f),
+                                    Color.White.copy(alpha = 0.05f),
+                                    Color.Black.copy(alpha = 0.1f)
+                                )
+                            )
+                        ),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                         )
@@ -796,3 +855,15 @@ fun InvoiceTrendGraph(
         )
     }
 }
+
+fun Modifier.floating3D(
+    rotationX: Float = 5f,
+    rotationY: Float = -8f,
+    cameraDistance: Float = 12f
+): Modifier = this.then(
+    Modifier.graphicsLayer {
+        this.rotationX = rotationX
+        this.rotationY = rotationY
+        this.cameraDistance = cameraDistance * density
+    }
+)
