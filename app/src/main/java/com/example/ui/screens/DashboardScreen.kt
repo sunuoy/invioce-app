@@ -444,8 +444,8 @@ fun DashboardScreen(
                 }
             }
 
-            // Canvas Revenue Trend mini-chart (Only render if we have invoices)
-            if (showSalesTrend && invoices.isNotEmpty()) {
+            // Canvas Revenue Trend mini-chart (Always render to maintain layout structure)
+            if (showSalesTrend) {
                 item {
                     Text(
                         text = "Sales Trend Projection",
@@ -492,6 +492,22 @@ fun DashboardScreen(
                                 primaryColor = MaterialTheme.colorScheme.primary,
                                 secondaryColor = MaterialTheme.colorScheme.secondary
                             )
+
+                            if (invoices.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.08f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No sales data found. Add invoices to project trend.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
                         }
                     }
                 }
