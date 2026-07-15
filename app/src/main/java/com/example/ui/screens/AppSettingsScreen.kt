@@ -58,6 +58,25 @@ fun AppSettingsScreen(
     
     var showRestoreConfirmation by remember { mutableStateOf<String?>(null) }
     var showClearDataConfirmation by remember { mutableStateOf(false) }
+
+    // Google Drive States
+    val gdAccessToken by viewModel.googleDriveAccessToken.collectAsStateWithLifecycle()
+    val gdLastSyncTime by viewModel.googleDriveLastSyncTime.collectAsStateWithLifecycle()
+    val gdSyncing by viewModel.isGoogleDriveSyncing.collectAsStateWithLifecycle()
+
+    val googleAccountPickerLauncherForDrive = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val data = result.data
+            if (data != null) {
+                val accountName = data.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME)
+                if (!accountName.isNullOrEmpty()) {
+                    viewModel.fetchGoogleDriveTokenAutomatically(context, accountName)
+                }
+            }
+        }
+    }
     
     // Setup file importing
     val importLauncher = rememberLauncherForActivityResult(
@@ -616,10 +635,139 @@ fun AppSettingsScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // 2.65. Google Drive Cloud Sync Card
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("google_drive_sync_card"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudSync,
+                            contentDescription = "Google Drive Sync",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Text(
+                            text = "Google Drive Sync",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Text(
+                        text = "Auto-save your business profile, stock items, customer data, and invoices to your personal Google Drive account in the background.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Status: ${if (gdAccessToken.isNotEmpty()) "Connected (Auto-sync Active)" else "Disconnected"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (gdAccessToken.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                        )
+
+                        if (gdAccessToken.isNotEmpty()) {
+                            TextButton(
+                                onClick = { viewModel.disableGoogleDriveSync() },
+                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Text("Disconnect", fontSize = 11.sp)
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "Last Synced: $gdLastSyncTime",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+
+                    if (gdAccessToken.isEmpty()) {
+                        Button(
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            onClick = {
+                                val intent = android.accounts.AccountManager.newChooseAccountIntent(
+                                    null, null, arrayOf("com.google"), null, null, null, null
+                                )
+                                googleAccountPickerLauncherForDrive.launch(intent)
+                            }
+                        ) {
+                            Icon(Icons.Default.CloudQueue, contentDescription = "Connect Google Drive", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Connect Google Drive", fontSize = 12.sp)
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Button(
+                                modifier = Modifier.weight(1f).height(42.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                enabled = !gdSyncing,
+                                onClick = {
+                                    viewModel.backupToGoogleDrive { success, msg ->
+                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            ) {
+                                if (gdSyncing) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.CloudUpload, contentDescription = "Backup now", modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Backup Now", fontSize = 11.sp)
+                                }
+                            }
+
+                            OutlinedButton(
+                                modifier = Modifier.weight(1f).height(42.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                enabled = !gdSyncing,
+                                onClick = {
+                                    viewModel.restoreFromGoogleDrive { success, msg ->
+                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            ) {
+                                if (gdSyncing) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.CloudDownload, contentDescription = "Restore now", modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Restore Now", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             // 2.75. GitHub Application Updates Card
             val updateInfoState by viewModel.updateInfo.collectAsStateWithLifecycle()
             val updateInfo = updateInfoState
             val isCheckingForUpdates by viewModel.isCheckingForUpdates.collectAsStateWithLifecycle()
+            val dlProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
+            val isDownloading by viewModel.isDownloading.collectAsStateWithLifecycle()
+            val dlStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
 
             Card(
                 modifier = Modifier.fillMaxWidth().testTag("github_updates_card_settings"),
@@ -719,13 +867,42 @@ fun AppSettingsScreen(
                         }
                     }
 
+                    if (isDownloading) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            LinearProgressIndicator(
+                                progress = dlProgress,
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = dlStatus ?: "Downloading...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                TextButton(
+                                    onClick = { viewModel.cancelApkDownload() },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                ) {
+                                    Text("Cancel", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Button(
                             onClick = { viewModel.checkForUpdates(silent = false) },
-                            enabled = !isCheckingForUpdates,
+                            enabled = !isCheckingForUpdates && !isDownloading,
                             modifier = Modifier.weight(1f).testTag("settings_check_update_btn"),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.secondary,
@@ -751,17 +928,9 @@ fun AppSettingsScreen(
                             Text(if (isCheckingForUpdates) "Checking..." else "Check Now", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
 
-                        if (updateInfo?.isUpdateAvailable == true) {
+                        if (updateInfo?.isUpdateAvailable == true && !isDownloading) {
                             Button(
-                                onClick = {
-                                    try {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.downloadUrl))
-                                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Could not open browser: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
+                                onClick = { viewModel.downloadAndInstallApk(updateInfo.downloadUrl) },
                                 modifier = Modifier.weight(1f).testTag("settings_download_update_btn"),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primary,
@@ -776,7 +945,7 @@ fun AppSettingsScreen(
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Get Update", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Install Update", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }

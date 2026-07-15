@@ -7,14 +7,13 @@ import com.example.data.*
 import com.example.util.BackupRestoreHelper
 import com.example.util.UpdateHelper
 import android.content.Context
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.isActive
 
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 class InvoiceViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = InvoiceDatabase.getDatabase(application)
@@ -62,10 +61,69 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // Google Drive Sync states
+    private val _googleDriveSyncEnabled = MutableStateFlow(false)
+    val googleDriveSyncEnabled: StateFlow<Boolean> = _googleDriveSyncEnabled.asStateFlow()
+
+    private val _isGoogleDriveSyncing = MutableStateFlow(false)
+    val isGoogleDriveSyncing: StateFlow<Boolean> = _isGoogleDriveSyncing.asStateFlow()
+
+    private val _googleDriveAccessToken = MutableStateFlow("")
+    val googleDriveAccessToken: StateFlow<String> = _googleDriveAccessToken.asStateFlow()
+
+    private val _googleDriveLastSyncTime = MutableStateFlow("Never")
+    val googleDriveLastSyncTime: StateFlow<String> = _googleDriveLastSyncTime.asStateFlow()
+
+    // Update download states
+    private val _downloadProgress = MutableStateFlow(0f)
+    val downloadProgress: StateFlow<Float> = _downloadProgress.asStateFlow()
+
+    private val _downloadStatus = MutableStateFlow<String?>(null)
+    val downloadStatus: StateFlow<String?> = _downloadStatus.asStateFlow()
+
+    private val _isDownloading = MutableStateFlow(false)
+    val isDownloading: StateFlow<Boolean> = _isDownloading.asStateFlow()
+
     init {
+        val gdEnabled = prefs.getBoolean("gd_sync_enabled", false)
+        val gdToken = prefs.getString("gd_access_token", "") ?: ""
+        val gdLastSync = prefs.getString("gd_last_sync_time", "Never") ?: "Never"
+        _googleDriveSyncEnabled.value = gdEnabled
+        _googleDriveAccessToken.value = gdToken
+        _googleDriveLastSyncTime.value = gdLastSync
+
         viewModelScope.launch {
-            // First boot placeholder seeding disabled
             checkForUpdates(silent = true)
+        }
+
+        // Auto-authenticate when business profile is loaded
+        viewModelScope.launch {
+            businessProfile.collect { profile ->
+                if (profile != null && profile.gmailId.isNotEmpty()) {
+                    fetchGoogleDriveTokenAutomatically(application, profile.gmailId)
+                }
+            }
+        }
+
+        // Auto-run Google Drive background sync when data changes and token is configured
+        viewModelScope.launch {
+            combine(
+                repository.allProducts,
+                repository.allCustomers,
+                repository.allInvoices,
+                repository.businessProfile,
+                _googleDriveAccessToken
+            ) { array: Array<Any?> ->
+                array[4] as String
+            }
+            .debounce(3000)
+            .collect { token ->
+                if (token.isNotEmpty()) {
+                    backupToGoogleDrive { success, msg ->
+                        android.util.Log.d("GoogleDriveAutoSync", "Background auto-backup: $msg")
+                    }
+                }
+            }
         }
     }
 
@@ -589,6 +647,303 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 _uiEvents.emit(UiEvent.ShowError("Failed to seed data: ${e.message}"))
             }
         }
+    }
+
+    // ------------------ GOOGLE DRIVE OPERATIONS ------------------
+    fun setGoogleDriveAccessToken(token: String) {
+        val trimmed = token.trim()
+        _googleDriveAccessToken.value = trimmed
+        if (trimmed.isNotEmpty()) {
+            _googleDriveSyncEnabled.value = true
+            prefs.edit()
+                .putBoolean("gd_sync_enabled", true)
+                .putString("gd_access_token", trimmed)
+                .apply()
+        }
+    }
+
+    fun disableGoogleDriveSync() {
+        _googleDriveSyncEnabled.value = false
+        _googleDriveAccessToken.value = ""
+        prefs.edit()
+            .putBoolean("gd_sync_enabled", false)
+            .remove("gd_access_token")
+            .apply()
+    }
+
+    fun backupToGoogleDrive(onComplete: (Boolean, String) -> Unit) {
+        val token = _googleDriveAccessToken.value
+        if (token.isEmpty()) {
+            onComplete(false, "Google Drive not authorized. Please configure access token.")
+            return
+        }
+
+        viewModelScope.launch {
+            _isGoogleDriveSyncing.value = true
+            try {
+                val json = exportAppDataToJSON()
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        val existingFileId = com.example.data.GoogleDriveService.findBackupFile(token)
+                        val success = com.example.data.GoogleDriveService.uploadBackupFile(token, json, existingFileId)
+                        
+                        withContext(Dispatchers.Main) {
+                            _isGoogleDriveSyncing.value = false
+                            if (success) {
+                                val nowStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+                                _googleDriveLastSyncTime.value = nowStr
+                                prefs.edit().putString("gd_last_sync_time", nowStr).apply()
+                                onComplete(true, "Successfully backed up data to Google Drive!")
+                            } else {
+                                com.example.data.GoogleDriveService.invalidateToken(getApplication(), token)
+                                onComplete(false, "Drive upload failed. Please check access token scope or expiry.")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            _isGoogleDriveSyncing.value = false
+                            onComplete(false, "Connection error: ${e.message}")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                _isGoogleDriveSyncing.value = false
+                onComplete(false, "Preparation error: ${e.message}")
+            }
+        }
+    }
+
+    fun restoreFromGoogleDrive(onComplete: (Boolean, String) -> Unit) {
+        val token = _googleDriveAccessToken.value
+        if (token.isEmpty()) {
+            onComplete(false, "Google Drive not authorized. Please configure access token.")
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            withContext(Dispatchers.Main) {
+                _isGoogleDriveSyncing.value = true
+            }
+
+            try {
+                val existingFileId = com.example.data.GoogleDriveService.findBackupFile(token)
+                if (existingFileId == null) {
+                    withContext(Dispatchers.Main) {
+                        _isGoogleDriveSyncing.value = false
+                        onComplete(false, "No 'invoice_app_backup.json' file is found on your Google Drive.")
+                    }
+                    return@launch
+                }
+
+                val jsonContent = com.example.data.GoogleDriveService.downloadBackupFile(token, existingFileId)
+                withContext(Dispatchers.Main) {
+                    if (jsonContent != null) {
+                        restoreDatabaseBackup(
+                            jsonString = jsonContent,
+                            onSuccess = {
+                                _isGoogleDriveSyncing.value = false
+                                onComplete(true, "Successfully restored records from Google Drive!")
+                            },
+                            onError = { err ->
+                                _isGoogleDriveSyncing.value = false
+                                onComplete(false, "Restore error: $err")
+                            }
+                        )
+                    } else {
+                        _isGoogleDriveSyncing.value = false
+                        onComplete(false, "Failed to download backup file from Google Drive.")
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    _isGoogleDriveSyncing.value = false
+                    onComplete(false, "Connection error: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun fetchGoogleDriveTokenAutomatically(context: Context, email: String) {
+        if (email.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val accountManager = android.accounts.AccountManager.get(context)
+                val accounts = accountManager.getAccountsByType("com.google")
+                val matchingAccount = accounts.find { it.name.equals(email, ignoreCase = true) }
+                if (matchingAccount != null) {
+                    val token = accountManager.blockingGetAuthToken(
+                        matchingAccount,
+                        "oauth2:https://www.googleapis.com/auth/drive.file",
+                        true
+                    )
+                    if (!token.isNullOrEmpty()) {
+                        withContext(Dispatchers.Main) {
+                            setGoogleDriveAccessToken(token)
+                            android.util.Log.d("GoogleDriveAutoSync", "Successfully auto-authenticated Google Drive for $email")
+                            
+                            // Auto restore if database is empty
+                            if (products.value.isEmpty() && invoices.value.isEmpty() && customers.value.isEmpty()) {
+                                android.util.Log.d("GoogleDriveAutoSync", "Local records empty. Triggering automatic cloud restore...")
+                                restoreFromGoogleDrive { success, msg ->
+                                    android.util.Log.d("GoogleDriveAutoSync", "Auto-restore completed: success=$success, msg=$msg")
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("GoogleDriveAutoSync", "Failed to auto-authenticate Google Drive: ${e.message}")
+            }
+        }
+    }
+
+    fun exportAppDataToJSON(): String {
+        return BackupRestoreHelper.exportToJson(
+            profile = businessProfile.value,
+            products = products.value,
+            customers = customers.value,
+            invoices = invoices.value
+        )
+    }
+
+    // ------------------ IN-APP UPDATE OPERATIONS ------------------
+    private var downloadJob: kotlinx.coroutines.Job? = null
+
+    fun cancelApkDownload() {
+        downloadJob?.cancel()
+        downloadJob = null
+        _isDownloading.value = false
+        _downloadStatus.value = null
+        _downloadProgress.value = 0f
+    }
+
+    fun downloadAndInstallApk(apkUrl: String) {
+        if (_isDownloading.value) return
+        _isDownloading.value = true
+        _downloadProgress.value = 0f
+        _downloadStatus.value = "Starting download..."
+
+        downloadJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val context = getApplication<Application>()
+                val connection = getRedirectedConnection(apkUrl)
+                connection.connect()
+
+                if (connection.responseCode != java.net.HttpURLConnection.HTTP_OK) {
+                    throw java.io.IOException("Server returned HTTP " + connection.responseCode + " " + connection.responseMessage)
+                }
+
+                val fileLength = connection.contentLength
+                val updateFile = java.io.File(context.cacheDir, "invoice_update.apk")
+                if (updateFile.exists()) {
+                    updateFile.delete()
+                }
+
+                connection.inputStream.use { input ->
+                    java.io.FileOutputStream(updateFile).use { output ->
+                        val buffer = ByteArray(4096)
+                        var total: Long = 0
+                        var count = 0
+                        while (isActive && input.read(buffer).also { count = it } != -1) {
+                            total += count
+                            if (fileLength > 0) {
+                                val progress = total.toFloat() / fileLength
+                                withContext(Dispatchers.Main) {
+                                    _downloadProgress.value = progress
+                                    val mbDown = String.format("%.1f", total / 1_048_576.0)
+                                    val mbTotal = String.format("%.1f", fileLength / 1_048_576.0)
+                                    _downloadStatus.value = "Downloading... $mbDown / $mbTotal MB"
+                                }
+                            }
+                            output.write(buffer, 0, count)
+                        }
+                        output.flush()
+                    }
+                }
+
+                if (!isActive) return@launch
+
+                withContext(Dispatchers.Main) {
+                    _downloadProgress.value = 1f
+                    _downloadStatus.value = "Download complete. Checking permissions..."
+                }
+
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    if (!context.packageManager.canRequestPackageInstalls()) {
+                        val settingsIntent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                            data = android.net.Uri.parse("package:" + context.packageName)
+                            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        withContext(Dispatchers.Main) {
+                            try {
+                                context.startActivity(settingsIntent)
+                                _downloadStatus.value = "Please enable 'Install unknown apps' permission"
+                            } catch (e: Exception) {
+                                _downloadStatus.value = "Could not open settings: ${e.message}"
+                            }
+                        }
+                        return@launch
+                    }
+                }
+
+                val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    updateFile
+                )
+
+                val installIntent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                    setDataAndType(contentUri, "application/vnd.android.package-archive")
+                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                }
+
+                withContext(Dispatchers.Main) {
+                    try {
+                        context.startActivity(installIntent)
+                        _downloadStatus.value = "Install dialog opened"
+                    } catch (e: Exception) {
+                        _downloadStatus.value = "Could not open installer: ${e.message}"
+                    }
+                }
+            } catch (e: Exception) {
+                if (isActive) {
+                    withContext(Dispatchers.Main) {
+                        _downloadStatus.value = "Error: ${e.localizedMessage ?: "Unknown error"}"
+                    }
+                }
+            } finally {
+                withContext(Dispatchers.Main) {
+                    _isDownloading.value = false
+                }
+            }
+        }
+    }
+
+    private fun getRedirectedConnection(urlStr: String): java.net.HttpURLConnection {
+        var url = java.net.URL(urlStr)
+        var connection = url.openConnection() as java.net.HttpURLConnection
+        connection.instanceFollowRedirects = true
+        connection.connectTimeout = 15000
+        connection.readTimeout = 15000
+        
+        var status = connection.responseCode
+        var redirects = 0
+        while (status == java.net.HttpURLConnection.HTTP_MOVED_TEMP ||
+               status == java.net.HttpURLConnection.HTTP_MOVED_PERM ||
+               status == 307 || status == 308) {
+            if (redirects > 5) break
+            val newUrl = connection.getHeaderField("Location") ?: break
+            connection.disconnect()
+            url = java.net.URL(newUrl)
+            connection = url.openConnection() as java.net.HttpURLConnection
+            connection.instanceFollowRedirects = true
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+            status = connection.responseCode
+            redirects++
+        }
+        return connection
     }
 
     sealed interface UiEvent {
