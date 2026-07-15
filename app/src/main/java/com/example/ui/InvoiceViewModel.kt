@@ -84,6 +84,32 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     private val _isDownloading = MutableStateFlow(false)
     val isDownloading: StateFlow<Boolean> = _isDownloading.asStateFlow()
 
+    // Standard business alerts
+    private val _uiEvents = MutableSharedFlow<UiEvent>()
+    val uiEvents: SharedFlow<UiEvent> = _uiEvents
+
+    // Reactive State Flows
+    val products: StateFlow<List<Product>> = repository.allProducts
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val customers: StateFlow<List<Customer>> = repository.allCustomers
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val invoices: StateFlow<List<InvoiceWithDetails>> = repository.allInvoices
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val businessProfile: StateFlow<BusinessProfile?> = repository.businessProfile
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val savedBusinessProfiles: StateFlow<List<SavedBusinessProfile>> = repository.savedBusinessProfiles
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val totalSales: StateFlow<Double?> = repository.totalSales
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val outstandingAmount: StateFlow<Double?> = repository.outstandingAmount
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
     init {
         val gdEnabled = prefs.getBoolean("gd_sync_enabled", false)
         val gdToken = prefs.getString("gd_access_token", "") ?: ""
@@ -126,32 +152,6 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             }
         }
     }
-
-    // Standard business alerts
-    private val _uiEvents = MutableSharedFlow<UiEvent>()
-    val uiEvents: SharedFlow<UiEvent> = _uiEvents
-
-    // Reactive State Flows
-    val products: StateFlow<List<Product>> = repository.allProducts
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val customers: StateFlow<List<Customer>> = repository.allCustomers
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val invoices: StateFlow<List<InvoiceWithDetails>> = repository.allInvoices
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val businessProfile: StateFlow<BusinessProfile?> = repository.businessProfile
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    val savedBusinessProfiles: StateFlow<List<SavedBusinessProfile>> = repository.savedBusinessProfiles
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val totalSales: StateFlow<Double?> = repository.totalSales
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
-    val outstandingAmount: StateFlow<Double?> = repository.outstandingAmount
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     // Support sequential generation: INV-YYYY-MMM-DD-XXXX with progressive suffix logic
     fun generateNextInvoiceNumber(): String {
