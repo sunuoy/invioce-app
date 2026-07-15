@@ -28,3 +28,6 @@
 
 # Keep org.json models
 -keep class org.json.** { *; }
+
+# Disable heavy optimization passes (medium-level optimization for fast builds)
+-dontoptimize
