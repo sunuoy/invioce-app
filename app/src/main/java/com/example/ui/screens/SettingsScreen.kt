@@ -374,11 +374,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
-                    .graphicsLayer {
-                        rotationX = 2.5f
-                        rotationY = -3f
-                        cameraDistance = 14f * density
-                    }
+                    .floating3D(rotationX = 2.5f, rotationY = -3f)
                     .drawBehind {
                         drawCircle(
                             color = Color(0xFF3B82F6).copy(alpha = 0.05f),
@@ -433,11 +429,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("saved_headers_registry_card")
-                    .graphicsLayer {
-                        rotationX = 2.5f
-                        rotationY = -3f
-                        cameraDistance = 14f * density
-                    }
+                    .floating3D(rotationX = 2.5f, rotationY = -3f)
                     .drawBehind {
                         drawCircle(
                             color = Color(0xFF10B981).copy(alpha = 0.03f),
@@ -662,11 +654,7 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .graphicsLayer {
-                        rotationX = 2.5f
-                        rotationY = -3f
-                        cameraDistance = 14f * density
-                    }
+                    .floating3D(rotationX = 2.5f, rotationY = -3f)
                     .drawBehind {
                         drawCircle(
                             color = Color(0xFF6366F1).copy(alpha = 0.03f),
@@ -1314,11 +1302,7 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .graphicsLayer {
-                        rotationX = 2.5f
-                        rotationY = -3f
-                        cameraDistance = 14f * density
-                    }
+                    .floating3D(rotationX = 2.5f, rotationY = -3f)
                     .drawBehind {
                         drawCircle(
                             color = Color(0xFF3B82F6).copy(alpha = 0.03f),

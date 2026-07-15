@@ -31,6 +31,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.composed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1061,11 +1063,54 @@ fun InvoiceTrendGraph(
 fun Modifier.floating3D(
     rotationX: Float = 5f,
     rotationY: Float = -8f,
-    cameraDistance: Float = 12f
-): Modifier = this.then(
-    Modifier.graphicsLayer {
-        this.rotationX = rotationX
-        this.rotationY = rotationY
-        this.cameraDistance = cameraDistance * density
-    }
-)
+    cameraDistance: Float = 14f
+): Modifier = this.composed {
+    var rawTiltX by remember { mutableStateOf(0f) }
+    var rawTiltY by remember { mutableStateOf(0f) }
+
+    val animatedTiltX by animateFloatAsState(
+        targetValue = rawTiltX,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "tiltX"
+    )
+    val animatedTiltY by animateFloatAsState(
+        targetValue = rawTiltY,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "tiltY"
+    )
+
+    this
+        .pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val changes = event.changes
+                    if (changes.any { it.pressed }) {
+                        val position = changes.first().position
+                        val w = size.width
+                        val h = size.height
+                        if (w > 0 && h > 0) {
+                            val normX = ((position.x - w / 2f) / (w / 2f)).coerceIn(-1f, 1f)
+                            val normY = ((position.y - h / 2f) / (h / 2f)).coerceIn(-1f, 1f)
+                            rawTiltX = -normY * 12f
+                            rawTiltY = normX * 12f
+                        }
+                    } else {
+                        rawTiltX = 0f
+                        rawTiltY = 0f
+                    }
+                }
+            }
+        }
+        .graphicsLayer {
+            this.rotationX = rotationX + animatedTiltX
+            this.rotationY = rotationY + animatedTiltY
+            this.cameraDistance = cameraDistance * density
+        }
+}
