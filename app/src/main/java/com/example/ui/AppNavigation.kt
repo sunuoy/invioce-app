@@ -42,22 +42,26 @@ fun MainAppNavigation(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
+            val surfaceColor = MaterialTheme.colorScheme.surface
             ModalDrawerSheet(
                 modifier = Modifier
                     .width(300.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFF6366F1).copy(alpha = 0.04f),
-                                MaterialTheme.colorScheme.surface
-                            )
-                        )
-                    )
                     .drawBehind {
+                        // Draw background with 80% (top) to 95% (bottom) opacity (20% transparency)
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    surfaceColor.copy(alpha = 0.82f),
+                                    surfaceColor.copy(alpha = 0.95f)
+                                )
+                            ),
+                            size = size
+                        )
+
                         // Orb 1 (Top Left) - Brand Violet/Indigo
                         drawCircle(
                             brush = Brush.radialGradient(
-                                colors = listOf(Color(0xFF6366F1).copy(alpha = 0.08f), Color.Transparent),
+                                colors = listOf(Color(0xFF6366F1).copy(alpha = 0.12f), Color.Transparent),
                                 center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.15f),
                                 radius = size.maxDimension * 0.5f
                             ),
@@ -67,7 +71,7 @@ fun MainAppNavigation(
                         // Orb 2 (Bottom Right) - Brand Blue
                         drawCircle(
                             brush = Brush.radialGradient(
-                                colors = listOf(Color(0xFF3B82F6).copy(alpha = 0.07f), Color.Transparent),
+                                colors = listOf(Color(0xFF3B82F6).copy(alpha = 0.10f), Color.Transparent),
                                 center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.85f),
                                 radius = size.maxDimension * 0.4f
                             ),
@@ -77,7 +81,7 @@ fun MainAppNavigation(
                         // Orb 3 (Center Left) - Coral Pink
                         drawCircle(
                             brush = Brush.radialGradient(
-                                colors = listOf(Color(0xFFEC4899).copy(alpha = 0.05f), Color.Transparent),
+                                colors = listOf(Color(0xFFEC4899).copy(alpha = 0.08f), Color.Transparent),
                                 center = androidx.compose.ui.geometry.Offset(size.width * 0.2f, size.height * 0.5f),
                                 radius = size.maxDimension * 0.35f
                             ),
