@@ -768,8 +768,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val accountManager = android.accounts.AccountManager.get(context)
-                val accounts = accountManager.getAccountsByType("com.google")
-                val matchingAccount = accounts.find { it.name.equals(email, ignoreCase = true) }
+                val matchingAccount = android.accounts.Account(email, "com.google")
                 if (matchingAccount != null) {
                     val token = accountManager.blockingGetAuthToken(
                         matchingAccount,
