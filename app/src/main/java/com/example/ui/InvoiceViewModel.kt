@@ -772,7 +772,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 if (matchingAccount != null) {
                     val token = accountManager.blockingGetAuthToken(
                         matchingAccount,
-                        "oauth2:server:client_id:93356178221-agfhu3breboia2gpgdmv1jen2geftcf8.apps.googleusercontent.com:api_scope:https://www.googleapis.com/auth/drive.file",
+                        "oauth2:https://www.googleapis.com/auth/drive.file",
                         true
                     )
                     if (!token.isNullOrEmpty()) {
@@ -792,6 +792,9 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 }
             } catch (e: Exception) {
                 android.util.Log.e("GoogleDriveAutoSync", "Failed to auto-authenticate Google Drive: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    android.widget.Toast.makeText(context, "Failed to connect Google Drive: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
