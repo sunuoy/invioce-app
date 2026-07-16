@@ -86,11 +86,11 @@ class ExampleRobolectricTest {
     // Resolve URI via FileProvider using the shadowed implementation
     val uri = androidx.core.content.FileProvider.getUriForFile(
       context,
-      "com.invoicegenerator.gqtwv.fileprovider",
+      "com.invoice.generator.fileprovider",
       pdfFile
     )
     assertNotNull("URI generated via FileProvider should not be null", uri)
     assertEquals("content", uri.scheme)
-    assertEquals("com.invoicegenerator.gqtwv.fileprovider", uri.authority)
+    assertEquals("com.invoice.generator.fileprovider", uri.authority)
   }
 }
