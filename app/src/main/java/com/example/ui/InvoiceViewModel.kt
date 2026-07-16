@@ -772,7 +772,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 if (matchingAccount != null) {
                     val token = accountManager.blockingGetAuthToken(
                         matchingAccount,
-                        "oauth2:https://www.googleapis.com/auth/drive.file",
+                        "oauth2:server:client_id:93356178221-qf0gqf3ml3t8oku4ta486nlvlptrhqfj.apps.googleusercontent.com:api_scope:https://www.googleapis.com/auth/drive.file",
                         true
                     )
                     if (!token.isNullOrEmpty()) {
