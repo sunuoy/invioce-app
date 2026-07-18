@@ -2,6 +2,9 @@ package com.example.ui.screens
 
 import android.widget.Toast
 import android.content.Intent
+import java.io.File
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -724,6 +727,55 @@ fun InvoiceDetailLayout(
             }
         }
 
+        if (item.invoice.attachmentPath.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Button(
+                onClick = {
+                    try {
+                        val file = File(item.invoice.attachmentPath)
+                        if (file.exists()) {
+                            val uri = androidx.core.content.FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                file
+                            )
+                            val extension = file.extension.lowercase()
+                            val mimeType = when (extension) {
+                                "pdf" -> "application/pdf"
+                                "jpg", "jpeg" -> "image/jpeg"
+                                "png" -> "image/png"
+                                "gif" -> "image/gif"
+                                "txt" -> "text/plain"
+                                else -> "*/*"
+                            }
+                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(uri, mimeType)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } else {
+                            Toast.makeText(context, "Attachment file does not exist locally.", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Unable to open attachment: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AttachFile,
+                    contentDescription = "View Attachment",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Open / View Attachment", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            }
+        }
+
         // UPI Pay Card if Business profile has UPI ID
         if (businessProfile != null && businessProfile.upiId.isNotBlank()) {
             Spacer(modifier = Modifier.height(10.dp))
@@ -936,6 +988,7 @@ fun CreateInvoiceScreen(
     var brokerageBy by remember { mutableStateOf(editingInvoice?.invoice?.brokerageBy ?: "") }
     var placeOfSupply by remember { mutableStateOf(editingInvoice?.invoice?.placeOfSupply ?: "") }
     var dueDateTimestamp by remember { mutableStateOf(editingInvoice?.invoice?.dueDateTimestamp ?: 0L) }
+    var attachmentPathState by remember { mutableStateOf(editingInvoice?.invoice?.attachmentPath ?: "") }
 
     // List of active line items currently added
     val addedItems = remember { mutableStateListOf<InvoiceLineItem>() }
@@ -946,6 +999,7 @@ fun CreateInvoiceScreen(
             addedItems.clear()
             addedItems.addAll(it.lineItems)
             dueDateTimestamp = it.invoice.dueDateTimestamp
+            attachmentPathState = it.invoice.attachmentPath
         }
     }
 
@@ -987,7 +1041,8 @@ fun CreateInvoiceScreen(
                                     vehicleNumber = vehicleNumber,
                                     brokerageBy = brokerageBy,
                                     placeOfSupply = placeOfSupply,
-                                    dueDateTimestamp = dueDateTimestamp
+                                    dueDateTimestamp = dueDateTimestamp,
+                                    attachmentPath = attachmentPathState
                                 )
                                 Toast.makeText(context, "Invoice Saved Successfully!", Toast.LENGTH_SHORT).show()
                                 onBack()
@@ -1219,6 +1274,98 @@ fun CreateInvoiceScreen(
                 }
             }
 
+            // Supporting Attachment
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Supporting Attachment",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        if (attachmentPathState.isEmpty()) {
+                            val launcher = rememberLauncherForActivityResult(
+                                contract = ActivityResultContracts.GetContent()
+                            ) { uri ->
+                                uri?.let {
+                                    try {
+                                        val attachmentsDir = File(context.filesDir, "attachments").apply { mkdirs() }
+                                        val extension = context.contentResolver.getType(it)?.split("/")?.lastOrNull() ?: "bin"
+                                        val destFile = File(attachmentsDir, "attachment_${System.currentTimeMillis()}.$extension")
+                                        context.contentResolver.openInputStream(it)?.use { input ->
+                                            destFile.outputStream().use { output ->
+                                                input.copyTo(output)
+                                            }
+                                        }
+                                        attachmentPathState = destFile.absolutePath
+                                        Toast.makeText(context, "Attachment uploaded!", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Failed to copy file: ${e.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            }
+                            Button(
+                                onClick = { launcher.launch("*/*") },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.AttachFile, contentDescription = "Add Attachment")
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Attach Document / Image")
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val file = File(attachmentPathState)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.InsertDriveFile,
+                                        contentDescription = "Attachment present",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Column {
+                                        Text(
+                                            text = file.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "${String.format(Locale.US, "%.2f", file.length() / 1024.0)} KB",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                }
+                                IconButton(onClick = { attachmentPathState = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Remove attachment",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Products list creation controller heading
             item {
                 Row(
@@ -1410,7 +1557,8 @@ fun CreateInvoiceScreen(
                             vehicleNumber = vehicleNumber,
                             brokerageBy = brokerageBy,
                             placeOfSupply = placeOfSupply,
-                            dueDateTimestamp = dueDateTimestamp
+                            dueDateTimestamp = dueDateTimestamp,
+                            attachmentPath = attachmentPathState
                         )
                         Toast.makeText(context, "Invoice Saved Successfully!", Toast.LENGTH_SHORT).show()
                         onBack()
@@ -2204,11 +2352,24 @@ fun CatalogInvoiceItemRow(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text(
-                            text = "Billed Date: ${dFormatter.format(Date(item.invoice.dateTimestamp))}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Billed Date: ${dFormatter.format(Date(item.invoice.dateTimestamp))}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                            if (item.invoice.attachmentPath.isNotEmpty()) {
+                                Icon(
+                                    imageVector = Icons.Default.AttachFile,
+                                    contentDescription = "Has Attachment",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
                     }
                     Text(
                         text = String.format(Locale.US, "₹%.2f", item.invoice.grandTotal),

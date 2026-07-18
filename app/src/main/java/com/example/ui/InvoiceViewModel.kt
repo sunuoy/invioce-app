@@ -330,7 +330,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         vehicleNumber: String = "",
         brokerageBy: String = "",
         placeOfSupply: String = "",
-        dueDateTimestamp: Long = 0L
+        dueDateTimestamp: Long = 0L,
+        attachmentPath: String = ""
     ) {
         viewModelScope.launch {
             if (invoiceNumber.isBlank()) {
@@ -355,6 +356,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 invoiceNumber = invoiceNumber.trim(),
                 customerId = customerId,
                 businessName = companyNameForInvoice,
+                attachmentPath = attachmentPath.trim(),
                 status = status,
                 notes = notes.trim(),
                 vehicleNumber = vehicleNumber.trim(),

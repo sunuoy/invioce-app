@@ -73,6 +73,7 @@ data class Invoice(
     val invoiceNumber: String, // e.g., "INV-2026-0001"
     val customerId: Int,       // FK (conceptually) to Customer
     val businessName: String = "",
+    val attachmentPath: String = "",
     val dateTimestamp: Long = System.currentTimeMillis(),
     val status: String,        // "Draft", "Sent", "Paid"
     val subtotal: Double = 0.0,
@@ -258,7 +259,7 @@ interface SavedBusinessProfileDao {
         Invoice::class,
         InvoiceLineItem::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class InvoiceDatabase : RoomDatabase() {
