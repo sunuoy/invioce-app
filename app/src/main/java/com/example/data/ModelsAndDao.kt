@@ -53,7 +53,8 @@ data class Product(
     val unit: String,    // "pcs", "kg", "hrs", "box", etc.
     val stock: Double = 0.0, // stock quantity
     val hsnSac: String = "",
-    val attachmentPath: String = ""
+    val attachmentPath: String = "",
+    val dateTimestamp: Long = System.currentTimeMillis()
 )
 
 @Entity(tableName = "customers")
@@ -266,7 +267,7 @@ interface SavedBusinessProfileDao {
         Invoice::class,
         InvoiceLineItem::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class InvoiceDatabase : RoomDatabase() {
@@ -280,6 +281,12 @@ abstract class InvoiceDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: InvoiceDatabase? = null
 
+        val MIGRATION_10_11 = object : androidx.room.migration.Migration(10, 11) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE products ADD COLUMN dateTimestamp INTEGER NOT NULL DEFAULT " + System.currentTimeMillis())
+            }
+        }
+
         fun getDatabase(context: Context): InvoiceDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -287,6 +294,7 @@ abstract class InvoiceDatabase : RoomDatabase() {
                     InvoiceDatabase::class.java,
                     "invoice_database"
                 )
+                .addMigrations(MIGRATION_10_11)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

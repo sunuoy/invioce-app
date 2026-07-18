@@ -55,6 +55,7 @@ fun ProductsScreen(
 ) {
     val context = LocalContext.current
     val products by viewModel.products.collectAsStateWithLifecycle()
+    val invoices by viewModel.invoices.collectAsStateWithLifecycle()
     val lowStockThreshold by viewModel.lowStockThreshold.collectAsStateWithLifecycle()
 
     var searchQuery by remember { mutableStateOf("") }
@@ -77,6 +78,90 @@ fun ProductsScreen(
                         IconButton(onClick = onMenuClick, modifier = Modifier.testTag("products_menu_btn")) {
                             Icon(Icons.Default.Menu, contentDescription = "Open navigation menu")
                         }
+                    }
+                },
+                actions = {
+                    // Export Stock movement ledger CSV
+                    IconButton(onClick = {
+                        if (products.isEmpty()) {
+                            Toast.makeText(context, "No inventory items to export", Toast.LENGTH_SHORT).show()
+                            return@IconButton
+                        }
+                        try {
+                            val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+                            val csvHeader = "Date,Product Name,Transaction Type,Reference/Invoice,Qty In (Purchase),Qty Out (Sale),Stock Balance\n"
+                            
+                            val allRows = mutableListOf<String>()
+                            
+                            for (p in products) {
+                                // Gather sales for this product
+                                val sales = mutableListOf<Triple<Long, String, Double>>() // timestamp, invoiceNumber, qty
+                                for (invDetails in invoices) {
+                                    for (item in invDetails.lineItems) {
+                                        if (item.productId == p.id) {
+                                            sales.add(Triple(invDetails.invoice.dateTimestamp, invDetails.invoice.invoiceNumber, item.quantity))
+                                        }
+                                    }
+                                }
+                                
+                                val totalSold = sales.sumOf { it.third }
+                                val initialPurchaseQty = p.stock + totalSold
+                                
+                                // Define transactions: Inflow + Outflows
+                                class StockTx(
+                                    val timestamp: Long,
+                                    val type: String,
+                                    val ref: String,
+                                    val qtyIn: Double,
+                                    val qtyOut: Double
+                                )
+                                
+                                val txList = mutableListOf<StockTx>()
+                                // Add the initial inflow
+                                txList.add(StockTx(p.dateTimestamp, "Purchase", "Initial Stock / Batch", initialPurchaseQty, 0.0))
+                                // Add sales outflows
+                                for (s in sales) {
+                                    txList.add(StockTx(s.first, "Sale", s.second, 0.0, s.third))
+                                }
+                                
+                                // Sort chronologically
+                                txList.sortBy { it.timestamp }
+                                
+                                var runningBalance = 0.0
+                                for (tx in txList) {
+                                    runningBalance += (tx.qtyIn - tx.qtyOut)
+                                    val dateStr = dateFormat.format(java.util.Date(tx.timestamp))
+                                    val prodNameEscaped = "\"${p.name.replace("\"", "\"\"")}\""
+                                    val refEscaped = "\"${tx.ref.replace("\"", "\"\"")}\""
+                                    allRows.add("$dateStr,$prodNameEscaped,${tx.type},$refEscaped,${tx.qtyIn},${tx.qtyOut},$runningBalance")
+                                }
+                            }
+                            
+                            val csvContent = csvHeader + allRows.joinToString("\n")
+                            val cacheDir = File(context.cacheDir, "exports").apply { mkdirs() }
+                            val exportFile = File(cacheDir, "stock_movement_ledger_${System.currentTimeMillis()}.csv")
+                            exportFile.writeText(csvContent, Charsets.UTF_8)
+                            
+                            val uri = androidx.core.content.FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                exportFile
+                            )
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/csv"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                putExtra(Intent.EXTRA_SUBJECT, "Stock Ledger Transaction History Export")
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "Export Stock Ledger via"))
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Export Stock Ledger"
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
