@@ -931,7 +931,7 @@ fun CreateInvoiceScreen(
     var invoiceNum by remember { mutableStateOf(editingInvoice?.invoice?.invoiceNumber ?: viewModel.generateNextInvoiceNumber()) }
     var selectedCustomer by remember { mutableStateOf<Customer?>(editingInvoice?.customer) }
     var notes by remember { mutableStateOf(editingInvoice?.invoice?.notes ?: "") }
-    var statusState by remember { mutableStateOf(editingInvoice?.invoice?.status ?: "Paid") } // default status is Paid
+    var statusState by remember { mutableStateOf(editingInvoice?.invoice?.status ?: "Sent") } // default status is Sent
     var vehicleNumber by remember { mutableStateOf(editingInvoice?.invoice?.vehicleNumber ?: "") }
     var brokerageBy by remember { mutableStateOf(editingInvoice?.invoice?.brokerageBy ?: "") }
     var placeOfSupply by remember { mutableStateOf(editingInvoice?.invoice?.placeOfSupply ?: "") }
