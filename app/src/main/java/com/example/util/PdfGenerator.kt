@@ -761,6 +761,50 @@ object PdfGenerator {
 
         pdfDocument.finishPage(page)
 
+        // Draw attached document on page 2 if it exists
+        val attachmentPath = invoice.attachmentPath
+        if (!attachmentPath.isNullOrEmpty()) {
+            val file = File(attachmentPath)
+            if (file.exists()) {
+                try {
+                    val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                    if (bitmap != null) {
+                        val pageInfo2 = PdfDocument.PageInfo.Builder(730, 842, 2).create()
+                        val page2 = pdfDocument.startPage(pageInfo2)
+                        val canvas2 = page2.canvas
+                        
+                        val titlePaint = Paint().apply {
+                            color = Color.parseColor(primaryColorHex)
+                            typeface = getBoldTypeface()
+                            textSize = 14f
+                            isAntiAlias = true
+                        }
+                        canvas2.drawText("Attached Document - Invoice: ${invoice.invoiceNumber}", 30f, 40f, titlePaint)
+                        
+                        val maxWidth = 670f
+                        val maxHeight = 740f
+                        val srcWidth = bitmap.width.toFloat()
+                        val srcHeight = bitmap.height.toFloat()
+                        
+                        val scale = Math.min(maxWidth / srcWidth, maxHeight / srcHeight)
+                        val destWidth = srcWidth * scale
+                        val destHeight = srcHeight * scale
+                        
+                        val left = 30f + (maxWidth - destWidth) / 2f
+                        val top = 60f + (maxHeight - destHeight) / 2f
+                        
+                        val destRect = RectF(left, top, left + destWidth, top + destHeight)
+                        canvas2.drawBitmap(bitmap, null, destRect, Paint(Paint.FILTER_BITMAP_FLAG))
+                        
+                        pdfDocument.finishPage(page2)
+                        bitmap.recycle()
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("PdfGenerator", "Error appending attachment to PDF: ${e.message}", e)
+                }
+            }
+        }
+
         // Save PDF to App Cache directory and return file
         val outputDir = context.cacheDir
         val outputFile = File(outputDir, "Invoice_${invoice.invoiceNumber.replace("/", "_")}.pdf")
