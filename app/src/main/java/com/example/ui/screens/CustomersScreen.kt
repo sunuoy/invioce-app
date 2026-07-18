@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import android.widget.Toast
+import java.io.File
+import android.content.Intent
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -118,6 +120,52 @@ fun CustomersScreen(
                         }
                     },
                     actions = {
+                        // Export Clients to CSV
+                        IconButton(onClick = {
+                            if (customers.isEmpty()) {
+                                Toast.makeText(context, "No clients to export", Toast.LENGTH_SHORT).show()
+                                return@IconButton
+                            }
+                            try {
+                                val csvHeader = "ID,Name,Company Name,Phone,Email,Address,GSTIN,Place of Supply\n"
+                                val csvBody = customers.joinToString("\n") { c ->
+                                    val id = c.id
+                                    val name = "\"${c.name.replace("\"", "\"\"")}\""
+                                    val company = "\"${c.companyName.replace("\"", "\"\"")}\""
+                                    val phone = "\"${c.phone.replace("\"", "\"\"")}\""
+                                    val email = "\"${c.email.replace("\"", "\"\"")}\""
+                                    val address = "\"${c.address.replace("\"", "\"\"")}\""
+                                    val gstin = "\"${c.gstin.replace("\"", "\"\"")}\""
+                                    val placeOfSupply = "\"${c.placeOfSupply.replace("\"", "\"\"")}\""
+                                    "$id,$name,$company,$phone,$email,$address,$gstin,$placeOfSupply"
+                                }
+                                val csvContent = csvHeader + csvBody
+                                val cacheDir = File(context.cacheDir, "exports").apply { mkdirs() }
+                                val exportFile = File(cacheDir, "clients_list_${System.currentTimeMillis()}.csv")
+                                exportFile.writeText(csvContent, Charsets.UTF_8)
+
+                                val uri = androidx.core.content.FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    exportFile
+                                )
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/csv"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    putExtra(Intent.EXTRA_SUBJECT, "Clients List Directory Export")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Export Clients List via"))
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Export Clients Directory"
+                            )
+                        }
+
                         // Enter bulk select manually
                         IconButton(onClick = {
                             isSelectionMode = true
