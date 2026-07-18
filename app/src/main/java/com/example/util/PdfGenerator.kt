@@ -400,17 +400,25 @@ object PdfGenerator {
         canvas.drawText("Due Date", midX + 10f, topBorder + 177f, textPaint)
         canvas.drawText(" : $dueDate", midX + 115f, topBorder + 177f, textPaint)
 
-        val placeSupplyVal = invoice.placeOfSupply.takeIf { it.isNotBlank() } ?: "N.A."
-        canvas.drawText("Place of Supply", midX + 10f, topBorder + 194f, textPaint)
-        canvas.drawText(" : $placeSupplyVal", midX + 115f, topBorder + 194f, textPaint)
+        var optionalY = topBorder + 194f
+        
+        if (invoice.placeOfSupply.isNotBlank()) {
+            canvas.drawText("Place of Supply", midX + 10f, optionalY, textPaint)
+            canvas.drawText(" : ${invoice.placeOfSupply}", midX + 115f, optionalY, textPaint)
+            optionalY += 17f
+        }
 
-        val vehicleVal = invoice.vehicleNumber.takeIf { it.isNotBlank() } ?: "N.A."
-        canvas.drawText("Vehicle Number", midX + 10f, topBorder + 211f, textPaint)
-        canvas.drawText(" : $vehicleVal", midX + 115f, topBorder + 211f, textPaint)
+        if (invoice.vehicleNumber.isNotBlank()) {
+            canvas.drawText("Vehicle Number", midX + 10f, optionalY, textPaint)
+            canvas.drawText(" : ${invoice.vehicleNumber}", midX + 115f, optionalY, textPaint)
+            optionalY += 17f
+        }
 
-        val brokerageVal = invoice.brokerageBy.takeIf { it.isNotBlank() } ?: "N.A."
-        canvas.drawText("Brokerage By", midX + 10f, topBorder + 226f, textPaint)
-        canvas.drawText(" : $brokerageVal", midX + 115f, topBorder + 226f, textPaint)
+        if (invoice.brokerageBy.isNotBlank()) {
+            canvas.drawText("Brokerage By", midX + 10f, optionalY, textPaint)
+            canvas.drawText(" : ${invoice.brokerageBy}", midX + 115f, optionalY, textPaint)
+            optionalY += 17f
+        }
 
         // --- 5. PRODUCTS / SERVICES TABLE (y: 255 to 550) ---
         canvas.drawLine(leftBorder, topBorder + 240f, rightBorder, topBorder + 240f, borderPaint)
