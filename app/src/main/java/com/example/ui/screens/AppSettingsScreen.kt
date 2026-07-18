@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -69,6 +70,7 @@ fun AppSettingsScreen(
     val gdAccessToken by viewModel.googleDriveAccessToken.collectAsStateWithLifecycle()
     val gdLastSyncTime by viewModel.googleDriveLastSyncTime.collectAsStateWithLifecycle()
     val gdSyncing by viewModel.isGoogleDriveSyncing.collectAsStateWithLifecycle()
+    val gdSyncMode by viewModel.googleDriveSyncMode.collectAsStateWithLifecycle()
 
     val googleAccountPickerLauncherForDrive = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -720,6 +722,46 @@ fun AppSettingsScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline
                     )
+
+                    if (gdAccessToken.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Sync Frequency",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                .padding(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            listOf("auto" to "Automatic", "hourly" to "Hourly", "manual" to "Manual").forEach { (value, label) ->
+                                val selected = gdSyncMode == value
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { viewModel.setGoogleDriveSyncMode(value) },
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(vertical = 8.dp),
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     if (gdAccessToken.isEmpty()) {
                         Button(

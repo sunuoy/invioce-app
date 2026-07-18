@@ -74,6 +74,14 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     private val _googleDriveLastSyncTime = MutableStateFlow("Never")
     val googleDriveLastSyncTime: StateFlow<String> = _googleDriveLastSyncTime.asStateFlow()
 
+    private val _googleDriveSyncMode = MutableStateFlow(prefs.getString("gd_sync_mode", "auto") ?: "auto")
+    val googleDriveSyncMode: StateFlow<String> = _googleDriveSyncMode.asStateFlow()
+
+    fun setGoogleDriveSyncMode(mode: String) {
+        prefs.edit().putString("gd_sync_mode", mode).apply()
+        _googleDriveSyncMode.value = mode
+    }
+
     // Update download states
     private val _downloadProgress = MutableStateFlow(0f)
     val downloadProgress: StateFlow<Float> = _downloadProgress.asStateFlow()
@@ -148,9 +156,22 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             }
             .debounce(3000)
             .collect { token ->
+                val mode = prefs.getString("gd_sync_mode", "auto") ?: "auto"
+                if (mode == "manual") {
+                    android.util.Log.d("GoogleDriveAutoSync", "Auto-backup skipped: manual mode is active.")
+                    return@collect
+                }
                 if (token.isNotEmpty()) {
+                    if (mode == "hourly") {
+                        val lastSync = prefs.getLong("gd_last_sync_timestamp", 0L)
+                        val elapsed = System.currentTimeMillis() - lastSync
+                        if (elapsed < 3600 * 1000) {
+                            android.util.Log.d("GoogleDriveAutoSync", "Auto-backup skipped: hourly mode active and less than 1 hour elapsed.")
+                            return@collect
+                        }
+                    }
                     backupToGoogleDrive { success, msg ->
-                        android.util.Log.d("GoogleDriveAutoSync", "Background auto-backup: $msg")
+                        android.util.Log.d("GoogleDriveAutoSync", "Background auto-backup ($mode): $msg")
                     }
                 }
             }
@@ -720,7 +741,10 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                             if (success) {
                                 val nowStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
                                 _googleDriveLastSyncTime.value = nowStr
-                                prefs.edit().putString("gd_last_sync_time", nowStr).apply()
+                                prefs.edit()
+                                    .putString("gd_last_sync_time", nowStr)
+                                    .putLong("gd_last_sync_timestamp", System.currentTimeMillis())
+                                    .apply()
                                 onComplete(true, "Successfully backed up data to Google Drive!")
                             } else {
                                 com.example.data.GoogleDriveService.invalidateToken(getApplication(), token)
