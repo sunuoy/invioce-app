@@ -22,7 +22,10 @@ object GoogleDriveService {
             connection.connectTimeout = 10000
             connection.readTimeout = 10000
 
-            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+            val responseCode = connection.responseCode
+            android.util.Log.d("GoogleDriveService", "findBackupFile response code: $responseCode")
+
+            if (responseCode == HttpURLConnection.HTTP_OK) {
                 val reader = BufferedReader(InputStreamReader(connection.inputStream))
                 val response = StringBuilder()
                 var line: String?
@@ -39,11 +42,14 @@ object GoogleDriveService {
                     null
                 }
             } else {
-                null
+                val errorStream = connection.errorStream
+                val errorText = errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                android.util.Log.e("GoogleDriveService", "findBackupFile error response: $errorText")
+                throw Exception("HTTP $responseCode: $errorText")
             }
         } catch (e: Exception) {
-            e.printStackTrace()
-            null
+            android.util.Log.e("GoogleDriveService", "findBackupFile exception: ${e.message}", e)
+            throw e
         } finally {
             connection?.disconnect()
         }
@@ -68,7 +74,17 @@ object GoogleDriveService {
                 writer.flush()
                 writer.close()
 
-                connection.responseCode == HttpURLConnection.HTTP_OK
+                val responseCode = connection.responseCode
+                android.util.Log.d("GoogleDriveService", "uploadBackupFile (PATCH) response code: $responseCode")
+
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    true
+                } else {
+                    val errorStream = connection.errorStream
+                    val errorText = errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                    android.util.Log.e("GoogleDriveService", "uploadBackupFile (PATCH) error response: $errorText")
+                    throw Exception("HTTP $responseCode: $errorText")
+                }
             } else {
                 val url = URL("https://www.googleapis.com/drive/v3/files")
                 connection = url.openConnection() as HttpURLConnection
@@ -87,7 +103,10 @@ object GoogleDriveService {
                 writer.flush()
                 writer.close()
 
-                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val responseCode = connection.responseCode
+                android.util.Log.d("GoogleDriveService", "uploadBackupFile (POST) response code: $responseCode")
+
+                if (responseCode == HttpURLConnection.HTTP_OK) {
                     val reader = BufferedReader(InputStreamReader(connection.inputStream))
                     val response = StringBuilder()
                     var line: String?
@@ -103,15 +122,18 @@ object GoogleDriveService {
                         connection.disconnect()
                         uploadBackupFile(token, jsonContent, newFileId)
                     } else {
-                        false
+                        throw Exception("Failed to get created file ID from response")
                     }
                 } else {
-                    false
+                    val errorStream = connection.errorStream
+                    val errorText = errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                    android.util.Log.e("GoogleDriveService", "uploadBackupFile (POST) error response: $errorText")
+                    throw Exception("HTTP $responseCode: $errorText")
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
-            false
+            android.util.Log.e("GoogleDriveService", "uploadBackupFile exception: ${e.message}", e)
+            throw e
         } finally {
             connection?.disconnect()
         }
@@ -148,6 +170,14 @@ object GoogleDriveService {
     }
 
     fun invalidateToken(context: Context, token: String) {
+        try {
+            val accountManager = android.accounts.AccountManager.get(context)
+            accountManager.invalidateAuthToken("com.google", token)
+            android.util.Log.d("GoogleDriveService", "Locally invalidated cached auth token in AccountManager")
+        } catch (e: Exception) {
+            android.util.Log.e("GoogleDriveService", "Failed to invalidate token locally: ${e.message}")
+        }
+
         var connection: HttpURLConnection? = null
         Thread {
             try {
@@ -157,6 +187,7 @@ object GoogleDriveService {
                 connection.connectTimeout = 5000
                 connection.readTimeout = 5000
                 connection.responseCode
+                android.util.Log.d("GoogleDriveService", "Revoked auth token on Google servers")
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {

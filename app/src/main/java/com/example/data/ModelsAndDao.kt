@@ -59,6 +59,7 @@ data class Product(
 data class Customer(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
+    val companyName: String = "",
     val phone: String = "",
     val email: String = "",
     val address: String = "",

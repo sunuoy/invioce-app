@@ -274,8 +274,8 @@ fun CustomersScreen(
     if (showAddDialog) {
         CustomerEditorDialog(
             onDismiss = { showAddDialog = false },
-            onConfirm = { name, phone, email, addr, gstin, supply ->
-                viewModel.saveCustomer(0, name, phone, email, addr, gstin, supply)
+            onConfirm = { name, companyName, phone, email, addr, gstin, supply ->
+                viewModel.saveCustomer(0, name, companyName, phone, email, addr, gstin, supply)
                 showAddDialog = false
             }
         )
@@ -286,8 +286,8 @@ fun CustomersScreen(
         CustomerEditorDialog(
             customer = original,
             onDismiss = { activeEditingCustomer = null },
-            onConfirm = { name, phone, email, addr, gstin, supply ->
-                viewModel.saveCustomer(original.id, name, phone, email, addr, gstin, supply)
+            onConfirm = { name, companyName, phone, email, addr, gstin, supply ->
+                viewModel.saveCustomer(original.id, name, companyName, phone, email, addr, gstin, supply)
                 activeEditingCustomer = null
             }
         )
@@ -394,7 +394,7 @@ fun CustomerItemCard(
 
             Column(modifier = Modifier.weight(1.5f)) {
                 Text(
-                    text = customer.name,
+                    text = if (customer.companyName.isNotEmpty()) "${customer.name} (${customer.companyName})" else customer.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -526,9 +526,10 @@ fun CustomerItemCard(
 fun CustomerEditorDialog(
     customer: Customer? = null,
     onDismiss: () -> Unit,
-    onConfirm: (name: String, phone: String, email: String, address: String, gstin: String, placeOfSupply: String) -> Unit
+    onConfirm: (name: String, companyName: String, phone: String, email: String, address: String, gstin: String, placeOfSupply: String) -> Unit
 ) {
     var name by remember { mutableStateOf(customer?.name ?: "") }
+    var companyName by remember { mutableStateOf(customer?.companyName ?: "") }
     var phone by remember { mutableStateOf(customer?.phone ?: "") }
     var email by remember { mutableStateOf(customer?.email ?: "") }
     var address by remember { mutableStateOf(customer?.address ?: "") }
@@ -550,9 +551,16 @@ fun CustomerEditorDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Client / Business Name*") },
+                    label = { Text("Contact Person Name*") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("client_dialog_name")
+                )
+                OutlinedTextField(
+                    value = companyName,
+                    onValueChange = { companyName = it },
+                    label = { Text("Company Name / Business") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = phone,
@@ -596,7 +604,7 @@ fun CustomerEditorDialog(
         },
         confirmButton = {
             Button(onClick = {
-                onConfirm(name, phone, email, address, gstin, placeOfSupply)
+                onConfirm(name, companyName, phone, email, address, gstin, placeOfSupply)
             }) {
                 Text(if (isEdit) "Save Details" else "Add Directory")
             }

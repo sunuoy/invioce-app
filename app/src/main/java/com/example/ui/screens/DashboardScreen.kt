@@ -190,6 +190,35 @@ fun DashboardScreen(
         },
         modifier = modifier
     ) { innerPadding ->
+        val infiniteTransition = rememberInfiniteTransition(label = "Background drift")
+        val orb1XShift by infiniteTransition.animateFloat(
+            initialValue = 0.10f,
+            targetValue = 0.25f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(12000, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "Orb1X"
+        )
+        val orb2YShift by infiniteTransition.animateFloat(
+            initialValue = 0.65f,
+            targetValue = 0.85f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(15000, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "Orb2Y"
+        )
+        val orb3XShift by infiniteTransition.animateFloat(
+            initialValue = 0.70f,
+            targetValue = 0.90f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(13000, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "Orb3X"
+        )
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -207,31 +236,31 @@ fun DashboardScreen(
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(Color(0xFF3B82F6).copy(alpha = 0.12f), Color.Transparent),
-                            center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.2f),
+                            center = androidx.compose.ui.geometry.Offset(size.width * orb1XShift, size.height * 0.2f),
                             radius = size.maxDimension * 0.45f
                         ),
                         radius = size.maxDimension * 0.45f,
-                        center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.2f)
+                        center = androidx.compose.ui.geometry.Offset(size.width * orb1XShift, size.height * 0.2f)
                     )
                     // Orb 2 (Bottom Right) - Emerald Green
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(Color(0xFF10B981).copy(alpha = 0.09f), Color.Transparent),
-                            center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.75f),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * orb2YShift),
                             radius = size.maxDimension * 0.4f
                         ),
                         radius = size.maxDimension * 0.4f,
-                        center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.75f)
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * orb2YShift)
                     )
                     // Orb 3 (Center Right) - Violet Indigo
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(Color(0xFF6366F1).copy(alpha = 0.07f), Color.Transparent),
-                            center = androidx.compose.ui.geometry.Offset(size.width * 0.8f, size.height * 0.4f),
+                            center = androidx.compose.ui.geometry.Offset(size.width * orb3XShift, size.height * 0.4f),
                             radius = size.maxDimension * 0.35f
                         ),
                         radius = size.maxDimension * 0.35f,
-                        center = androidx.compose.ui.geometry.Offset(size.width * 0.8f, size.height * 0.4f)
+                        center = androidx.compose.ui.geometry.Offset(size.width * orb3XShift, size.height * 0.4f)
                     )
                 }
         ) {

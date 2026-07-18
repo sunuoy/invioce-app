@@ -12,6 +12,11 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -317,13 +322,56 @@ fun InvoicesScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.ReceiptLong,
-                            contentDescription = "Search Empty",
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        val primaryColor = MaterialTheme.colorScheme.primary
+                        Canvas(modifier = Modifier.size(96.dp)) {
+                            val path = Path().apply {
+                                moveTo(25.dp.toPx(), 10.dp.toPx())
+                                lineTo(71.dp.toPx(), 10.dp.toPx())
+                                lineTo(71.dp.toPx(), 86.dp.toPx())
+                                // Wavy bottom
+                                lineTo(63.dp.toPx(), 81.dp.toPx())
+                                lineTo(55.dp.toPx(), 86.dp.toPx())
+                                lineTo(47.dp.toPx(), 81.dp.toPx())
+                                lineTo(39.dp.toPx(), 86.dp.toPx())
+                                lineTo(31.dp.toPx(), 81.dp.toPx())
+                                lineTo(25.dp.toPx(), 86.dp.toPx())
+                                close()
+                            }
+                            // Glow background
+                            drawPath(
+                                path = path,
+                                color = primaryColor.copy(alpha = 0.04f)
+                            )
+                            // Stroke outline
+                            drawPath(
+                                path = path,
+                                color = primaryColor.copy(alpha = 0.35f),
+                                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                            )
+                            // Decorative lines on the receipt
+                            drawLine(
+                                color = primaryColor.copy(alpha = 0.25f),
+                                start = Offset(35.dp.toPx(), 26.dp.toPx()),
+                                end = Offset(61.dp.toPx(), 26.dp.toPx()),
+                                strokeWidth = 2.dp.toPx(),
+                                cap = StrokeCap.Round
+                            )
+                            drawLine(
+                                color = primaryColor.copy(alpha = 0.25f),
+                                start = Offset(35.dp.toPx(), 40.dp.toPx()),
+                                end = Offset(53.dp.toPx(), 40.dp.toPx()),
+                                strokeWidth = 2.dp.toPx(),
+                                cap = StrokeCap.Round
+                            )
+                            drawLine(
+                                color = primaryColor.copy(alpha = 0.45f), // Bold price indicator line
+                                start = Offset(35.dp.toPx(), 56.dp.toPx()),
+                                end = Offset(61.dp.toPx(), 56.dp.toPx()),
+                                strokeWidth = 3.dp.toPx(),
+                                cap = StrokeCap.Round
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "No invoices found",
                             fontWeight = FontWeight.SemiBold,
@@ -1500,6 +1548,7 @@ fun CreateInvoiceScreen(
                 // Inner dialog launchers
                 if (showAddClientDialogFlow) {
                     var newCliName by remember { mutableStateOf("") }
+                    var newCliCompanyName by remember { mutableStateOf("") }
                     var newCliPhone by remember { mutableStateOf("") }
                     var newCliEmail by remember { mutableStateOf("") }
                     var newCliAddr by remember { mutableStateOf("") }
@@ -1512,7 +1561,14 @@ fun CreateInvoiceScreen(
                                 OutlinedTextField(
                                     value = newCliName,
                                     onValueChange = { newCliName = it },
-                                    label = { Text("Client/Business Name*") },
+                                    label = { Text("Client Name*") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                OutlinedTextField(
+                                    value = newCliCompanyName,
+                                    onValueChange = { newCliCompanyName = it },
+                                    label = { Text("Company Name") },
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -1549,6 +1605,7 @@ fun CreateInvoiceScreen(
                                 viewModel.saveCustomer(
                                     id = 0,
                                     name = newCliName,
+                                    companyName = newCliCompanyName,
                                     phone = newCliPhone,
                                     email = newCliEmail,
                                     address = newCliAddr
@@ -1568,6 +1625,7 @@ fun CreateInvoiceScreen(
 
                 activeEditClientFlow?.let { origin ->
                     var newCliName by remember { mutableStateOf(origin.name) }
+                    var newCliCompanyName by remember { mutableStateOf(origin.companyName) }
                     var newCliPhone by remember { mutableStateOf(origin.phone) }
                     var newCliEmail by remember { mutableStateOf(origin.email) }
                     var newCliAddr by remember { mutableStateOf(origin.address) }
@@ -1580,7 +1638,14 @@ fun CreateInvoiceScreen(
                                 OutlinedTextField(
                                     value = newCliName,
                                     onValueChange = { newCliName = it },
-                                    label = { Text("Client/Business Name*") },
+                                    label = { Text("Client Name*") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                OutlinedTextField(
+                                    value = newCliCompanyName,
+                                    onValueChange = { newCliCompanyName = it },
+                                    label = { Text("Company Name") },
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -1617,6 +1682,7 @@ fun CreateInvoiceScreen(
                                 viewModel.saveCustomer(
                                     id = origin.id,
                                     name = newCliName,
+                                    companyName = newCliCompanyName,
                                     phone = newCliPhone,
                                     email = newCliEmail,
                                     address = newCliAddr
@@ -1640,6 +1706,7 @@ fun CreateInvoiceScreen(
     // Modal adding new client inline dialog
     if (showAddClientDialog) {
         var newCliName by remember { mutableStateOf("") }
+        var newCliCompanyName by remember { mutableStateOf("") }
         var newCliPhone by remember { mutableStateOf("") }
         var newCliEmail by remember { mutableStateOf("") }
         var newCliAddr by remember { mutableStateOf("") }
@@ -1652,9 +1719,16 @@ fun CreateInvoiceScreen(
                     OutlinedTextField(
                         value = newCliName,
                         onValueChange = { newCliName = it },
-                        label = { Text("Client/Business Name*") },
+                        label = { Text("Client Name*") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth().testTag("new_client_name")
+                    )
+                    OutlinedTextField(
+                        value = newCliCompanyName,
+                        onValueChange = { newCliCompanyName = it },
+                        label = { Text("Company Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = newCliPhone,
@@ -1689,6 +1763,7 @@ fun CreateInvoiceScreen(
                     viewModel.saveCustomer(
                         id = 0,
                         name = newCliName,
+                        companyName = newCliCompanyName,
                         phone = newCliPhone,
                         email = newCliEmail,
                         address = newCliAddr
@@ -2102,8 +2177,11 @@ fun CatalogInvoiceItemRow(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
+                        val clientName = item.customer?.let {
+                            if (it.companyName.isNotEmpty()) "${it.name} (${it.companyName})" else it.name
+                        } ?: "No Client Information"
                         Text(
-                            text = item.customer?.name ?: "No Client Information",
+                            text = clientName,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant

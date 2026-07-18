@@ -10,6 +10,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -649,12 +654,29 @@ fun AppSettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CloudSync,
-                            contentDescription = "Google Drive Sync",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
+                        val primaryColor = MaterialTheme.colorScheme.primary
+                        Canvas(modifier = Modifier.size(24.dp)) {
+                            val path = Path().apply {
+                                moveTo(4.dp.toPx(), 16.dp.toPx())
+                                cubicTo(2.dp.toPx(), 16.dp.toPx(), 1.dp.toPx(), 14.dp.toPx(), 1.dp.toPx(), 12.dp.toPx())
+                                cubicTo(1.dp.toPx(), 9.dp.toPx(), 3.dp.toPx(), 7.dp.toPx(), 6.dp.toPx(), 7.dp.toPx())
+                                cubicTo(7.dp.toPx(), 4.dp.toPx(), 10.dp.toPx(), 2.dp.toPx(), 13.dp.toPx(), 2.dp.toPx())
+                                cubicTo(17.dp.toPx(), 2.dp.toPx(), 20.dp.toPx(), 5.dp.toPx(), 20.dp.toPx(), 9.dp.toPx())
+                                cubicTo(22.dp.toPx(), 9.dp.toPx(), 23.dp.toPx(), 11.dp.toPx(), 23.dp.toPx(), 13.dp.toPx())
+                                cubicTo(23.dp.toPx(), 15.dp.toPx(), 21.dp.toPx(), 17.dp.toPx(), 19.dp.toPx(), 17.dp.toPx())
+                                lineTo(4.dp.toPx(), 17.dp.toPx())
+                                close()
+                            }
+                            drawPath(
+                                path = path,
+                                color = primaryColor.copy(alpha = 0.08f)
+                            )
+                            drawPath(
+                                path = path,
+                                color = primaryColor.copy(alpha = 0.6f),
+                                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                            )
+                        }
                         Text(
                             text = "Google Drive Sync",
                             style = MaterialTheme.typography.titleSmall,

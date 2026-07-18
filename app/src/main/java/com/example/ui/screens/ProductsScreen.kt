@@ -11,6 +11,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Inventory2
@@ -283,13 +288,43 @@ fun ProductsScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Inventory2,
-                        contentDescription = "Search Empty",
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    val primaryColor = MaterialTheme.colorScheme.primary
+                    Canvas(modifier = Modifier.size(96.dp)) {
+                        val cx = size.width / 2
+                        val cy = size.height / 2
+                        val depth = 16.dp.toPx()
+                        
+                        val topPath = Path().apply {
+                            moveTo(cx, cy - 24.dp.toPx())
+                            lineTo(cx + 36.dp.toPx(), cy - 12.dp.toPx() - depth / 2)
+                            lineTo(cx, cy - depth)
+                            lineTo(cx - 36.dp.toPx(), cy - 12.dp.toPx() - depth / 2)
+                            close()
+                        }
+                        val leftPath = Path().apply {
+                            moveTo(cx - 36.dp.toPx(), cy - 12.dp.toPx() - depth / 2)
+                            lineTo(cx, cy - depth)
+                            lineTo(cx, cy + 24.dp.toPx() - depth)
+                            lineTo(cx - 36.dp.toPx(), cy + 12.dp.toPx() - depth)
+                            close()
+                        }
+                        val rightPath = Path().apply {
+                            moveTo(cx, cy - depth)
+                            lineTo(cx + 36.dp.toPx(), cy - 12.dp.toPx() - depth / 2)
+                            lineTo(cx + 36.dp.toPx(), cy + 12.dp.toPx() - depth)
+                            lineTo(cx, cy + 24.dp.toPx() - depth)
+                            close()
+                        }
+
+                        drawPath(leftPath, color = primaryColor.copy(alpha = 0.04f))
+                        drawPath(rightPath, color = primaryColor.copy(alpha = 0.02f))
+                        drawPath(topPath, color = primaryColor.copy(alpha = 0.08f))
+
+                        drawPath(leftPath, color = primaryColor.copy(alpha = 0.35f), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+                        drawPath(rightPath, color = primaryColor.copy(alpha = 0.35f), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+                        drawPath(topPath, color = primaryColor.copy(alpha = 0.45f), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "No products found",
                         fontWeight = FontWeight.SemiBold,
@@ -487,25 +522,38 @@ fun StockIndicatorTracker(stockValue: Double, unitStr: String, lowStockThreshold
         else -> Color(0xFF10B981)                 // Green / Healthy
     }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Box(
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(stockColor)
+            )
+            Text(
+                text = when {
+                    stockValue <= 0f -> "Out of Stock"
+                    isCritical -> "Low stock: $stockValue $unitStr"
+                    else -> "In Stock: $stockValue $unitStr available"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isCritical) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        
+        val progress = (stockValue / 100.0).coerceIn(0.0, 1.0).toFloat()
+        LinearProgressIndicator(
+            progress = { progress },
+            color = stockColor,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(stockColor)
-        )
-        Text(
-            text = when {
-                stockValue <= 0f -> "Out of Stock"
-                isCritical -> "Low stock: $stockValue $unitStr (Threshold: ${lowStockThreshold.toInt()})"
-                else -> "In Stock: $stockValue $unitStr available"
-            },
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isCritical) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant
+                .width(160.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
         )
     }
 }

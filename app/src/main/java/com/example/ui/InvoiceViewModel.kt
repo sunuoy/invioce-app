@@ -114,6 +114,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         val gdEnabled = prefs.getBoolean("gd_sync_enabled", false)
         val gdToken = prefs.getString("gd_access_token", "") ?: ""
         val gdLastSync = prefs.getString("gd_last_sync_time", "Never") ?: "Never"
+        val gdEmail = prefs.getString("gd_account_email", "") ?: ""
         _googleDriveSyncEnabled.value = gdEnabled
         _googleDriveAccessToken.value = gdToken
         _googleDriveLastSyncTime.value = gdLastSync
@@ -122,8 +123,11 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             checkForUpdates(silent = true)
         }
 
-        // Auto-authenticate when business profile is loaded
+        // Auto-authenticate when business profile is loaded or on startup if enabled
         viewModelScope.launch {
+            if (gdEnabled && gdEmail.isNotEmpty()) {
+                fetchGoogleDriveTokenAutomatically(application, gdEmail)
+            }
             businessProfile.collect { profile ->
                 if (profile != null && profile.gmailId.isNotEmpty()) {
                     fetchGoogleDriveTokenAutomatically(application, profile.gmailId)
@@ -282,7 +286,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // ------------------ CUSTOMER OPERATIONS ------------------
-    fun saveCustomer(id: Int, name: String, phone: String, email: String, address: String, gstin: String = "", placeOfSupply: String = "") {
+    fun saveCustomer(id: Int, name: String, companyName: String, phone: String, email: String, address: String, gstin: String = "", placeOfSupply: String = "") {
         viewModelScope.launch {
             if (name.isBlank()) {
                 _uiEvents.emit(UiEvent.ShowError("Customer name cannot be blank"))
@@ -291,6 +295,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             val customer = Customer(
                 id = id,
                 name = name.trim(),
+                companyName = companyName.trim(),
                 phone = phone.trim(),
                 email = email.trim(),
                 address = address.trim(),
@@ -668,6 +673,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         prefs.edit()
             .putBoolean("gd_sync_enabled", false)
             .remove("gd_access_token")
+            .remove("gd_account_email")
             .apply()
     }
 
@@ -696,13 +702,23 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                                 onComplete(true, "Successfully backed up data to Google Drive!")
                             } else {
                                 com.example.data.GoogleDriveService.invalidateToken(getApplication(), token)
-                                onComplete(false, "Drive upload failed. Please check access token scope or expiry.")
+                                _googleDriveAccessToken.value = ""
+                                prefs.edit().remove("gd_access_token").apply()
+                                onComplete(false, "Drive upload failed. Please connect Google Drive again.")
                             }
                         }
                     } catch (e: Exception) {
                         withContext(Dispatchers.Main) {
                             _isGoogleDriveSyncing.value = false
-                            onComplete(false, "Connection error: ${e.message}")
+                            val errorMsg = e.message ?: ""
+                            if (errorMsg.contains("HTTP 401") || errorMsg.contains("HTTP 403")) {
+                                com.example.data.GoogleDriveService.invalidateToken(getApplication(), token)
+                                _googleDriveAccessToken.value = ""
+                                prefs.edit().remove("gd_access_token").apply()
+                                onComplete(false, "Google Drive session expired. Please connect Google Drive again.")
+                            } else {
+                                onComplete(false, "Sync failed: ${e.message}")
+                            }
                         }
                     }
                 }
@@ -757,7 +773,15 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     _isGoogleDriveSyncing.value = false
-                    onComplete(false, "Connection error: ${e.message}")
+                    val errorMsg = e.message ?: ""
+                    if (errorMsg.contains("HTTP 401") || errorMsg.contains("HTTP 403")) {
+                        com.example.data.GoogleDriveService.invalidateToken(getApplication(), token)
+                        _googleDriveAccessToken.value = ""
+                        prefs.edit().remove("gd_access_token").apply()
+                        onComplete(false, "Google Drive session expired. Please connect Google Drive again.")
+                    } else {
+                        onComplete(false, "Connection error: ${e.message}")
+                    }
                 }
             }
         }
@@ -765,21 +789,27 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
     fun fetchGoogleDriveTokenAutomatically(context: Context, email: String) {
         if (email.isEmpty()) return
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val accountManager = android.accounts.AccountManager.get(context)
-                val matchingAccount = android.accounts.Account(email, "com.google")
-                if (matchingAccount != null) {
-                    val token = accountManager.blockingGetAuthToken(
-                        matchingAccount,
-                        "oauth2:https://www.googleapis.com/auth/drive.file",
-                        true
-                    )
+        val activity = context as? android.app.Activity
+        
+        // Persistently save the email for auto-reauthentication on app launch
+        prefs.edit().putString("gd_account_email", email).apply()
+        
+        val accountManager = android.accounts.AccountManager.get(context)
+        val matchingAccount = android.accounts.Account(email, "com.google")
+        accountManager.getAuthToken(
+            matchingAccount,
+            "oauth2:https://www.googleapis.com/auth/drive.file",
+            null,
+            activity,
+            { future ->
+                try {
+                    val bundle = future.result
+                    val token = bundle.getString(android.accounts.AccountManager.KEY_AUTHTOKEN)
                     if (!token.isNullOrEmpty()) {
-                        withContext(Dispatchers.Main) {
+                        viewModelScope.launch(Dispatchers.Main) {
                             setGoogleDriveAccessToken(token)
                             android.util.Log.d("GoogleDriveAutoSync", "Successfully auto-authenticated Google Drive for $email")
-                            
+
                             // Auto restore if database is empty
                             if (products.value.isEmpty() && invoices.value.isEmpty() && customers.value.isEmpty()) {
                                 android.util.Log.d("GoogleDriveAutoSync", "Local records empty. Triggering automatic cloud restore...")
@@ -788,15 +818,25 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                                 }
                             }
                         }
+                    } else {
+                        android.util.Log.e("GoogleDriveAutoSync", "Token was null or empty after consent flow")
+                        if (activity != null) {
+                            viewModelScope.launch(Dispatchers.Main) {
+                                android.widget.Toast.makeText(context, "Google Drive: failed to get access token", android.widget.Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("GoogleDriveAutoSync", "Failed to auto-authenticate Google Drive: ${e.message}")
+                    if (activity != null) {
+                        viewModelScope.launch(Dispatchers.Main) {
+                            android.widget.Toast.makeText(context, "Failed to connect Google Drive: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
-            } catch (e: Exception) {
-                android.util.Log.e("GoogleDriveAutoSync", "Failed to auto-authenticate Google Drive: ${e.message}")
-                withContext(Dispatchers.Main) {
-                    android.widget.Toast.makeText(context, "Failed to connect Google Drive: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
-                }
-            }
-        }
+            },
+            null
+        )
     }
 
     fun exportAppDataToJSON(): String {

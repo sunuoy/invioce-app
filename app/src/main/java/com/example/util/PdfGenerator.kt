@@ -359,7 +359,9 @@ object PdfGenerator {
         canvas.drawText("INVOICE METADATA", midX + 10f, topBorder + 122.5f, subHeadingTextPaint)
 
         // Draw Recipient profile details
-        val cName = customer?.name ?: "Walking Customer"
+        val cName = customer?.let {
+            if (it.companyName.isNotBlank()) "${it.name} (${it.companyName})" else it.name
+        } ?: "Walking Customer"
         val cGstin = customer?.gstin?.takeIf { it.isNotBlank() } ?: "N.A."
         val cPhone = customer?.phone?.takeIf { it.isNotBlank() } ?: "N.A."
         val cEmail = customer?.email?.takeIf { it.isNotBlank() } ?: "N.A."
