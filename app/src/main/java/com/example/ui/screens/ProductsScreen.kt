@@ -60,8 +60,85 @@ fun ProductsScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var activeEditorProduct by remember { mutableStateOf<Product?>(null) }
+    var activeHistoryProduct by remember { mutableStateOf<Product?>(null) }
     var showCreatorDialog by remember { mutableStateOf(false) }
     var isThresholdExpanded by remember { mutableStateOf(false) }
+
+    val selectFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            try {
+                val csvContent = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
+                if (csvContent.isBlank()) {
+                    Toast.makeText(context, "Selected CSV file is empty", Toast.LENGTH_SHORT).show()
+                    return@rememberLauncherForActivityResult
+                }
+                
+                val lines = csvContent.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+                if (lines.size <= 1) {
+                    Toast.makeText(context, "No product records found in CSV", Toast.LENGTH_SHORT).show()
+                    return@rememberLauncherForActivityResult
+                }
+                
+                fun parseCsvLine(line: String): List<String> {
+                    val result = mutableListOf<String>()
+                    var cur = java.lang.StringBuilder()
+                    var inQuotes = false
+                    var i = 0
+                    while (i < line.length) {
+                        val ch = line[i]
+                        if (ch == '\"') {
+                            if (inQuotes && i + 1 < line.length && line[i + 1] == '\"') {
+                                cur.append('\"')
+                                i++
+                            } else {
+                                inQuotes = !inQuotes
+                            }
+                        } else if (ch == ',' && !inQuotes) {
+                            result.add(cur.toString().trim())
+                            cur = java.lang.StringBuilder()
+                        } else {
+                            cur.append(ch)
+                        }
+                        i++
+                    }
+                    result.add(cur.toString().trim())
+                    return result
+                }
+                
+                var importedCount = 0
+                for (j in 1 until lines.size) {
+                    val cols = parseCsvLine(lines[j])
+                    if (cols.size >= 2) {
+                        val name = cols[1].removeSurrounding("\"")
+                        if (name.isNotBlank()) {
+                            val price = if (cols.size > 2) cols[2].removeSurrounding("\"").toDoubleOrNull() ?: 0.0 else 0.0
+                            val taxRate = if (cols.size > 3) cols[3].removeSurrounding("\"").toDoubleOrNull() ?: 0.0 else 0.0
+                            val unit = if (cols.size > 4) cols[4].removeSurrounding("\"") else "pcs"
+                            val stock = if (cols.size > 5) cols[5].removeSurrounding("\"").toDoubleOrNull() ?: 0.0 else 0.0
+                            val hsnSac = if (cols.size > 6) cols[6].removeSurrounding("\"") else ""
+                            
+                            viewModel.saveProduct(
+                                id = 0,
+                                name = name,
+                                price = price,
+                                tax = taxRate,
+                                unit = unit,
+                                stock = stock,
+                                hsnSac = hsnSac,
+                                attachmentPath = ""
+                            )
+                            importedCount++
+                        }
+                    }
+                }
+                Toast.makeText(context, "Successfully imported $importedCount products!", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     val filteredProducts = remember(products, searchQuery) {
         products.filter {
@@ -161,6 +238,59 @@ fun ProductsScreen(
                         Icon(
                             imageVector = Icons.Default.Share,
                             contentDescription = "Export Stock Ledger"
+                        )
+                    }
+
+                    IconButton(onClick = {
+                        if (products.isEmpty()) {
+                            Toast.makeText(context, "No inventory products to export", Toast.LENGTH_SHORT).show()
+                            return@IconButton
+                        }
+                        try {
+                            val csvHeader = "ID,Name,Price,Tax Rate,Unit,Stock,HSN/SAC\n"
+                            val csvBody = products.joinToString("\n") { p ->
+                                val id = p.id
+                                val name = "\"${p.name.replace("\"", "\"\"")}\""
+                                val price = p.price
+                                val taxRate = p.taxRate
+                                val unit = "\"${p.unit.replace("\"", "\"\"")}\""
+                                val stock = p.stock
+                                val hsnSac = "\"${p.hsnSac.replace("\"", "\"\"")}\""
+                                "$id,$name,$price,$taxRate,$unit,$stock,$hsnSac"
+                            }
+                            val csvContent = csvHeader + csvBody
+                            val cacheDir = File(context.cacheDir, "exports").apply { mkdirs() }
+                            val exportFile = File(cacheDir, "products_list_${System.currentTimeMillis()}.csv")
+                            exportFile.writeText(csvContent, Charsets.UTF_8)
+
+                            val uri = androidx.core.content.FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                exportFile
+                            )
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/csv"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                putExtra(Intent.EXTRA_SUBJECT, "Products Directory Export")
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "Export Products List via"))
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = "Export Products Directory"
+                        )
+                    }
+
+                    IconButton(onClick = {
+                        selectFileLauncher.launch("*/*")
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.FileUpload,
+                            contentDescription = "Import Products Directory"
                         )
                     }
                 },
@@ -444,7 +574,8 @@ fun ProductsScreen(
                             onDeleteClicked = {
                                 viewModel.deleteProduct(item)
                                 Toast.makeText(context, "Product Deleted", Toast.LENGTH_SHORT).show()
-                            }
+                            },
+                            onHistoryClicked = { activeHistoryProduct = item }
                         )
                     }
                 }
@@ -475,6 +606,140 @@ fun ProductsScreen(
             }
         )
     }
+
+    // Modal Stock Ledger History Dialog
+    activeHistoryProduct?.let { prod ->
+        // Calculate sales (Outflow)
+        val sales = mutableListOf<Triple<Long, String, Double>>() // timestamp, invoiceNumber, qty
+        for (invDetails in invoices) {
+            for (item in invDetails.lineItems) {
+                if (item.productId == prod.id) {
+                    sales.add(Triple(invDetails.invoice.dateTimestamp, invDetails.invoice.invoiceNumber, item.quantity))
+                }
+            }
+        }
+        val totalSold = sales.sumOf { it.third }
+        val initialPurchaseQty = prod.stock + totalSold
+
+        class StockTx(
+            val timestamp: Long,
+            val type: String,
+            val ref: String,
+            val qtyIn: Double,
+            val qtyOut: Double
+        )
+
+        val txList = mutableListOf<StockTx>()
+        txList.add(StockTx(prod.dateTimestamp, "Initial Stock / Batch", "Inward Restock", initialPurchaseQty, 0.0))
+        for (s in sales) {
+            txList.add(StockTx(s.first, "Sales Invoice", s.second, 0.0, s.third))
+        }
+        txList.sortBy { it.timestamp }
+
+        var runningBalance = 0.0
+        val txsWithBalance = txList.map { tx ->
+            runningBalance += (tx.qtyIn - tx.qtyOut)
+            Triple(tx, runningBalance, java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(tx.timestamp)))
+        }
+
+        AlertDialog(
+            onDismissRequest = { activeHistoryProduct = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Text("Stock Ledger: ${prod.name}")
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Real-time records of all inventory inflows (Purchase/Restock) and outflows (Sales invoices):",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth().weight(1f)
+                    ) {
+                        items(txsWithBalance) { (tx, balance, dateStr) ->
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (tx.qtyIn > 0) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+                                                    else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f)
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (tx.qtyIn > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                    else MaterialTheme.colorScheme.error.copy(alpha = 0.3f)
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = if (tx.qtyIn > 0) "Stock In (Restock)" else "Stock Out (Sale)",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (tx.qtyIn > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                        )
+                                        Text(
+                                            text = dateStr,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = "Ref: ${tx.ref}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                text = "Quantity: ${if (tx.qtyIn > 0) "+${tx.qtyIn}" else "-${tx.qtyOut}"} ${prod.unit}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text(
+                                                text = "Balance",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.outline
+                                            )
+                                            Text(
+                                                text = "$balance ${prod.unit}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { activeHistoryProduct = null }) {
+                    Text("Close Ledger")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -483,7 +748,8 @@ fun ProductItemRow(
     openingStock: Double,
     lowStockThreshold: Float,
     onEditClicked: () -> Unit,
-    onDeleteClicked: () -> Unit
+    onDeleteClicked: () -> Unit,
+    onHistoryClicked: () -> Unit
 ) {
     val isCritical = product.stock <= lowStockThreshold
     val cardBg = if (isCritical) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface
@@ -649,6 +915,13 @@ fun ProductItemRow(
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
+                }
+                IconButton(onClick = onHistoryClicked) {
+                    Icon(
+                        imageVector = Icons.Default.History,
+                        contentDescription = "Stock Ledger History",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                 }
                 IconButton(onClick = onEditClicked) {
                     Icon(

@@ -96,6 +96,9 @@ fun InvoicesScreen(
     val selectedInvoices = remember { mutableStateListOf<InvoiceWithDetails>() }
     var showBulkDeleteConfirm by remember { mutableStateOf(false) }
 
+    var showPaidDetailsDialogForInvoice by remember { mutableStateOf<InvoiceWithDetails?>(null) }
+    var showClosedReasonDialogForInvoice by remember { mutableStateOf<InvoiceWithDetails?>(null) }
+
     // Filter invoices
     val filteredInvoices = remember(invoices, selectedFilter, searchQuery) {
         invoices.filter {
@@ -449,6 +452,199 @@ fun InvoicesScreen(
         )
     }
 
+    // Modal dialog collecting payment details (Cash, UPI, Cheque, Note, Attachment) when marked Paid
+    showPaidDetailsDialogForInvoice?.let { billing ->
+        var paymentMethod by remember { mutableStateOf("Cash") }
+        var paymentNote by remember { mutableStateOf("") }
+        var paymentAttachmentPath by remember { mutableStateOf("") }
+        
+        val pickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent()
+        ) { uri ->
+            uri?.let {
+                try {
+                    val attachmentsDir = File(context.filesDir, "attachments").apply { mkdirs() }
+                    val extension = context.contentResolver.getType(it)?.split("/")?.lastOrNull() ?: "bin"
+                    val destFile = File(attachmentsDir, "payment_${System.currentTimeMillis()}.$extension")
+                    context.contentResolver.openInputStream(it)?.use { input ->
+                        destFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    paymentAttachmentPath = destFile.absolutePath
+                    Toast.makeText(context, "Payment receipt attached!", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Failed to copy receipt file: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { showPaidDetailsDialogForInvoice = null },
+            icon = { Icon(Icons.Default.Payment, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Enter Payment Details") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Select payment mode and add optional reference note/receipt attachment:")
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Cash", "UPI", "Cheque").forEach { mode ->
+                            val selected = paymentMethod == mode
+                            InputChip(
+                                selected = selected,
+                                onClick = { paymentMethod = mode },
+                                label = { Text(mode) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    
+                    OutlinedTextField(
+                        value = paymentNote,
+                        onValueChange = { paymentNote = it },
+                        label = { Text("Payment Note / Reference No.") },
+                        placeholder = { Text("e.g. UPI Txn ID, Cheque number...") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    if (paymentAttachmentPath.isEmpty()) {
+                        Button(
+                            onClick = { pickerLauncher.launch("*/*") },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Attach Payment Receipt / Cheque Photo", fontSize = 11.sp)
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Receipt: ${File(paymentAttachmentPath).name}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            IconButton(onClick = { paymentAttachmentPath = "" }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.updateInvoiceStatus(
+                            invoiceId = billing.invoice.id,
+                            newStatus = "Paid",
+                            paymentMethod = paymentMethod,
+                            paymentNote = paymentNote,
+                            paymentAttachmentPath = paymentAttachmentPath,
+                            closeReason = ""
+                        )
+                        // Update active details view
+                        activeInvoiceDetails = billing.copy(
+                            invoice = billing.invoice.copy(
+                                status = "Paid",
+                                paymentMethod = paymentMethod,
+                                paymentNote = paymentNote,
+                                paymentAttachmentPath = paymentAttachmentPath,
+                                closeReason = ""
+                            )
+                        )
+                        showPaidDetailsDialogForInvoice = null
+                    }
+                ) {
+                    Text("Mark as Paid")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPaidDetailsDialogForInvoice = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Modal dialog collecting close reason when marked Closed
+    showClosedReasonDialogForInvoice?.let { billing ->
+        var closeReason by remember { mutableStateOf("") }
+        
+        AlertDialog(
+            onDismissRequest = { showClosedReasonDialogForInvoice = null },
+            icon = { Icon(Icons.Default.Cancel, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Close Invoice") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Please specify the reason for closing this invoice (e.g. Cancelled, Product Returned, Bad Debt):")
+                    
+                    OutlinedTextField(
+                        value = closeReason,
+                        onValueChange = { closeReason = it },
+                        label = { Text("Reason for Closing*") },
+                        placeholder = { Text("e.g. Customer cancelled order") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (closeReason.isBlank()) {
+                            Toast.makeText(context, "Reason of closing cannot be blank", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        viewModel.updateInvoiceStatus(
+                            invoiceId = billing.invoice.id,
+                            newStatus = "Closed",
+                            paymentMethod = "",
+                            paymentNote = "",
+                            paymentAttachmentPath = "",
+                            closeReason = closeReason
+                        )
+                        // Update active details view
+                        activeInvoiceDetails = billing.copy(
+                            invoice = billing.invoice.copy(
+                                status = "Closed",
+                                paymentMethod = "",
+                                paymentNote = "",
+                                paymentAttachmentPath = "",
+                                closeReason = closeReason
+                            )
+                        )
+                        showClosedReasonDialogForInvoice = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Close Invoice")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClosedReasonDialogForInvoice = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     // Invoice Detail Sheet Dialog
     activeInvoiceDetails?.let { billing ->
         ModalBottomSheet(
@@ -459,9 +655,15 @@ fun InvoicesScreen(
                 item = billing,
                 businessProfile = profile,
                 onUpdateStatus = { st ->
-                    viewModel.updateInvoiceStatus(billing.invoice.id, st)
-                    // Update active view
-                    activeInvoiceDetails = billing.copy(invoice = billing.invoice.copy(status = st))
+                    if (st == "Paid") {
+                        showPaidDetailsDialogForInvoice = billing
+                    } else if (st == "Closed") {
+                        showClosedReasonDialogForInvoice = billing
+                    } else {
+                        viewModel.updateInvoiceStatus(billing.invoice.id, st)
+                        // Update active view
+                        activeInvoiceDetails = billing.copy(invoice = billing.invoice.copy(status = st))
+                    }
                 },
                 onEdit = {
                     if (billing.invoice.status != "Closed" && billing.invoice.status != "Paid") {
@@ -905,6 +1107,74 @@ fun InvoiceDetailLayout(
             }
         }
 
+        if (item.invoice.status == "Paid" && item.invoice.paymentMethod.isNotBlank()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text("Payment Confirmation details:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Payment Mode: ${item.invoice.paymentMethod}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                    if (item.invoice.paymentNote.isNotBlank()) {
+                        Text("Note/Ref: ${item.invoice.paymentNote}", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (item.invoice.paymentAttachmentPath.isNotBlank() && item.invoice.paymentAttachmentPath != "null") {
+                        val context = LocalContext.current
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Button(
+                            onClick = {
+                                try {
+                                    val file = File(item.invoice.paymentAttachmentPath)
+                                    if (file.exists() && file.isFile) {
+                                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                                            context,
+                                            "${context.packageName}.fileprovider",
+                                            file
+                                        )
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            setDataAndType(uri, "image/*")
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(Intent.createChooser(intent, "Open Receipt via"))
+                                    } else {
+                                        Toast.makeText(context, "Receipt file does not exist locally.", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Unable to open receipt: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.height(30.dp)
+                        ) {
+                            Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(12.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Open Payment Receipt Image", fontSize = 10.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        if (item.invoice.status == "Closed" && item.invoice.closeReason.isNotBlank()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text("Closure Status Information:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Reason for Closing: ${item.invoice.closeReason}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
 
         // Line items summary headers
@@ -1024,6 +1294,11 @@ fun CreateInvoiceScreen(
     var dueDateTimestamp by remember { mutableStateOf(editingInvoice?.invoice?.dueDateTimestamp ?: 0L) }
     var attachmentPathState by remember { mutableStateOf(editingInvoice?.invoice?.attachmentPath ?: "") }
 
+    var paymentMethodState by remember { mutableStateOf(editingInvoice?.invoice?.paymentMethod ?: "Cash") }
+    var paymentNoteState by remember { mutableStateOf(editingInvoice?.invoice?.paymentNote ?: "") }
+    var paymentAttachmentPathState by remember { mutableStateOf(editingInvoice?.invoice?.paymentAttachmentPath ?: "") }
+    var closeReasonState by remember { mutableStateOf(editingInvoice?.invoice?.closeReason ?: "") }
+
     // List of active line items currently added
     val addedItems = remember { mutableStateListOf<InvoiceLineItem>() }
 
@@ -1034,6 +1309,10 @@ fun CreateInvoiceScreen(
             addedItems.addAll(it.lineItems)
             dueDateTimestamp = it.invoice.dueDateTimestamp
             attachmentPathState = it.invoice.attachmentPath
+            paymentMethodState = it.invoice.paymentMethod
+            paymentNoteState = it.invoice.paymentNote
+            paymentAttachmentPathState = it.invoice.paymentAttachmentPath
+            closeReasonState = it.invoice.closeReason
         }
     }
 
@@ -1076,7 +1355,11 @@ fun CreateInvoiceScreen(
                                     brokerageBy = brokerageBy,
                                     placeOfSupply = placeOfSupply,
                                     dueDateTimestamp = dueDateTimestamp,
-                                    attachmentPath = attachmentPathState
+                                    attachmentPath = attachmentPathState,
+                                    paymentMethod = if (statusState == "Paid") paymentMethodState else "",
+                                    paymentNote = if (statusState == "Paid") paymentNoteState else "",
+                                    paymentAttachmentPath = if (statusState == "Paid") paymentAttachmentPathState else "",
+                                    closeReason = if (statusState == "Closed") closeReasonState else ""
                                 )
                                 Toast.makeText(context, "Invoice Saved Successfully!", Toast.LENGTH_SHORT).show()
                                 onBack()
@@ -1165,7 +1448,7 @@ fun CreateInvoiceScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            val statuses = listOf("Paid", "Sent", "Draft")
+                            val statuses = listOf("Paid", "Sent", "Draft", "Closed")
                             statuses.forEach { item ->
                                 val active = statusState == item
                                 InputChip(
@@ -1183,6 +1466,122 @@ fun CreateInvoiceScreen(
                                     },
                                     modifier = Modifier.weight(1f)
                                 )
+                            }
+                        }
+
+                        if (statusState == "Paid") {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("Payment Method", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        listOf("Cash", "UPI", "Cheque").forEach { mode ->
+                                            val selected = paymentMethodState == mode
+                                            InputChip(
+                                                selected = selected,
+                                                onClick = { paymentMethodState = mode },
+                                                label = { Text(mode) },
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
+                                    }
+                                    
+                                    OutlinedTextField(
+                                        value = paymentNoteState,
+                                        onValueChange = { paymentNoteState = it },
+                                        label = { Text("Payment Note / Reference No.") },
+                                        placeholder = { Text("e.g. UPI Transaction ID, Cheque number") },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    
+                                    val receiptLauncher = rememberLauncherForActivityResult(
+                                        contract = ActivityResultContracts.GetContent()
+                                    ) { uri ->
+                                        uri?.let {
+                                            try {
+                                                val attachmentsDir = File(context.filesDir, "attachments").apply { mkdirs() }
+                                                val extension = context.contentResolver.getType(it)?.split("/")?.lastOrNull() ?: "bin"
+                                                val destFile = File(attachmentsDir, "payment_${System.currentTimeMillis()}.$extension")
+                                                context.contentResolver.openInputStream(it)?.use { input ->
+                                                    destFile.outputStream().use { output ->
+                                                        input.copyTo(output)
+                                                    }
+                                                }
+                                                paymentAttachmentPathState = destFile.absolutePath
+                                                Toast.makeText(context, "Receipt attached!", Toast.LENGTH_SHORT).show()
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Failed to copy receipt: ${e.message}", Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (paymentAttachmentPathState.isEmpty()) {
+                                        Button(
+                                            onClick = { receiptLauncher.launch("image/*") },
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                            shape = RoundedCornerShape(6.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Attach Payment Receipt / Cheque Photo", fontSize = 11.sp)
+                                        }
+                                    } else {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                                .padding(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "Receipt: ${File(paymentAttachmentPathState).name}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            IconButton(onClick = { paymentAttachmentPathState = "" }, modifier = Modifier.size(24.dp)) {
+                                                Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (statusState == "Closed") {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f)),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.2f))
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("Reason for Closing", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                                    OutlinedTextField(
+                                        value = closeReasonState,
+                                        onValueChange = { closeReasonState = it },
+                                        label = { Text("Reason Details*") },
+                                        placeholder = { Text("e.g. Returned, Cancelled, etc.") },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
                             }
                         }
 
@@ -1640,7 +2039,7 @@ fun CreateInvoiceScreen(
                 var activeEditClientFlow by remember { mutableStateOf<Customer?>(null) }
 
                 val filteredSheetCustomers = remember(customers, clientSearchText) {
-                    customers.filter {
+                    customers.filter { !it.isClosed }.filter {
                         it.name.contains(clientSearchText, ignoreCase = true) ||
                                 it.phone.contains(clientSearchText) ||
                                 it.email.contains(clientSearchText, ignoreCase = true)
@@ -2164,6 +2563,16 @@ fun CreateInvoiceScreen(
                         Toast.makeText(context, "Quantity must be greater than 0", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
+                    chosenInventoryProd?.let { prod ->
+                        if (prod.stock <= 0) {
+                            Toast.makeText(context, "Cannot add item: Product is out of stock", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+                        if (qty > prod.stock) {
+                            Toast.makeText(context, "Cannot add item: Insufficient stock (Only ${prod.stock} ${prod.unit} left)", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+                    }
                     if (discValue < 0 || discPercent < 0) {
                         Toast.makeText(context, "Discount cannot be negative", Toast.LENGTH_SHORT).show()
                         return@Button
@@ -2259,7 +2668,7 @@ fun CatalogInvoiceItemRow(
     val dFormatter = remember { SimpleDateFormat("dd-MM-yyyy", Locale.US) }
     val statusColor = when (item.invoice.status) {
         "Paid" -> Color(0xFF10B981)
-        "Sent" -> Color(0xFF3B82F6)
+        "Sent" -> Color(0xFFEF4444)
         "Draft" -> Color(0xFF6B7280)
         else -> Color(0xFFF59E0B)
     }

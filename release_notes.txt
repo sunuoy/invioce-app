@@ -1,21 +1,13 @@
-# Release v1.19.8
+# Release v1.19.9
 
-## Changelog (v1.13.0 to v1.19.8)
+## Changelog (v1.19.8 to v1.19.9)
 
-### 📄 Invoice & PDF Header Layout
-- **Annual Invoice Suffix Reset**: Automatically resets the generated invoice sequence back to `0001` (e.g. `INV-2027-JAN-01-0001`) whenever the calendar year changes.
-- **Dynamic PDF Header Spacing**: Collapsed spacing in PDF headers so that if optional business details (phone, email, GSTIN) are blank, they are completely hidden and no empty blank spaces or default dummy values are printed.
-- **Red "Sent" Status Indicator**: Updated the "Sent" status badge color to Red in the invoice tracker list.
-- **Clean PDF Metadata**: Hidden place of supply, vehicle number, and brokerage by dynamically if left empty.
+### 💳 Payment & Closure Details
+- **Payment Method Confirmation**: When marking an invoice as **Paid** (via detail sheets or invoice editor), you can specify payment method (Cash, UPI, Cheque), add transaction/cheque reference notes, and attach receipt screenshot images which are copied locally to the app's persistent storage.
+- **Closure Reason Details**: When marking an invoice as **Closed**, the app prompts you for a description/reason for closing (e.g. Order Cancelled, Product Returned, Bad Debt).
+- **Detail Displays**: Stylized visual cards showing payment modes/references or closing reason text are dynamically rendered inside the invoice details card stack.
 
-### 📊 Inventory & Clients
-- **CSV Inventory Import/Export**: Import and export your product inventory directly via CSV, including details like Name, Price, Tax Rate, Unit Type (e.g. `Kg`, `Pcs`, `Box`), Stock, and HSN/SAC.
-- **Stock Ledger History**: Added a visual timeline ledger button next to each product to track date-wise restocks (In) and sales (Out).
-- **Stock Limits Block**: Prevents adding products to invoices if they are out of stock or if quantity exceeds available stock.
-- **CSV Customer Import**: Import client lists directly into your database from a CSV file.
-- **Phone Validation**: Enforced 10-13 digit phone number rules app-wide.
-
-### 💾 Backup & Cloud Sync
-- **Local Offline Backup**: Added a \"Save Offline\" option to store database backup JSONs directly on local storage.
-- **Cloud Sync Modes**: Configure Google Drive backup frequency dynamically to Automatic, Hourly, or Manual.
-- **Profile Isolation**: Drive sync configurations and active statuses are saved independently for each business profile.
+### 🔒 Client Directory Safeguards
+- **Client Deletion Protection**: Active clients with generated invoices cannot be hard deleted. If attempted, they can be marked as **Closed** (marked visually with a red badge).
+- **Dropdown Exclusion**: Inactive/closed clients are automatically filtered out from recipient selection lists when generating new invoices.
+- **Clients Directory CSV Sync**: Customer CSV import and export templates have been expanded to include the **`Closed`** boolean column status.

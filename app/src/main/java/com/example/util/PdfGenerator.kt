@@ -314,24 +314,39 @@ object PdfGenerator {
         // Draw stylized custom vector or monogram brand logo
         drawBrandLogo(canvas, logoLeft, logoTop, logoRight, logoBottom, profile, primaryColor, borderPaint)
 
-        val bName = if (profile?.businessName.isNullOrBlank()) "Add Company Name" else profile.businessName
-        val bAddr = if (profile?.address.isNullOrBlank()) "Add Address" else profile.address
-        val bPhone = if (profile?.phone.isNullOrBlank()) "+91 9999999999" else profile.phone
-        val bEmail = if (profile?.email.isNullOrBlank()) "company@gmail.com" else profile.email
-        val bGstin = if (profile?.gstin.isNullOrBlank()) "29AAAAA1234F000" else profile.gstin
-        val bUpi = if (profile?.upiId.isNullOrBlank()) "company@upi" else profile.upiId
+        val bName = profile?.businessName ?: ""
+        val bAddr = profile?.address ?: ""
+        val bPhone = profile?.phone ?: ""
+        val bEmail = profile?.email ?: ""
+        val bGstin = profile?.gstin ?: ""
 
-        // Draw Business Details
-        canvas.drawText(bName, 95f, topBorder + 43f, titlePaint.apply { textSize = 16.0f })
-        titlePaint.textSize = 14.0f // reset
-        canvas.drawText(bAddr, 95f, topBorder + 59f, textPaint.apply { textSize = 12.5f })
-        canvas.drawText("Mobile: $bPhone | Email: $bEmail", 95f, topBorder + 75f, textPaint)
-        textPaint.textSize = 10.5f // reset
+        var currentHeaderY = topBorder + 43f
+        if (bName.isNotBlank()) {
+            canvas.drawText(bName, 95f, currentHeaderY, titlePaint.apply { textSize = 16.0f })
+            titlePaint.textSize = 14.0f // reset
+            currentHeaderY += 16f
+        }
+        if (bAddr.isNotBlank()) {
+            canvas.drawText(bAddr, 95f, currentHeaderY, textPaint.apply { textSize = 12.5f })
+            currentHeaderY += 16f
+        }
         
-        val gstinAndPan = "GSTIN - $bGstin | PAN - ${bGstin.take(10)}"
-        canvas.drawText(gstinAndPan, 95f, topBorder + 91f, boldTextPaint.apply { color = primaryColor; textSize = 12.5f })
-        boldTextPaint.color = textDarkColor // reset
-        boldTextPaint.textSize = 10.5f // reset
+        val contactLine = listOfNotNull(
+            bPhone.takeIf { it.isNotBlank() }?.let { "Mobile: $it" },
+            bEmail.takeIf { it.isNotBlank() }?.let { "Email: $it" }
+        ).joinToString(" | ")
+        
+        if (contactLine.isNotBlank()) {
+            canvas.drawText(contactLine, 95f, currentHeaderY, textPaint)
+            currentHeaderY += 16f
+        }
+        
+        if (bGstin.isNotBlank()) {
+            val gstinAndPan = "GSTIN - $bGstin | PAN - ${bGstin.take(10)}"
+            canvas.drawText(gstinAndPan, 95f, currentHeaderY, boldTextPaint.apply { color = primaryColor; textSize = 12.5f })
+            boldTextPaint.color = textDarkColor // reset
+            boldTextPaint.textSize = 10.5f // reset
+        }
 
         // --- 4. BILLING DETAILS & INVOICE META BLOCK (y: 125 to 245) ---
         val midX = 365f

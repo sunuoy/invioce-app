@@ -191,7 +191,9 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     // Support sequential generation: INV-YYYY-MMM-DD-XXXX with progressive suffix logic per active company
     fun generateNextInvoiceNumber(): String {
         val existingInvoices = invoices.value
-        val dateString = java.text.SimpleDateFormat("yyyy-MMM-dd", java.util.Locale.US).format(java.util.Date()).uppercase()
+        val calendar = java.util.Calendar.getInstance()
+        val currentYear = calendar.get(java.util.Calendar.YEAR)
+        val dateString = java.text.SimpleDateFormat("yyyy-MMM-dd", java.util.Locale.US).format(calendar.time).uppercase()
         val currentCompany = businessProfile.value?.businessName ?: ""
         
         var maxSuffix = 0
@@ -201,6 +203,13 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             if (inv.invoice.businessName != currentCompany) {
                 continue
             }
+            // Filter to only include invoices created in the current calendar year
+            val invCalendar = java.util.Calendar.getInstance().apply { timeInMillis = inv.invoice.dateTimestamp }
+            val invYear = invCalendar.get(java.util.Calendar.YEAR)
+            if (invYear != currentYear) {
+                continue
+            }
+            
             val numStr = inv.invoice.invoiceNumber
             val matchResult = regex.find(numStr)
             if (matchResult != null) {
@@ -323,7 +332,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // ------------------ CUSTOMER OPERATIONS ------------------
-    fun saveCustomer(id: Int, name: String, companyName: String, phone: String, email: String, address: String, gstin: String = "", placeOfSupply: String = "") {
+    fun saveCustomer(id: Int, name: String, companyName: String, phone: String, email: String, address: String, gstin: String = "", placeOfSupply: String = "", isClosed: Boolean = false) {
         viewModelScope.launch {
             if (name.isBlank()) {
                 _uiEvents.emit(UiEvent.ShowError("Customer name cannot be blank"))
@@ -344,17 +353,32 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 email = email.trim(),
                 address = address.trim(),
                 gstin = gstin.trim(),
-                placeOfSupply = placeOfSupply.trim()
+                placeOfSupply = placeOfSupply.trim(),
+                isClosed = isClosed
             )
             repository.insertCustomer(customer)
             _uiEvents.emit(UiEvent.ShowSuccess("Customer details saved!"))
         }
     }
 
+    fun toggleCustomerClosedStatus(customer: Customer, isClosed: Boolean) {
+        viewModelScope.launch {
+            val updated = customer.copy(isClosed = isClosed)
+            repository.insertCustomer(updated)
+            val actionText = if (isClosed) "Closed (Inactive)" else "Active"
+            _uiEvents.emit(UiEvent.ShowSuccess("Client '${customer.name}' marked as $actionText"))
+        }
+    }
+
     fun deleteCustomer(customer: Customer) {
         viewModelScope.launch {
-            repository.deleteCustomer(customer)
-            _uiEvents.emit(UiEvent.ShowSuccess("Customer deleted"))
+            val hasInvoices = invoices.value.any { it.invoice.customerId == customer.id }
+            if (hasInvoices) {
+                _uiEvents.emit(UiEvent.ShowError("Client has generated invoices. Cannot be deleted. Please mark them as Closed instead."))
+            } else {
+                repository.deleteCustomer(customer)
+                _uiEvents.emit(UiEvent.ShowSuccess("Customer deleted"))
+            }
         }
     }
 
@@ -370,7 +394,11 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         brokerageBy: String = "",
         placeOfSupply: String = "",
         dueDateTimestamp: Long = 0L,
-        attachmentPath: String = ""
+        attachmentPath: String = "",
+        paymentMethod: String = "",
+        paymentNote: String = "",
+        paymentAttachmentPath: String = "",
+        closeReason: String = ""
     ) {
         viewModelScope.launch {
             if (invoiceNumber.isBlank()) {
@@ -401,7 +429,11 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 vehicleNumber = vehicleNumber.trim(),
                 brokerageBy = brokerageBy.trim(),
                 placeOfSupply = placeOfSupply.trim(),
-                dueDateTimestamp = dueDateTimestamp
+                dueDateTimestamp = dueDateTimestamp,
+                paymentMethod = paymentMethod,
+                paymentNote = paymentNote,
+                paymentAttachmentPath = paymentAttachmentPath,
+                closeReason = closeReason
             )
 
             val invoiceId = repository.saveInvoice(invoice, items)
@@ -432,22 +464,47 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     fun deleteCustomersBulk(customersList: List<Customer>) {
         viewModelScope.launch {
             try {
+                var deleteCount = 0
+                var skipCount = 0
                 for (cust in customersList) {
-                    repository.deleteCustomer(cust)
+                    val hasInvoices = invoices.value.any { it.invoice.customerId == cust.id }
+                    if (hasInvoices) {
+                        skipCount++
+                    } else {
+                        repository.deleteCustomer(cust)
+                        deleteCount++
+                    }
                 }
-                _uiEvents.emit(UiEvent.ShowSuccess("Successfully deleted ${customersList.size} clients"))
+                if (skipCount > 0) {
+                    _uiEvents.emit(UiEvent.ShowError("Deleted $deleteCount clients. Skipped $skipCount clients with generated invoices."))
+                } else {
+                    _uiEvents.emit(UiEvent.ShowSuccess("Successfully deleted $deleteCount clients"))
+                }
             } catch (e: Exception) {
                 _uiEvents.emit(UiEvent.ShowError("Clients bulk delete failed: ${e.message}"))
             }
         }
     }
 
-    fun updateInvoiceStatus(invoiceId: Int, newStatus: String) {
+    fun updateInvoiceStatus(
+        invoiceId: Int,
+        newStatus: String,
+        paymentMethod: String = "",
+        paymentNote: String = "",
+        paymentAttachmentPath: String = "",
+        closeReason: String = ""
+    ) {
         viewModelScope.launch {
             val scopeInvoices = invoices.value
             val match = scopeInvoices.find { it.invoice.id == invoiceId }
             if (match != null) {
-                val updatedInvoice = match.invoice.copy(status = newStatus)
+                val updatedInvoice = match.invoice.copy(
+                    status = newStatus,
+                    paymentMethod = paymentMethod,
+                    paymentNote = paymentNote,
+                    paymentAttachmentPath = paymentAttachmentPath,
+                    closeReason = closeReason
+                )
                 repository.saveInvoice(updatedInvoice, match.lineItems)
                 _uiEvents.emit(UiEvent.ShowSuccess("Invoice status updated to $newStatus"))
             }

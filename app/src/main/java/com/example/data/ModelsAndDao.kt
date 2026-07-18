@@ -66,7 +66,8 @@ data class Customer(
     val email: String = "",
     val address: String = "",
     val gstin: String = "",
-    val placeOfSupply: String = ""
+    val placeOfSupply: String = "",
+    val isClosed: Boolean = false
 )
 
 @Entity(tableName = "invoices")
@@ -77,7 +78,7 @@ data class Invoice(
     val businessName: String = "",
     val attachmentPath: String = "",
     val dateTimestamp: Long = System.currentTimeMillis(),
-    val status: String,        // "Draft", "Sent", "Paid"
+    val status: String,        // "Draft", "Sent", "Paid", "Closed"
     val subtotal: Double = 0.0,
     val taxTotal: Double = 0.0,
     val grandTotal: Double = 0.0,
@@ -86,7 +87,11 @@ data class Invoice(
     val brokerageBy: String = "",
     val placeOfSupply: String = "",
     val downloadCount: Int = 0,
-    val dueDateTimestamp: Long = 0L
+    val dueDateTimestamp: Long = 0L,
+    val paymentMethod: String = "",
+    val paymentNote: String = "",
+    val paymentAttachmentPath: String = "",
+    val closeReason: String = ""
 )
 
 @Entity(tableName = "invoice_line_items")
@@ -267,7 +272,7 @@ interface SavedBusinessProfileDao {
         Invoice::class,
         InvoiceLineItem::class
     ],
-    version = 11,
+    version = 13,
     exportSchema = false
 )
 abstract class InvoiceDatabase : RoomDatabase() {
@@ -287,6 +292,21 @@ abstract class InvoiceDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_11_12 = object : androidx.room.migration.Migration(11, 12) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE invoices ADD COLUMN paymentMethod TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE invoices ADD COLUMN paymentNote TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE invoices ADD COLUMN paymentAttachmentPath TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE invoices ADD COLUMN closeReason TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        val MIGRATION_12_13 = object : androidx.room.migration.Migration(12, 13) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE customers ADD COLUMN isClosed INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getDatabase(context: Context): InvoiceDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -294,7 +314,7 @@ abstract class InvoiceDatabase : RoomDatabase() {
                     InvoiceDatabase::class.java,
                     "invoice_database"
                 )
-                .addMigrations(MIGRATION_10_11)
+                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

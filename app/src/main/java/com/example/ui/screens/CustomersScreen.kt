@@ -111,6 +111,7 @@ fun CustomersScreen(
                             val address = if (cols.size > 5) cols[5].removeSurrounding("\"") else ""
                             val gstin = if (cols.size > 6) cols[6].removeSurrounding("\"") else ""
                             val placeOfSupply = if (cols.size > 7) cols[7].removeSurrounding("\"") else ""
+                            val isClosed = if (cols.size > 8) cols[8].removeSurrounding("\"").toBoolean() else false
                             
                             viewModel.saveCustomer(
                                 id = 0,
@@ -120,7 +121,8 @@ fun CustomersScreen(
                                 email = email,
                                 address = address,
                                 gstin = gstin,
-                                placeOfSupply = placeOfSupply
+                                placeOfSupply = placeOfSupply,
+                                isClosed = isClosed
                             )
                             importedCount++
                         }
@@ -206,7 +208,7 @@ fun CustomersScreen(
                                 return@IconButton
                             }
                             try {
-                                val csvHeader = "ID,Name,Company Name,Phone,Email,Address,GSTIN,Place of Supply\n"
+                                val csvHeader = "ID,Name,Company Name,Phone,Email,Address,GSTIN,Place of Supply,Closed\n"
                                 val csvBody = customers.joinToString("\n") { c ->
                                     val id = c.id
                                     val name = "\"${c.name.replace("\"", "\"\"")}\""
@@ -216,7 +218,7 @@ fun CustomersScreen(
                                     val address = "\"${c.address.replace("\"", "\"\"")}\""
                                     val gstin = "\"${c.gstin.replace("\"", "\"\"")}\""
                                     val placeOfSupply = "\"${c.placeOfSupply.replace("\"", "\"\"")}\""
-                                    "$id,$name,$company,$phone,$email,$address,$gstin,$placeOfSupply"
+                                    "$id,$name,$company,$phone,$email,$address,$gstin,$placeOfSupply,${c.isClosed}"
                                 }
                                 val csvContent = csvHeader + csvBody
                                 val cacheDir = File(context.cacheDir, "exports").apply { mkdirs() }
@@ -397,7 +399,9 @@ fun CustomersScreen(
                             onEditClicked = { activeEditingCustomer = item },
                             onDeleteClicked = {
                                 viewModel.deleteCustomer(item)
-                                Toast.makeText(context, "Client account deleted", Toast.LENGTH_SHORT).show()
+                            },
+                            onToggleClosedClicked = {
+                                viewModel.toggleCustomerClosedStatus(item, !item.isClosed)
                             }
                         )
                     }
@@ -466,7 +470,8 @@ fun CustomerItemCard(
     isSelected: Boolean,
     onSelectedChange: (Boolean) -> Unit,
     onEditClicked: () -> Unit,
-    onDeleteClicked: () -> Unit
+    onDeleteClicked: () -> Unit,
+    onToggleClosedClicked: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -530,12 +535,32 @@ fun CustomerItemCard(
             }
 
             Column(modifier = Modifier.weight(1.5f)) {
-                Text(
-                    text = if (customer.companyName.isNotEmpty()) "${customer.name} (${customer.companyName})" else customer.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = if (customer.companyName.isNotEmpty()) "${customer.name} (${customer.companyName})" else customer.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (customer.isClosed) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (customer.isClosed) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        ) {
+                            Text(
+                                text = "Closed",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 if (customer.phone.isNotBlank()) {
                     Row(
@@ -639,6 +664,13 @@ fun CustomerItemCard(
 
             if (!isSelectionMode) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onToggleClosedClicked) {
+                        Icon(
+                            imageVector = if (customer.isClosed) Icons.Default.LockOpen else Icons.Default.Lock,
+                            contentDescription = if (customer.isClosed) "Activate Client" else "Close Client",
+                            tint = if (customer.isClosed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        )
+                    }
                     IconButton(onClick = onEditClicked) {
                         Icon(
                             imageVector = Icons.Default.Edit,
