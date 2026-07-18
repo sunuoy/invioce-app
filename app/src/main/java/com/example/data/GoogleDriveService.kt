@@ -37,7 +37,7 @@ object GoogleDriveService {
                 val json = JSONObject(response.toString())
                 val files = json.optJSONArray("files")
                 if (files != null && files.length() > 0) {
-                    files.getJSONObject(0).optString("id", null)
+                    files.getJSONObject(0).optString("id").takeIf { it.isNotEmpty() }
                 } else {
                     null
                 }
@@ -116,7 +116,7 @@ object GoogleDriveService {
                     reader.close()
                     
                     val createdFile = JSONObject(response.toString())
-                    val newFileId = createdFile.optString("id", null)
+                    val newFileId = createdFile.optString("id").takeIf { it.isNotEmpty() }
                     
                     if (newFileId != null) {
                         connection.disconnect()
