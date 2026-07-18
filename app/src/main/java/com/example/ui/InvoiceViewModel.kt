@@ -157,14 +157,19 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Support sequential generation: INV-YYYY-MMM-DD-XXXX with progressive suffix logic
+    // Support sequential generation: INV-YYYY-MMM-DD-XXXX with progressive suffix logic per active company
     fun generateNextInvoiceNumber(): String {
         val existingInvoices = invoices.value
         val dateString = java.text.SimpleDateFormat("yyyy-MMM-dd", java.util.Locale.US).format(java.util.Date()).uppercase()
+        val currentCompany = businessProfile.value?.businessName ?: ""
         
         var maxSuffix = 0
         val regex = Regex("\\d+$")
         for (inv in existingInvoices) {
+            // Filter sequence to only include invoices belonging to the active company profile
+            if (inv.invoice.businessName != currentCompany) {
+                continue
+            }
             val numStr = inv.invoice.invoiceNumber
             val matchResult = regex.find(numStr)
             if (matchResult != null) {
@@ -341,10 +346,15 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 return@launch
             }
 
+            val existingInv = if (id != 0) invoices.value.find { it.invoice.id == id }?.invoice else null
+            val companyNameForInvoice = existingInv?.businessName?.takeIf { it.isNotEmpty() }
+                ?: (businessProfile.value?.businessName ?: "")
+
             val invoice = Invoice(
                 id = id,
                 invoiceNumber = invoiceNumber.trim(),
                 customerId = customerId,
+                businessName = companyNameForInvoice,
                 status = status,
                 notes = notes.trim(),
                 vehicleNumber = vehicleNumber.trim(),
