@@ -1,0 +1,17 @@
+# Release v1.19.5
+
+## Changelog (v1.13.0 to v1.19.5)
+
+### 📊 Inventory & Clients
+- **Opening & Closing Stock**: View calculated opening stock alongside remaining closing stock on inventory product cards.
+- **CSV Customer Import**: Import client lists directly into your database from a CSV file.
+- **Phone Validation**: Enforced 10-13 digit phone number rules app-wide.
+
+### 💾 Backup & Cloud Sync
+- **Local Offline Backup**: Added a \"Save Offline\" option to store database backup JSONs directly on local storage.
+- **Cloud Sync Modes**: Configure Google Drive backup frequency dynamically to Automatic, Hourly, or Manual.
+- **Profile Isolation**: Drive sync configurations and active statuses are saved independently for each business profile.
+
+### 📄 PDF Document Export
+- **Clean Fields**: Place of Supply, Vehicle Number, and Brokerage By are hidden dynamically if left blank.
+- **Strict Attachment Checks**: Fixed empty blank pages being appended if no documents were attached.
