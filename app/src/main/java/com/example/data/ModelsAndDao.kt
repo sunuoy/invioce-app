@@ -257,7 +257,7 @@ interface SavedBusinessProfileDao {
         Invoice::class,
         InvoiceLineItem::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class InvoiceDatabase : RoomDatabase() {
