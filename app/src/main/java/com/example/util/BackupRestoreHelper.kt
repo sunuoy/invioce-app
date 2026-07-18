@@ -8,6 +8,7 @@ object BackupRestoreHelper {
 
     fun exportToJson(
         profile: BusinessProfile?,
+        savedProfiles: List<SavedBusinessProfile>,
         products: List<Product>,
         customers: List<Customer>,
         invoices: List<InvoiceWithDetails>
@@ -35,6 +36,30 @@ object BackupRestoreHelper {
             root.put("businessProfile", profJson)
         }
 
+        // 1B. Saved Business Profiles
+        val savedArr = JSONArray()
+        for (sp in savedProfiles) {
+            val spJson = JSONObject().apply {
+                put("id", sp.id)
+                put("businessName", sp.businessName)
+                put("address", sp.address)
+                put("phone", sp.phone)
+                put("email", sp.email)
+                put("gstin", sp.gstin)
+                put("logoUrl", sp.logoUrl)
+                put("upiId", sp.upiId)
+                put("gmailId", sp.gmailId)
+                put("shortIcon", sp.shortIcon)
+                put("bankAccountName", sp.bankAccountName)
+                put("bankName", sp.bankName)
+                put("bankAccountNo", sp.bankAccountNo)
+                put("bankBranch", sp.bankBranch)
+                put("bankIfsc", sp.bankIfsc)
+            }
+            savedArr.put(spJson)
+        }
+        root.put("savedProfiles", savedArr)
+
         // 2. Products
         val productsArr = JSONArray()
         for (prod in products) {
@@ -46,6 +71,7 @@ object BackupRestoreHelper {
                 put("unit", prod.unit)
                 put("stock", prod.stock)
                 put("hsnSac", prod.hsnSac)
+                put("attachmentPath", prod.attachmentPath)
             }
             productsArr.put(prodJson)
         }
@@ -57,6 +83,7 @@ object BackupRestoreHelper {
             val custJson = JSONObject().apply {
                 put("id", cust.id)
                 put("name", cust.name)
+                put("companyName", cust.companyName)
                 put("phone", cust.phone)
                 put("email", cust.email)
                 put("address", cust.address)
@@ -75,6 +102,8 @@ object BackupRestoreHelper {
                 put("id", inv.id)
                 put("invoiceNumber", inv.invoiceNumber)
                 put("customerId", inv.customerId)
+                put("businessName", inv.businessName)
+                put("attachmentPath", inv.attachmentPath)
                 put("dateTimestamp", inv.dateTimestamp)
                 put("status", inv.status)
                 put("subtotal", inv.subtotal)
@@ -139,6 +168,34 @@ object BackupRestoreHelper {
             )
         } else null
 
+        // 1B. Saved Business Profiles
+        val savedProfiles = mutableListOf<SavedBusinessProfile>()
+        if (root.has("savedProfiles")) {
+            val arr = root.getJSONArray("savedProfiles")
+            for (i in 0 until arr.length()) {
+                val spJson = arr.getJSONObject(i)
+                savedProfiles.add(
+                    SavedBusinessProfile(
+                        id = spJson.optInt("id", 0),
+                        businessName = spJson.optString("businessName", ""),
+                        address = spJson.optString("address", ""),
+                        phone = spJson.optString("phone", ""),
+                        email = spJson.optString("email", ""),
+                        gstin = spJson.optString("gstin", ""),
+                        logoUrl = spJson.optString("logoUrl", ""),
+                        upiId = spJson.optString("upiId", ""),
+                        gmailId = spJson.optString("gmailId", ""),
+                        shortIcon = spJson.optString("shortIcon", "💼"),
+                        bankAccountName = spJson.optString("bankAccountName", ""),
+                        bankName = spJson.optString("bankName", ""),
+                        bankAccountNo = spJson.optString("bankAccountNo", ""),
+                        bankBranch = spJson.optString("bankBranch", ""),
+                        bankIfsc = spJson.optString("bankIfsc", "")
+                    )
+                )
+            }
+        }
+
         // 2. Products
         val products = mutableListOf<Product>()
         if (root.has("products")) {
@@ -153,7 +210,8 @@ object BackupRestoreHelper {
                         taxRate = prodJson.optDouble("taxRate", 0.0),
                         unit = prodJson.optString("unit", "pcs"),
                         stock = prodJson.optDouble("stock", 0.0),
-                        hsnSac = prodJson.optString("hsnSac", "")
+                        hsnSac = prodJson.optString("hsnSac", ""),
+                        attachmentPath = prodJson.optString("attachmentPath", "")
                     )
                 )
             }
@@ -169,6 +227,7 @@ object BackupRestoreHelper {
                     Customer(
                         id = custJson.optInt("id", 0),
                         name = custJson.optString("name", ""),
+                        companyName = custJson.optString("companyName", ""),
                         phone = custJson.optString("phone", ""),
                         email = custJson.optString("email", ""),
                         address = custJson.optString("address", ""),
@@ -192,6 +251,8 @@ object BackupRestoreHelper {
                         id = invId,
                         invoiceNumber = invJson.optString("invoiceNumber", ""),
                         customerId = invJson.optInt("customerId", 0),
+                        businessName = invJson.optString("businessName", ""),
+                        attachmentPath = invJson.optString("attachmentPath", ""),
                         dateTimestamp = invJson.optLong("dateTimestamp", System.currentTimeMillis()),
                         status = invJson.optString("status", "Paid"),
                         subtotal = invJson.optDouble("subtotal", 0.0),
@@ -231,12 +292,13 @@ object BackupRestoreHelper {
             }
         }
 
-        return BackupData(profile, products, customers, invoices, lineItems)
+        return BackupData(profile, savedProfiles, products, customers, invoices, lineItems)
     }
 }
 
 data class BackupData(
     val profile: BusinessProfile?,
+    val savedProfiles: List<SavedBusinessProfile>,
     val products: List<Product>,
     val customers: List<Customer>,
     val invoices: List<Invoice>,

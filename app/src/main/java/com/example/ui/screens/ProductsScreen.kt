@@ -1,6 +1,10 @@
 package com.example.ui.screens
 
 import android.widget.Toast
+import android.content.Intent
+import java.io.File
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -365,8 +369,8 @@ fun ProductsScreen(
     if (showCreatorDialog) {
         ProductDialogEditor(
             onDismiss = { showCreatorDialog = false },
-            onConfirm = { name, price, tax, unit, stock, hsnSac ->
-                viewModel.saveProduct(0, name, price, tax, unit, stock, hsnSac)
+            onConfirm = { name, price, tax, unit, stock, hsnSac, attachmentPath ->
+                viewModel.saveProduct(0, name, price, tax, unit, stock, hsnSac, attachmentPath)
                 showCreatorDialog = false
             }
         )
@@ -377,8 +381,8 @@ fun ProductsScreen(
         ProductDialogEditor(
             product = item,
             onDismiss = { activeEditorProduct = null },
-            onConfirm = { name, price, tax, unit, stock, hsnSac ->
-                viewModel.saveProduct(item.id, name, price, tax, unit, stock, hsnSac)
+            onConfirm = { name, price, tax, unit, stock, hsnSac, attachmentPath ->
+                viewModel.saveProduct(item.id, name, price, tax, unit, stock, hsnSac, attachmentPath)
                 activeEditorProduct = null
             }
         )
@@ -494,6 +498,46 @@ fun ProductItemRow(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (product.attachmentPath.isNotBlank()) {
+                    val context = LocalContext.current
+                    IconButton(onClick = {
+                        try {
+                            val file = File(product.attachmentPath)
+                            if (file.exists()) {
+                                val uri = androidx.core.content.FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    file
+                                )
+                                val extension = file.extension.lowercase()
+                                val mimeType = when (extension) {
+                                    "pdf" -> "application/pdf"
+                                    "jpg", "jpeg" -> "image/jpeg"
+                                    "png" -> "image/png"
+                                    "gif" -> "image/gif"
+                                    "txt" -> "text/plain"
+                                    else -> "*/*"
+                                }
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(uri, mimeType)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            } else {
+                                Toast.makeText(context, "Document file does not exist locally.", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Unable to open document: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.AttachFile,
+                            contentDescription = "View Stock Purchase Document",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
                 IconButton(onClick = onEditClicked) {
                     Icon(
                         imageVector = Icons.Default.Edit,
@@ -562,7 +606,7 @@ fun StockIndicatorTracker(stockValue: Double, unitStr: String, lowStockThreshold
 fun ProductDialogEditor(
     product: Product? = null,
     onDismiss: () -> Unit,
-    onConfirm: (name: String, price: Double, tax: Double, unit: String, stock: Double, hsnSac: String) -> Unit
+    onConfirm: (name: String, price: Double, tax: Double, unit: String, stock: Double, hsnSac: String, attachmentPath: String) -> Unit
 ) {
     var name by remember { mutableStateOf(product?.name ?: "") }
     var priceStr by remember { mutableStateOf(product?.price?.toString() ?: "") }
@@ -570,6 +614,7 @@ fun ProductDialogEditor(
     var unit by remember { mutableStateOf(product?.unit ?: "kg") }
     var stockStr by remember { mutableStateOf(product?.stock?.toString() ?: "50") }
     var hsnSac by remember { mutableStateOf(product?.hsnSac ?: "") }
+    var attachmentPathState by remember { mutableStateOf(product?.attachmentPath ?: "") }
 
     val isEdit = product != null
 
@@ -650,6 +695,79 @@ fun ProductDialogEditor(
                         modifier = Modifier.weight(1.2f).testTag("product_dialog_stock")
                     )
                 }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Purchase Invoice / Document", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                if (attachmentPathState.isEmpty()) {
+                    val context = LocalContext.current
+                    val launcher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.GetContent()
+                    ) { uri ->
+                        uri?.let {
+                            try {
+                                val attachmentsDir = File(context.filesDir, "attachments").apply { mkdirs() }
+                                val extension = context.contentResolver.getType(it)?.split("/")?.lastOrNull() ?: "bin"
+                                val destFile = File(attachmentsDir, "purchase_${System.currentTimeMillis()}.$extension")
+                                context.contentResolver.openInputStream(it)?.use { input ->
+                                    destFile.outputStream().use { output ->
+                                        input.copyTo(output)
+                                    }
+                                }
+                                attachmentPathState = destFile.absolutePath
+                                Toast.makeText(context, "Purchase document attached!", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Failed to copy file: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                    Button(
+                        onClick = { launcher.launch("*/*") },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.AttachFile, contentDescription = "Attach Document", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Attach Stock Invoice", fontSize = 12.sp)
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val file = File(attachmentPathState)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.InsertDriveFile,
+                                contentDescription = "Attachment present",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = file.name,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        IconButton(onClick = { attachmentPathState = "" }) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Remove attachment",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -658,7 +776,7 @@ fun ProductDialogEditor(
                 val tax = taxStr.toDoubleOrNull() ?: 18.0
                 val stock = stockStr.toDoubleOrNull() ?: 0.0
 
-                onConfirm(name, price, tax, unit, stock, hsnSac)
+                onConfirm(name, price, tax, unit, stock, hsnSac, attachmentPathState)
             }) {
                 Text(if (isEdit) "Save Edits" else "Confirm Register")
             }

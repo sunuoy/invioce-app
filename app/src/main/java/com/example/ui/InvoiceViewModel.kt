@@ -250,7 +250,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // ------------------ PRODUCT STOCK OPERATIONS ------------------
-    fun saveProduct(id: Int, name: String, price: Double, tax: Double, unit: String, stock: Double, hsnSac: String = "") {
+    fun saveProduct(id: Int, name: String, price: Double, tax: Double, unit: String, stock: Double, hsnSac: String = "", attachmentPath: String = "") {
         viewModelScope.launch {
             if (name.isBlank()) {
                 _uiEvents.emit(UiEvent.ShowError("Product name cannot be blank"))
@@ -276,7 +276,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 taxRate = tax,
                 unit = unit.trim(),
                 stock = stock,
-                hsnSac = hsnSac.trim()
+                hsnSac = hsnSac.trim(),
+                attachmentPath = attachmentPath.trim()
             )
             repository.insertProduct(product)
             _uiEvents.emit(UiEvent.ShowSuccess("Product stock saved successfully!"))
@@ -432,6 +433,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 val backupData = BackupRestoreHelper.importFromJson(jsonString)
                 repository.restoreData(
                     profile = backupData.profile,
+                    savedProfiles = backupData.savedProfiles,
                     products = backupData.products,
                     customers = backupData.customers,
                     invoices = backupData.invoices,
@@ -451,6 +453,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             try {
                 repository.restoreData(
                     profile = null,
+                    savedProfiles = emptyList(),
                     products = emptyList(),
                     customers = emptyList(),
                     invoices = emptyList(),
@@ -854,6 +857,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     fun exportAppDataToJSON(): String {
         return BackupRestoreHelper.exportToJson(
             profile = businessProfile.value,
+            savedProfiles = savedBusinessProfiles.value,
             products = products.value,
             customers = customers.value,
             invoices = invoices.value

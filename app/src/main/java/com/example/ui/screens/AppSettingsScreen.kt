@@ -57,6 +57,7 @@ fun AppSettingsScreen(
     
     // Database collections for Backup
     val businessProfile by viewModel.businessProfile.collectAsStateWithLifecycle()
+    val savedBusinessProfiles by viewModel.savedBusinessProfiles.collectAsStateWithLifecycle()
     val products by viewModel.products.collectAsStateWithLifecycle()
     val customers by viewModel.customers.collectAsStateWithLifecycle()
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
@@ -107,6 +108,7 @@ fun AppSettingsScreen(
         try {
             val jsonString = BackupRestoreHelper.exportToJson(
                 profile = businessProfile,
+                savedProfiles = savedBusinessProfiles,
                 products = products,
                 customers = customers,
                 invoices = invoices

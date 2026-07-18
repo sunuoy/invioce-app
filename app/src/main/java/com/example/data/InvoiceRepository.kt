@@ -125,12 +125,14 @@ class InvoiceRepository(
     // ------------------ BACKUP & RESTORE ------------------
     suspend fun restoreData(
         profile: BusinessProfile?,
+        savedProfiles: List<SavedBusinessProfile>,
         products: List<Product>,
         customers: List<Customer>,
         invoices: List<Invoice>,
         lineItems: List<InvoiceLineItem>
     ) {
         businessProfileDao.clearBusinessProfile()
+        savedBusinessProfileDao.clearAllSavedProfiles()
         productDao.clearAllProducts()
         customerDao.clearAllCustomers()
         invoiceDao.clearAllInvoices()
@@ -138,6 +140,9 @@ class InvoiceRepository(
 
         if (profile != null) {
             businessProfileDao.insertOrUpdateProfile(profile)
+        }
+        if (savedProfiles.isNotEmpty()) {
+            savedBusinessProfileDao.insertSavedProfilesBulk(savedProfiles)
         }
         if (products.isNotEmpty()) {
             productDao.insertProductsBulk(products)

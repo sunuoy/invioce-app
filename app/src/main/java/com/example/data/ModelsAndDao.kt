@@ -52,7 +52,8 @@ data class Product(
     val taxRate: Double, // Percentage e.g. 18.0 for 18% GST
     val unit: String,    // "pcs", "kg", "hrs", "box", etc.
     val stock: Double = 0.0, // stock quantity
-    val hsnSac: String = ""
+    val hsnSac: String = "",
+    val attachmentPath: String = ""
 )
 
 @Entity(tableName = "customers")
@@ -246,6 +247,12 @@ interface SavedBusinessProfileDao {
 
     @Query("DELETE FROM saved_business_profile WHERE id = :id")
     suspend fun deleteSavedProfile(id: Int)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSavedProfilesBulk(profiles: List<SavedBusinessProfile>)
+
+    @Query("DELETE FROM saved_business_profile")
+    suspend fun clearAllSavedProfiles()
 }
 
 // ------------------ DATABASE ------------------
@@ -259,7 +266,7 @@ interface SavedBusinessProfileDao {
         Invoice::class,
         InvoiceLineItem::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class InvoiceDatabase : RoomDatabase() {
