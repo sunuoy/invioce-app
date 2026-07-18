@@ -5,6 +5,9 @@ import android.content.Intent
 import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -57,6 +60,7 @@ fun InvoicesScreen(
     onClearViewInvoiceId: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
     val profile by viewModel.businessProfile.collectAsStateWithLifecycle()
     val clients by viewModel.customers.collectAsStateWithLifecycle()
@@ -474,61 +478,91 @@ fun InvoicesScreen(
                     Toast.makeText(context, "Invoice Deleted", Toast.LENGTH_SHORT).show()
                 },
                 onExportPdf = {
-                    try {
-                        val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
-                        val exportedMessage = PdfGenerator.exportPdfToDownloads(context, pdfFile, billing.invoice.invoiceNumber)
-                        if (exportedMessage != null) {
-                            // Increment download count since they exported the copy
-                            viewModel.incrementDownloadCount(billing.invoice.id)
-                            // Update local sheet details state statically to reflect the increment
-                            activeInvoiceDetails = billing.copy(
-                                invoice = billing.invoice.copy(downloadCount = billing.invoice.downloadCount + 1)
-                            )
-                            Toast.makeText(context, "$exportedMessage", Toast.LENGTH_LONG).show()
-                            
-                            // Automatically open the exported PDF file
-                            try {
-                                PdfGenerator.previewPdf(context, pdfFile)
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Unable to auto-open PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+                    scope.launch(Dispatchers.IO) {
+                        try {
+                            val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
+                            withContext(Dispatchers.Main) {
+                                val exportedMessage = PdfGenerator.exportPdfToDownloads(context, pdfFile, billing.invoice.invoiceNumber)
+                                if (exportedMessage != null) {
+                                    // Increment download count since they exported the copy
+                                    viewModel.incrementDownloadCount(billing.invoice.id)
+                                    // Update local sheet details state statically to reflect the increment
+                                    activeInvoiceDetails = billing.copy(
+                                        invoice = billing.invoice.copy(downloadCount = billing.invoice.downloadCount + 1)
+                                    )
+                                    Toast.makeText(context, "$exportedMessage", Toast.LENGTH_LONG).show()
+                                    
+                                    // Automatically open the exported PDF file
+                                    try {
+                                        PdfGenerator.previewPdf(context, pdfFile)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Unable to auto-open PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    Toast.makeText(context, "Failed to export PDF locally.", Toast.LENGTH_LONG).show()
+                                }
                             }
-                        } else {
-                            Toast.makeText(context, "Failed to export PDF locally.", Toast.LENGTH_LONG).show()
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, "Export Error: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
                         }
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Export Error: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 },
                 onSharePdf = {
-                    try {
-                        val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
-                        PdfGenerator.shareInvoicePdf(context, pdfFile)
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    scope.launch(Dispatchers.IO) {
+                        try {
+                            val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
+                            withContext(Dispatchers.Main) {
+                                PdfGenerator.shareInvoicePdf(context, pdfFile)
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, "Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
                     }
                 },
                 onPreviewPdf = {
-                    try {
-                        val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
-                        PdfGenerator.previewPdf(context, pdfFile)
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Preview Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    scope.launch(Dispatchers.IO) {
+                        try {
+                            val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
+                            withContext(Dispatchers.Main) {
+                                PdfGenerator.previewPdf(context, pdfFile)
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, "Preview Error: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
                     }
                 },
                 onShareWhatsApp = {
-                    try {
-                        val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
-                        PdfGenerator.shareViaWhatsApp(context, pdfFile)
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "WhatsApp Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    scope.launch(Dispatchers.IO) {
+                        try {
+                            val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
+                            withContext(Dispatchers.Main) {
+                                PdfGenerator.shareViaWhatsApp(context, pdfFile)
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, "WhatsApp Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
                     }
                 },
                 onShareEmail = {
-                    try {
-                        val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
-                        PdfGenerator.shareViaEmail(context, pdfFile)
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Email Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    scope.launch(Dispatchers.IO) {
+                        try {
+                            val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
+                            withContext(Dispatchers.Main) {
+                                PdfGenerator.shareViaEmail(context, pdfFile)
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, "Email Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
                     }
                 },
                 onDismiss = { activeInvoiceDetails = null }
