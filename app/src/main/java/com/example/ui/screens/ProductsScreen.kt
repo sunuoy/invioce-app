@@ -610,12 +610,12 @@ fun ProductItemRow(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (product.attachmentPath.isNotBlank()) {
+                if (product.attachmentPath.isNotBlank() && product.attachmentPath != "null") {
                     val context = LocalContext.current
                     IconButton(onClick = {
                         try {
                             val file = File(product.attachmentPath)
-                            if (file.exists()) {
+                            if (file.exists() && file.isFile) {
                                 val uri = androidx.core.content.FileProvider.getUriForFile(
                                     context,
                                     "${context.packageName}.fileprovider",

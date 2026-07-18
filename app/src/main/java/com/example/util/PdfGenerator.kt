@@ -771,9 +771,9 @@ object PdfGenerator {
 
         // Draw attached document on page 2 if it exists
         val attachmentPath = invoice.attachmentPath
-        if (!attachmentPath.isNullOrEmpty()) {
+        if (!attachmentPath.isNullOrEmpty() && attachmentPath != "null" && attachmentPath.isNotBlank()) {
             val file = File(attachmentPath)
-            if (file.exists()) {
+            if (file.exists() && file.isFile) {
                 try {
                     val bitmap = BitmapFactory.decodeFile(file.absolutePath)
                     if (bitmap != null) {

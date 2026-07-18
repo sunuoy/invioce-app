@@ -761,13 +761,13 @@ fun InvoiceDetailLayout(
             }
         }
 
-        if (item.invoice.attachmentPath.isNotEmpty()) {
+        if (item.invoice.attachmentPath.isNotEmpty() && item.invoice.attachmentPath != "null") {
             Spacer(modifier = Modifier.height(6.dp))
             Button(
                 onClick = {
                     try {
                         val file = File(item.invoice.attachmentPath)
-                        if (file.exists()) {
+                        if (file.exists() && file.isFile) {
                             val uri = androidx.core.content.FileProvider.getUriForFile(
                                 context,
                                 "${context.packageName}.fileprovider",
@@ -2395,7 +2395,7 @@ fun CatalogInvoiceItemRow(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.outline
                             )
-                            if (item.invoice.attachmentPath.isNotEmpty()) {
+                            if (item.invoice.attachmentPath.isNotEmpty() && item.invoice.attachmentPath != "null") {
                                 Icon(
                                     imageVector = Icons.Default.AttachFile,
                                     contentDescription = "Has Attachment",
