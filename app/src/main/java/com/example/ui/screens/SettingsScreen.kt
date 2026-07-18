@@ -106,6 +106,10 @@ fun SettingsScreen(
         bankAccountNo.isNotEmpty() && (!bankAccountNo.all { it.isDigit() } || bankAccountNo.length < 9 || bankAccountNo.length > 16)
     }
 
+    val isPhoneError = remember(phone) {
+        phone.isNotEmpty() && (!phone.all { it.isDigit() } || phone.length < 10 || phone.length > 13)
+    }
+
     var pendingLogoUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
     val selectImageLauncher = rememberLauncherForActivityResult(
@@ -274,6 +278,8 @@ fun SettingsScreen(
                         onClick = {
                             if (name.isBlank()) {
                                 Toast.makeText(context, "Business Name cannot be empty", Toast.LENGTH_SHORT).show()
+                            } else if (isPhoneError) {
+                                Toast.makeText(context, "Phone number must be 10 to 13 digits only", Toast.LENGTH_SHORT).show()
                             } else if (isBankNameError) {
                                 Toast.makeText(context, "Bank Name must contain text only", Toast.LENGTH_SHORT).show()
                             } else if (isBankAccountNoError) {
@@ -762,11 +768,17 @@ fun SettingsScreen(
                         value = phone,
                         onValueChange = { phone = it },
                         label = { Text("Phone") },
-                        placeholder = { Text("e.g. +91...") },
+                        placeholder = { Text("e.g. 9876543210") },
                         leadingIcon = { Icon(Icons.Default.Phone, contentDescription = "Business Contact number", modifier = Modifier.size(20.dp)) },
                         modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        singleLine = true
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        isError = isPhoneError,
+                        supportingText = {
+                            if (isPhoneError) {
+                                Text("Phone number must be 10 to 13 digits only")
+                            }
+                        }
                     )
 
                     OutlinedTextField(
@@ -1469,6 +1481,18 @@ fun SettingsScreen(
                 onClick = {
                     if (name.isBlank()) {
                         Toast.makeText(context, "Business Name cannot be empty", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    if (isPhoneError) {
+                        Toast.makeText(context, "Phone number must be 10 to 13 digits only", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    if (isBankNameError) {
+                        Toast.makeText(context, "Bank Name must contain text only", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    if (isBankAccountNoError) {
+                        Toast.makeText(context, "Bank Account number must be 9 to 16 digits only", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
                     viewModel.saveBusinessProfile(
