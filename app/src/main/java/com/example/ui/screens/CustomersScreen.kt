@@ -673,6 +673,11 @@ fun CustomerEditorDialog(
     var gstin by remember { mutableStateOf(customer?.gstin ?: "") }
     var placeOfSupply by remember { mutableStateOf(customer?.placeOfSupply ?: "") }
 
+    val context = LocalContext.current
+    val isPhoneError = remember(phone) {
+        phone.isNotEmpty() && (phone.filter { it.isDigit() }.length < 10 || phone.filter { it.isDigit() }.length > 13)
+    }
+
     val isEdit = customer != null
 
     AlertDialog(
@@ -703,9 +708,15 @@ fun CustomerEditorDialog(
                     value = phone,
                     onValueChange = { phone = it },
                     label = { Text("Phone Number") },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("client_dialog_phone")
+                    modifier = Modifier.fillMaxWidth().testTag("client_dialog_phone"),
+                    isError = isPhoneError,
+                    supportingText = {
+                        if (isPhoneError) {
+                            Text("Phone number must contain between 10 to 13 digits")
+                        }
+                    }
                 )
                 OutlinedTextField(
                     value = email,
@@ -741,7 +752,11 @@ fun CustomerEditorDialog(
         },
         confirmButton = {
             Button(onClick = {
-                onConfirm(name, companyName, phone, email, address, gstin, placeOfSupply)
+                if (isPhoneError) {
+                    Toast.makeText(context, "Phone number must contain between 10 to 13 digits", Toast.LENGTH_SHORT).show()
+                } else {
+                    onConfirm(name, companyName, phone, email, address, gstin, placeOfSupply)
+                }
             }) {
                 Text(if (isEdit) "Save Details" else "Add Directory")
             }

@@ -107,7 +107,7 @@ fun SettingsScreen(
     }
 
     val isPhoneError = remember(phone) {
-        phone.isNotEmpty() && (!phone.all { it.isDigit() } || phone.length < 10 || phone.length > 13)
+        phone.isNotEmpty() && (phone.filter { it.isDigit() }.length < 10 || phone.filter { it.isDigit() }.length > 13)
     }
 
     var pendingLogoUri by remember { mutableStateOf<android.net.Uri?>(null) }

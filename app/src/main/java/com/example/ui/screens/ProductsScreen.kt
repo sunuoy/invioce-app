@@ -434,8 +434,11 @@ fun ProductsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(filteredProducts, key = { it.id }) { item ->
+                        val sales = invoices.flatMap { it.lineItems }.filter { it.productId == item.id }.sumOf { it.quantity }
+                        val openingStock = item.stock + sales
                         ProductItemRow(
                             product = item,
+                            openingStock = openingStock,
                             lowStockThreshold = lowStockThreshold,
                             onEditClicked = { activeEditorProduct = item },
                             onDeleteClicked = {
@@ -477,6 +480,7 @@ fun ProductsScreen(
 @Composable
 fun ProductItemRow(
     product: Product,
+    openingStock: Double,
     lowStockThreshold: Float,
     onEditClicked: () -> Unit,
     onDeleteClicked: () -> Unit
@@ -580,6 +584,29 @@ fun ProductItemRow(
 
                 // Inventory stock visualization
                 StockIndicatorTracker(stockValue = product.stock, unitStr = product.unit, lowStockThreshold = lowStockThreshold)
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Opening: $openingStock ${product.unit}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Text(
+                        text = "|",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    )
+                    Text(
+                        text = "Closing: ${product.stock} ${product.unit}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isCritical) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    )
+                }
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {

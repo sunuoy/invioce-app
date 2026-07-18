@@ -298,6 +298,13 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 _uiEvents.emit(UiEvent.ShowError("Customer name cannot be blank"))
                 return@launch
             }
+            if (phone.isNotBlank()) {
+                val digitsCount = phone.filter { it.isDigit() }.length
+                if (digitsCount < 10 || digitsCount > 13) {
+                    _uiEvents.emit(UiEvent.ShowError("Phone number must contain between 10 to 13 digits"))
+                    return@launch
+                }
+            }
             val customer = Customer(
                 id = id,
                 name = name.trim(),
