@@ -78,7 +78,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     val googleDriveSyncMode: StateFlow<String> = _googleDriveSyncMode.asStateFlow()
 
     fun setGoogleDriveSyncMode(mode: String) {
-        prefs.edit().putString("gd_sync_mode", mode).apply()
+        val profileName = businessProfile.value?.businessName ?: "default"
+        prefs.edit().putString("gd_sync_mode_$profileName", mode).apply()
         _googleDriveSyncMode.value = mode
     }
 
@@ -143,6 +144,14 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             }
         }
 
+        // Synchronize googleDriveSyncMode state with the active profile
+        viewModelScope.launch {
+            repository.businessProfile.collect { profile ->
+                val profileName = profile?.businessName ?: "default"
+                _googleDriveSyncMode.value = prefs.getString("gd_sync_mode_$profileName", "auto") ?: "auto"
+            }
+        }
+
         // Auto-run Google Drive background sync when data changes and token is configured
         viewModelScope.launch {
             combine(
@@ -156,14 +165,15 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             }
             .debounce(3000)
             .collect { token ->
-                val mode = prefs.getString("gd_sync_mode", "auto") ?: "auto"
+                val profileName = businessProfile.value?.businessName ?: "default"
+                val mode = prefs.getString("gd_sync_mode_$profileName", "auto") ?: "auto"
                 if (mode == "manual") {
                     android.util.Log.d("GoogleDriveAutoSync", "Auto-backup skipped: manual mode is active.")
                     return@collect
                 }
                 if (token.isNotEmpty()) {
                     if (mode == "hourly") {
-                        val lastSync = prefs.getLong("gd_last_sync_timestamp", 0L)
+                        val lastSync = prefs.getLong("gd_last_sync_timestamp_$profileName", 0L)
                         val elapsed = System.currentTimeMillis() - lastSync
                         if (elapsed < 3600 * 1000) {
                             android.util.Log.d("GoogleDriveAutoSync", "Auto-backup skipped: hourly mode active and less than 1 hour elapsed.")

@@ -104,6 +104,33 @@ fun AppSettingsScreen(
             }
         }
     }
+
+    val createBackupFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val jsonString = BackupRestoreHelper.exportToJson(
+                    profile = businessProfile,
+                    savedProfiles = savedBusinessProfiles,
+                    products = products,
+                    customers = customers,
+                    invoices = invoices
+                )
+                context.contentResolver.openOutputStream(uri)?.use { output ->
+                    output.write(jsonString.toByteArray())
+                }
+                Toast.makeText(context, "Backup saved offline successfully!", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to save backup: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val saveBackupOffline = {
+        val dateStr = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+        createBackupFileLauncher.launch("invoice_easy_backup_$dateStr.json")
+    }
     
     // Export function
     val exportBackupData = {
@@ -166,6 +193,74 @@ fun AppSettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // 0. Active Company Profile Details Card
+            businessProfile?.let { profile ->
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth().testTag("active_company_card")
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = profile.shortIcon.takeIf { it.isNotEmpty() } ?: "💼",
+                                fontSize = 24.sp
+                            )
+                            Column {
+                                Text(
+                                    text = profile.businessName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Active Company Profile",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                        
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        )
+                        
+                        if (profile.phone.isNotBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.outline)
+                                Text(profile.phone, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        if (profile.email.isNotBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.outline)
+                                Text(profile.email, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        if (profile.gstin.isNotBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.outline)
+                                Text("GSTIN: ${profile.gstin}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                        if (profile.address.isNotBlank()) {
+                            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.outline)
+                                Text(profile.address, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
             
             // 1. Interactive Theme Preferences Section
             Card(
@@ -497,32 +592,56 @@ fun AppSettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Button(
-                            onClick = { exportBackupData() },
-                            modifier = Modifier.weight(1f).testTag("app_settings_export_btn"),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(vertical = 10.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CloudDownload,
-                                contentDescription = "Export backup",
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Export Backup", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Button(
+                                onClick = { exportBackupData() },
+                                modifier = Modifier.weight(1f).testTag("app_settings_export_btn"),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(vertical = 10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Share backup",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Share Backup", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+
+                            Button(
+                                onClick = { saveBackupOffline() },
+                                modifier = Modifier.weight(1f).testTag("app_settings_save_offline_btn"),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiary,
+                                    contentColor = MaterialTheme.colorScheme.onTertiary
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(vertical = 10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Save,
+                                    contentDescription = "Save Offline",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Save Offline", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
                         }
 
                         Button(
                             onClick = { importLauncher.launch("application/json") },
-                            modifier = Modifier.weight(1f).testTag("app_settings_import_btn"),
+                            modifier = Modifier.fillMaxWidth().testTag("app_settings_import_btn"),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer
@@ -536,7 +655,7 @@ fun AppSettingsScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                             Text("Import Restore", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Import Restore", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
