@@ -3,6 +3,8 @@ package com.example.ui.screens
 import android.widget.Toast
 import java.io.File
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -53,6 +55,83 @@ fun CustomersScreen(
     var isSelectionMode by remember { mutableStateOf(false) }
     val selectedCustomers = remember { mutableStateListOf<Customer>() }
     var showBulkDeleteConfirm by remember { mutableStateOf(false) }
+
+    val selectFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            try {
+                val csvContent = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
+                if (csvContent.isBlank()) {
+                    Toast.makeText(context, "Selected CSV file is empty", Toast.LENGTH_SHORT).show()
+                    return@rememberLauncherForActivityResult
+                }
+                
+                val lines = csvContent.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+                if (lines.size <= 1) {
+                    Toast.makeText(context, "No client records found in CSV", Toast.LENGTH_SHORT).show()
+                    return@rememberLauncherForActivityResult
+                }
+                
+                fun parseCsvLine(line: String): List<String> {
+                    val result = mutableListOf<String>()
+                    var cur = java.lang.StringBuilder()
+                    var inQuotes = false
+                    var i = 0
+                    while (i < line.length) {
+                        val ch = line[i]
+                        if (ch == '\"') {
+                            if (inQuotes && i + 1 < line.length && line[i + 1] == '\"') {
+                                cur.append('\"')
+                                i++
+                            } else {
+                                inQuotes = !inQuotes
+                            }
+                        } else if (ch == ',' && !inQuotes) {
+                            result.add(cur.toString().trim())
+                            cur = java.lang.StringBuilder()
+                        } else {
+                            cur.append(ch)
+                        }
+                        i++
+                    }
+                    result.add(cur.toString().trim())
+                    return result
+                }
+                
+                var importedCount = 0
+                for (j in 1 until lines.size) {
+                    val cols = parseCsvLine(lines[j])
+                    if (cols.size >= 2) {
+                        val name = cols[1].removeSurrounding("\"")
+                        if (name.isNotBlank()) {
+                            val companyName = if (cols.size > 2) cols[2].removeSurrounding("\"") else ""
+                            val phone = if (cols.size > 3) cols[3].removeSurrounding("\"") else ""
+                            val email = if (cols.size > 4) cols[4].removeSurrounding("\"") else ""
+                            val address = if (cols.size > 5) cols[5].removeSurrounding("\"") else ""
+                            val gstin = if (cols.size > 6) cols[6].removeSurrounding("\"") else ""
+                            val placeOfSupply = if (cols.size > 7) cols[7].removeSurrounding("\"") else ""
+                            
+                            viewModel.saveCustomer(
+                                id = 0,
+                                name = name,
+                                companyName = companyName,
+                                phone = phone,
+                                email = email,
+                                address = address,
+                                gstin = gstin,
+                                placeOfSupply = placeOfSupply
+                            )
+                            importedCount++
+                        }
+                    }
+                }
+                Toast.makeText(context, "Successfully imported $importedCount clients!", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     val filteredCustomers = remember(customers, searchQuery) {
         customers.filter {
@@ -163,6 +242,16 @@ fun CustomersScreen(
                             Icon(
                                 imageVector = Icons.Default.Share,
                                 contentDescription = "Export Clients Directory"
+                            )
+                        }
+
+                        // Import Clients from CSV
+                        IconButton(onClick = {
+                            selectFileLauncher.launch("*/*")
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.FileUpload,
+                                contentDescription = "Import Clients Directory"
                             )
                         }
 
