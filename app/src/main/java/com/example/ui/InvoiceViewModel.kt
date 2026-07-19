@@ -159,13 +159,6 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     init {
-        // Pre-populate default admin account if user accounts database is empty
-        viewModelScope.launch {
-            if (repository.getUserCount() == 0) {
-                repository.insertUserAccount(UserAccount(username = "admin", passcode = "1234", role = "Admin"))
-            }
-        }
-
         val gdEnabled = prefs.getBoolean("gd_sync_enabled", false)
         val gdToken = prefs.getString("gd_access_token", "") ?: ""
         val gdLastSync = prefs.getString("gd_last_sync_time", "Never") ?: "Never"
