@@ -110,6 +110,14 @@ data class InvoiceLineItem(
     val hsnSac: String = ""
 )
 
+@Entity(tableName = "user_accounts")
+data class UserAccount(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val username: String,
+    val passcode: String,
+    val role: String // "Admin" or "User"
+)
+
 // ------------------ RELATIONS ------------------
 
 data class InvoiceWithDetails(
@@ -244,6 +252,24 @@ interface BusinessProfileDao {
 }
 
 @Dao
+interface UserAccountDao {
+    @Query("SELECT * FROM user_accounts ORDER BY id ASC")
+    fun getAllUserAccounts(): Flow<List<UserAccount>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertUserAccount(account: UserAccount)
+
+    @Query("DELETE FROM user_accounts WHERE id = :id")
+    suspend fun deleteUserAccount(id: Int)
+
+    @Query("SELECT * FROM user_accounts WHERE username = :username LIMIT 1")
+    suspend fun getUserAccountByUsername(username: String): UserAccount?
+
+    @Query("SELECT COUNT(*) FROM user_accounts")
+    suspend fun getUserCount(): Int
+}
+
+@Dao
 interface SavedBusinessProfileDao {
     @Query("SELECT * FROM saved_business_profile ORDER BY id DESC")
     fun getAllSavedProfiles(): Flow<List<SavedBusinessProfile>>
@@ -270,9 +296,10 @@ interface SavedBusinessProfileDao {
         Product::class,
         Customer::class,
         Invoice::class,
-        InvoiceLineItem::class
+        InvoiceLineItem::class,
+        UserAccount::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class InvoiceDatabase : RoomDatabase() {
@@ -281,6 +308,7 @@ abstract class InvoiceDatabase : RoomDatabase() {
     abstract fun customerDao(): CustomerDao
     abstract fun businessProfileDao(): BusinessProfileDao
     abstract fun savedBusinessProfileDao(): SavedBusinessProfileDao
+    abstract fun userAccountDao(): UserAccountDao
 
     companion object {
         @Volatile
@@ -307,6 +335,18 @@ abstract class InvoiceDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_13_14 = object : androidx.room.migration.Migration(13, 14) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `user_accounts` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`username` TEXT NOT NULL, " +
+                    "`passcode` TEXT NOT NULL, " +
+                    "`role` TEXT NOT NULL)"
+                )
+            }
+        }
+
         fun getDatabase(context: Context): InvoiceDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -314,7 +354,7 @@ abstract class InvoiceDatabase : RoomDatabase() {
                     InvoiceDatabase::class.java,
                     "invoice_database"
                 )
-                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

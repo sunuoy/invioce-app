@@ -22,8 +22,44 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         database.productDao(),
         database.customerDao(),
         database.businessProfileDao(),
-        database.savedBusinessProfileDao()
+        database.savedBusinessProfileDao(),
+        database.userAccountDao()
     )
+
+    val allUserAccounts: StateFlow<List<UserAccount>> = repository.allUserAccounts
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _currentUser = MutableStateFlow<UserAccount?>(null)
+    val currentUser: StateFlow<UserAccount?> = _currentUser.asStateFlow()
+
+    fun loginUser(username: String, passcode: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val account = repository.getUserAccountByUsername(username)
+            if (account != null && account.passcode == passcode) {
+                _currentUser.value = account
+                onResult(true)
+            } else {
+                onResult(false)
+            }
+        }
+    }
+
+    fun logout() {
+        _currentUser.value = null
+    }
+
+    fun createUserAccount(username: String, passcode: String, role: String) {
+        viewModelScope.launch {
+            val newAccount = UserAccount(username = username, passcode = passcode, role = role)
+            repository.insertUserAccount(newAccount)
+        }
+    }
+
+    fun deleteUserAccount(id: Int) {
+        viewModelScope.launch {
+            repository.deleteUserAccount(id)
+        }
+    }
 
     private val prefs = application.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE)
 
@@ -123,6 +159,13 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     init {
+        // Pre-populate default admin account if user accounts database is empty
+        viewModelScope.launch {
+            if (repository.getUserCount() == 0) {
+                repository.insertUserAccount(UserAccount(username = "admin", passcode = "1234", role = "Admin"))
+            }
+        }
+
         val gdEnabled = prefs.getBoolean("gd_sync_enabled", false)
         val gdToken = prefs.getString("gd_access_token", "") ?: ""
         val gdLastSync = prefs.getString("gd_last_sync_time", "Never") ?: "Never"

@@ -7,8 +7,16 @@ class InvoiceRepository(
     private val productDao: ProductDao,
     private val customerDao: CustomerDao,
     private val businessProfileDao: BusinessProfileDao,
-    private val savedBusinessProfileDao: SavedBusinessProfileDao
+    private val savedBusinessProfileDao: SavedBusinessProfileDao,
+    private val userAccountDao: UserAccountDao
 ) {
+    // ------------------ USER ACCOUNTS ------------------
+    val allUserAccounts: Flow<List<UserAccount>> = userAccountDao.getAllUserAccounts()
+    suspend fun insertUserAccount(account: UserAccount) = userAccountDao.insertUserAccount(account)
+    suspend fun deleteUserAccount(id: Int) = userAccountDao.deleteUserAccount(id)
+    suspend fun getUserAccountByUsername(username: String): UserAccount? = userAccountDao.getUserAccountByUsername(username)
+    suspend fun getUserCount(): Int = userAccountDao.getUserCount()
+
     // ------------------ PRODUCTS ------------------
     val allProducts: Flow<List<Product>> = productDao.getAllProducts()
     
