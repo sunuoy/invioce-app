@@ -77,6 +77,9 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     private val _googleDriveSyncMode = MutableStateFlow(prefs.getString("gd_sync_mode", "auto") ?: "auto")
     val googleDriveSyncMode: StateFlow<String> = _googleDriveSyncMode.asStateFlow()
 
+    private val _googleDriveAccountEmail = MutableStateFlow(prefs.getString("gd_account_email", "") ?: "")
+    val googleDriveAccountEmail: StateFlow<String> = _googleDriveAccountEmail.asStateFlow()
+
     fun setGoogleDriveSyncMode(mode: String) {
         val profileName = businessProfile.value?.businessName ?: "default"
         prefs.edit().putString("gd_sync_mode_$profileName", mode).apply()
@@ -780,6 +783,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     fun disableGoogleDriveSync() {
         _googleDriveSyncEnabled.value = false
         _googleDriveAccessToken.value = ""
+        _googleDriveAccountEmail.value = ""
         prefs.edit()
             .putBoolean("gd_sync_enabled", false)
             .remove("gd_access_token")
@@ -906,6 +910,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         
         // Persistently save the email for auto-reauthentication on app launch
         prefs.edit().putString("gd_account_email", email).apply()
+        _googleDriveAccountEmail.value = email
         
         val accountManager = android.accounts.AccountManager.get(context)
         val matchingAccount = android.accounts.Account(email, "com.google")

@@ -68,6 +68,7 @@ fun SettingsScreen(
     val gdLastSyncTime by viewModel.googleDriveLastSyncTime.collectAsStateWithLifecycle()
     val gdSyncing by viewModel.isGoogleDriveSyncing.collectAsStateWithLifecycle()
     val gdSyncMode by viewModel.googleDriveSyncMode.collectAsStateWithLifecycle()
+    val gdAccountEmail by viewModel.googleDriveAccountEmail.collectAsStateWithLifecycle()
 
     val googleAccountPickerLauncherForDrive = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -794,6 +795,17 @@ fun SettingsScreen(
                         singleLine = true
                     )
 
+                    OutlinedTextField(
+                        value = gmailId,
+                        onValueChange = { gmailId = it },
+                        label = { Text("Backup Gmail ID") },
+                        placeholder = { Text("e.g. business@gmail.com") },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = "Backup Gmail ID", modifier = Modifier.size(20.dp)) },
+                        modifier = Modifier.fillMaxWidth().testTag("setting_biz_gmail_input"),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Email),
+                        singleLine = true
+                    )
+
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                     OutlinedTextField(
@@ -1371,7 +1383,9 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Status: ${if (gdAccessToken.isNotEmpty()) "Connected (Auto-sync Active)" else "Disconnected"}",
+                            text = if (gdAccessToken.isNotEmpty()) {
+                                if (gdAccountEmail.isNotEmpty()) "Status: Connected to $gdAccountEmail" else "Status: Connected (Auto-sync Active)"
+                            } else "Status: Disconnected",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
                             color = if (gdAccessToken.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
@@ -1982,4 +1996,130 @@ fun SignatureDrawingDialog(
             }
         }
     )
+}
+
+@Composable
+fun ThemeMiniPreview(themeName: String) {
+    val primaryColor = when(themeName) {
+        "Classic Navy" -> Color(0xFF1E3A8A)
+        "Forest Green" -> Color(0xFF065F46)
+        "Burgundy" -> Color(0xFF881337)
+        "Burnt sienna" -> Color(0xFFE35336)
+        "Modern Minimalist" -> Color(0xFF0F172A)
+        "Royal Violet" -> Color(0xFF4C1D95)
+        else -> Color(0xFF1E3A8A)
+    }
+    val secondaryColor = when(themeName) {
+        "Classic Navy" -> Color(0xFF2563EB)
+        "Forest Green" -> Color(0xFF10B981)
+        "Burgundy" -> Color(0xFFE11D48)
+        "Burnt sienna" -> Color(0xFFF4A460)
+        "Modern Minimalist" -> Color(0xFF64748B)
+        "Royal Violet" -> Color(0xFFA78BFA)
+        else -> Color(0xFF2563EB)
+    }
+    val themeBg = when(themeName) {
+        "Classic Navy" -> Color(0xFFF1F5F9)
+        "Forest Green" -> Color(0xFFF0FDF4)
+        "Burgundy" -> Color(0xFFFFF1F2)
+        "Burnt sienna" -> Color(0xFFF5F5DC)
+        "Modern Minimalist" -> Color(0xFFF1F5F9)
+        "Royal Violet" -> Color(0xFFF5F3FF)
+        else -> Color(0xFFF1F5F9)
+    }
+    val dividerColor = when(themeName) {
+        "Classic Navy" -> Color(0xFF94A3B8)
+        "Forest Green" -> Color(0xFF059669)
+        "Burgundy" -> Color(0xFFFDA4AF)
+        "Burnt sienna" -> Color(0xFFA0522D)
+        "Modern Minimalist" -> Color(0xFFCBD5E1)
+        "Royal Violet" -> Color(0xFF7C3AED)
+        else -> Color(0xFF94A3B8)
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, dividerColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Mini Header Bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(14.dp)
+                    .background(primaryColor, RoundedCornerShape(4.dp))
+            )
+            
+            // Sender & Receiver block
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(modifier = Modifier.width(60.dp).height(8.dp).background(secondaryColor.copy(alpha = 0.7f), RoundedCornerShape(2.dp)))
+                    Box(modifier = Modifier.width(80.dp).height(6.dp).background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.dp)))
+                }
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(modifier = Modifier.width(40.dp).height(8.dp).background(secondaryColor.copy(alpha = 0.7f), RoundedCornerShape(2.dp)))
+                    Box(modifier = Modifier.width(50.dp).height(6.dp).background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.dp)))
+                }
+            }
+            
+            // Table Mock
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(0.5.dp, dividerColor.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+            ) {
+                // Table header
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(12.dp)
+                        .background(primaryColor)
+                )
+                // Row 1
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(12.dp)
+                        .background(themeBg)
+                )
+                // Row 2
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(12.dp)
+                        .background(MaterialTheme.colorScheme.surface)
+                )
+            }
+            
+            // Grand Total Mock
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Row(
+                    modifier = Modifier
+                        .width(100.dp)
+                        .height(14.dp)
+                        .background(themeBg, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.width(20.dp).height(6.dp).background(primaryColor.copy(alpha = 0.7f), RoundedCornerShape(1.dp)))
+                    Box(modifier = Modifier.width(30.dp).height(6.dp).background(primaryColor, RoundedCornerShape(1.dp)))
+                }
+            }
+        }
+    }
 }

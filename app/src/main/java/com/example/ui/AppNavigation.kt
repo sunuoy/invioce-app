@@ -1,6 +1,7 @@
 package com.example.ui
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -13,6 +14,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.background
 import com.example.ui.screens.*
@@ -166,7 +168,42 @@ fun MainAppNavigation(
                             NavigationBarItem(
                                 selected = currentTab == tab,
                                 onClick = { currentTab = tab },
-                                icon = { Icon(tab.icon, contentDescription = tab.title) },
+                                icon = {
+                                    val iconScale by animateFloatAsState(
+                                        targetValue = if (currentTab == tab) 1.25f else 1.0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioHighBouncy,
+                                            stiffness = Spring.StiffnessLow
+                                        ),
+                                        label = "nav_icon_scale"
+                                    )
+                                    val iconTranslationY by animateFloatAsState(
+                                        targetValue = if (currentTab == tab) -6f else 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioHighBouncy,
+                                            stiffness = Spring.StiffnessLow
+                                        ),
+                                        label = "nav_icon_translation_y"
+                                    )
+                                    val iconRotation by animateFloatAsState(
+                                        targetValue = if (currentTab == tab) 360f else 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessLow
+                                        ),
+                                        label = "nav_icon_rotation"
+                                    )
+                                    Icon(
+                                        imageVector = tab.icon,
+                                        contentDescription = tab.title,
+                                        modifier = Modifier.graphicsLayer {
+                                            scaleX = iconScale
+                                            scaleY = iconScale
+                                            translationY = iconTranslationY * density
+                                            rotationZ = iconRotation
+                                        }
+                                    )
+                                },
                                 label = { Text(tab.title) },
                                 modifier = Modifier.testTag(tab.tag)
                             )

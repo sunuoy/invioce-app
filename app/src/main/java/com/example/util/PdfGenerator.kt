@@ -128,33 +128,31 @@ object PdfGenerator {
         val primaryColorHex = when (selectedTheme) {
             "Forest Green" -> "#065F46"
             "Burgundy" -> "#881337"
-            "Charcoal" -> "#1E293B"
-            "Sunset Indigo" -> "#4338CA"
             "Burnt sienna" -> "#E35336"
-            "Blooming romance" -> "#660033"
+            "Modern Minimalist" -> "#0F172A"
+            "Royal Violet" -> "#4C1D95"
             else -> "#1E3A8A" // "Classic Navy"
         }
         val secondaryColorHex = when (selectedTheme) {
             "Forest Green" -> "#10B981"
             "Burgundy" -> "#E11D48"
-            "Charcoal" -> "#64748B"
-            "Sunset Indigo" -> "#6366F1"
             "Burnt sienna" -> "#F4A460"
-            "Blooming romance" -> "#469110"
+            "Modern Minimalist" -> "#64748B"
+            "Royal Violet" -> "#A78BFA"
             else -> "#2563EB" // "Classic Navy"
         }
         val themeBgHex = when (selectedTheme) {
             "Forest Green" -> "#F0FDF4"
             "Burgundy" -> "#FFF1F2"
-            "Charcoal" -> "#F8FAFC"
-            "Sunset Indigo" -> "#EEF2FF"
             "Burnt sienna" -> "#F5F5DC"
-            "Blooming romance" -> "#E673AC"
+            "Modern Minimalist" -> "#F1F5F9"
+            "Royal Violet" -> "#F5F3FF"
             else -> "#F1F5F9"
         }
         val dividerColorHex = when (selectedTheme) {
             "Burnt sienna" -> "#A0522D"
-            "Blooming romance" -> "#00520A"
+            "Modern Minimalist" -> "#CBD5E1"
+            "Royal Violet" -> "#7C3AED"
             else -> "#94A3B8"
         }
 
