@@ -56,6 +56,19 @@ fun AuthScreen(
     var isPasswordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) {
+        viewModel.uiEvents.collect { event ->
+            when (event) {
+                is InvoiceViewModel.UiEvent.ShowSuccess -> {
+                    Toast.makeText(context, event.msg, Toast.LENGTH_LONG).show()
+                }
+                is InvoiceViewModel.UiEvent.ShowError -> {
+                    Toast.makeText(context, event.msg, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     // Aesthetic color definitions
     val gradientColors = listOf(
         Color(0xFF0F172A), // Slate 900
@@ -252,17 +265,22 @@ fun AuthScreen(
                     }
 
                     scope.launch {
-                        val success = if (isSignUpMode) {
-                            viewModel.registerUser(email.trim(), password)
-                        } else {
-                            viewModel.loginUser(email.trim(), password)
-                        }
+                        isLoading = true
+                        try {
+                            val success = if (isSignUpMode) {
+                                viewModel.registerUser(email.trim(), password)
+                            } else {
+                                viewModel.loginUser(email.trim(), password)
+                            }
 
-                        if (success) {
-                            authPrefs.edit()
-                                .putBoolean("remember_me", rememberMe)
-                                .putString("saved_email", if (rememberMe) email.trim() else "")
-                                .apply()
+                            if (success) {
+                                authPrefs.edit()
+                                    .putBoolean("remember_me", rememberMe)
+                                    .putString("saved_email", if (rememberMe) email.trim() else "")
+                                    .apply()
+                            }
+                        } finally {
+                            isLoading = false
                         }
                     }
                 },
