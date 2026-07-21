@@ -57,7 +57,6 @@ fun ProductsScreen(
     val products by viewModel.products.collectAsStateWithLifecycle()
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
     val lowStockThreshold by viewModel.lowStockThreshold.collectAsStateWithLifecycle()
-    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
 
     var searchQuery by remember { mutableStateOf("") }
     var activeEditorProduct by remember { mutableStateOf<Product?>(null) }
@@ -571,7 +570,6 @@ fun ProductsScreen(
                             product = item,
                             openingStock = openingStock,
                             lowStockThreshold = lowStockThreshold,
-                            isAdmin = currentUser?.role == "Admin",
                             onEditClicked = { activeEditorProduct = item },
                             onDeleteClicked = {
                                 viewModel.deleteProduct(item)
@@ -749,7 +747,6 @@ fun ProductItemRow(
     product: Product,
     openingStock: Double,
     lowStockThreshold: Float,
-    isAdmin: Boolean = true,
     onEditClicked: () -> Unit,
     onDeleteClicked: () -> Unit,
     onHistoryClicked: () -> Unit
@@ -933,14 +930,12 @@ fun ProductItemRow(
                         tint = MaterialTheme.colorScheme.outline
                     )
                 }
-                if (isAdmin) {
-                    IconButton(onClick = onDeleteClicked) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete product",
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
+                IconButton(onClick = onDeleteClicked) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete product",
+                        tint = MaterialTheme.colorScheme.error
+                    )
                 }
             }
         }

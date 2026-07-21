@@ -64,7 +64,6 @@ fun InvoicesScreen(
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
     val profile by viewModel.businessProfile.collectAsStateWithLifecycle()
     val clients by viewModel.customers.collectAsStateWithLifecycle()
-    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
 
     var selectedFilter by remember { mutableStateOf("All") }
     var searchQuery by remember { mutableStateOf("") }
@@ -194,14 +193,12 @@ fun InvoicesScreen(
                             }
                         },
                         actions = {
-                            if (currentUser?.role == "Admin") {
-                                // Enable bulk deletion modes
-                                IconButton(onClick = {
-                                    isSelectionMode = true
-                                    selectedInvoices.clear()
-                                }, modifier = Modifier.testTag("enter_bulk_select_invoices")) {
-                                    Icon(Icons.Default.List, contentDescription = "Enable Bulk Delete selection")
-                                }
+                            // Enable bulk deletion modes
+                            IconButton(onClick = {
+                                isSelectionMode = true
+                                selectedInvoices.clear()
+                            }, modifier = Modifier.testTag("enter_bulk_select_invoices")) {
+                                Icon(Icons.Default.List, contentDescription = "Enable Bulk Delete selection")
                             }
 
                              IconButton(
@@ -648,6 +645,7 @@ fun InvoicesScreen(
         )
     }
 
+    // Invoice Detail Sheet Dialog
     activeInvoiceDetails?.let { billing ->
         ModalBottomSheet(
             onDismissRequest = { activeInvoiceDetails = null },
@@ -656,7 +654,6 @@ fun InvoicesScreen(
             InvoiceDetailLayout(
                 item = billing,
                 businessProfile = profile,
-                isAdmin = currentUser?.role == "Admin",
                 onUpdateStatus = { st ->
                     if (st == "Paid") {
                         showPaidDetailsDialogForInvoice = billing
@@ -781,7 +778,6 @@ fun InvoicesScreen(
 fun InvoiceDetailLayout(
     item: InvoiceWithDetails,
     businessProfile: BusinessProfile?,
-    isAdmin: Boolean = true,
     onUpdateStatus: (String) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -923,19 +919,17 @@ fun InvoiceDetailLayout(
                 }
             }
 
-            if (isAdmin) {
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.errorContainer)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = MaterialTheme.colorScheme.onErrorContainer
-                    )
-                }
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
             }
         }
 

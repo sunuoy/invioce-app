@@ -46,7 +46,6 @@ fun CustomersScreen(
 ) {
     val context = LocalContext.current
     val customers by viewModel.customers.collectAsStateWithLifecycle()
-    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
 
     var searchQuery by remember { mutableStateOf("") }
     var showAddDialog by remember { mutableStateOf(false) }
@@ -259,13 +258,11 @@ fun CustomersScreen(
                         }
 
                         // Enter bulk select manually
-                        if (currentUser?.role == "Admin") {
-                            IconButton(onClick = {
-                                isSelectionMode = true
-                                selectedCustomers.clear()
-                            }, modifier = Modifier.testTag("enter_bulk_select_clients")) {
-                                Icon(Icons.Default.Checklist, contentDescription = "Enable Bulk Delete")
-                            }
+                        IconButton(onClick = {
+                            isSelectionMode = true
+                            selectedCustomers.clear()
+                        }, modifier = Modifier.testTag("enter_bulk_select_clients")) {
+                            Icon(Icons.Default.Checklist, contentDescription = "Enable Bulk Delete")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -392,7 +389,6 @@ fun CustomersScreen(
                             customer = item,
                             isSelectionMode = isSelectionMode,
                             isSelected = isSelected,
-                            isAdmin = currentUser?.role == "Admin",
                             onSelectedChange = { selected ->
                                 if (selected) {
                                     if (!selectedCustomers.contains(item)) selectedCustomers.add(item)
@@ -472,7 +468,6 @@ fun CustomerItemCard(
     customer: Customer,
     isSelectionMode: Boolean,
     isSelected: Boolean,
-    isAdmin: Boolean = true,
     onSelectedChange: (Boolean) -> Unit,
     onEditClicked: () -> Unit,
     onDeleteClicked: () -> Unit,
@@ -683,14 +678,12 @@ fun CustomerItemCard(
                             tint = MaterialTheme.colorScheme.outline
                         )
                     }
-                    if (isAdmin) {
-                        IconButton(onClick = onDeleteClicked) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Delete client",
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
+                    IconButton(onClick = onDeleteClicked) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete client",
+                            tint = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }
