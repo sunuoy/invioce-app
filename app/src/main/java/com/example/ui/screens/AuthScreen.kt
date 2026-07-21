@@ -172,20 +172,21 @@ fun AuthScreen(
             )
 
             if (!isSignUpMode) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Box(
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.CenterEnd
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text(
-                        text = "Forgot Password?",
-                        color = neonPink,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
-                        modifier = Modifier.clickable {
-                            showForgotPasswordDialog = true
-                        }
-                    )
+                    TextButton(
+                        onClick = { showForgotPasswordDialog = true },
+                        contentPadding = PaddingValues(vertical = 4.dp, horizontal = 0.dp)
+                    ) {
+                        Text(
+                            text = "Forgot Password?",
+                            color = neonPink,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
             }
 
