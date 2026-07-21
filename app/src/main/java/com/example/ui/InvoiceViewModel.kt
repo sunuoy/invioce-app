@@ -1156,15 +1156,22 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         if (SupabaseClientManager.isConfigured()) {
             val res = SupabaseClientManager.signUpUser(getApplication(), email, password)
             if (res.isSuccess) {
-                prefs.edit()
-                    .putString("reg_pwd_$email", password)
-                    .putBoolean("is_logged_in", true)
-                    .putString("user_email", email)
-                    .apply()
-                _isUserLoggedIn.value = true
-                _userEmail.value = email
-                _uiEvents.emit(UiEvent.ShowSuccess("Account created in Supabase successfully!"))
-                return true
+                val status = res.getOrNull()
+                prefs.edit().putString("reg_pwd_$email", password).apply()
+
+                if (status == "CONFIRMATION_REQUIRED") {
+                    _uiEvents.emit(UiEvent.ShowSuccess("Registration successful! Please check your email inbox to confirm your account."))
+                    return false // Keep on auth screen so they can sign in after email confirmation
+                } else {
+                    prefs.edit()
+                        .putBoolean("is_logged_in", true)
+                        .putString("user_email", email)
+                        .apply()
+                    _isUserLoggedIn.value = true
+                    _userEmail.value = email
+                    _uiEvents.emit(UiEvent.ShowSuccess("Account created in Supabase successfully!"))
+                    return true
+                }
             } else {
                 _uiEvents.emit(UiEvent.ShowError(res.exceptionOrNull()?.message ?: "Supabase signup failed"))
                 return false

@@ -84,8 +84,10 @@ object SupabaseClientManager {
 
                 if (token.isNotEmpty()) {
                     saveSession(context, token, uid)
+                    Result.success("LOGGED_IN")
+                } else {
+                    Result.success("CONFIRMATION_REQUIRED")
                 }
-                Result.success(uid.ifEmpty { "User registered successfully" })
             } else {
                 val errorMsg = try {
                     JSONObject(responseBody).optString("msg", JSONObject(responseBody).optString("error_description", "Sign up failed"))
