@@ -42,7 +42,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,8 +62,6 @@ fun SettingsScreen(
     val customers by viewModel.customers.collectAsStateWithLifecycle()
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
     val savedProfiles by viewModel.savedBusinessProfiles.collectAsStateWithLifecycle()
-    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
-    val userAccounts by viewModel.allUserAccounts.collectAsStateWithLifecycle()
 
     // Google Drive States
     val gdAccessToken by viewModel.googleDriveAccessToken.collectAsStateWithLifecycle()
@@ -72,6 +69,7 @@ fun SettingsScreen(
     val gdSyncing by viewModel.isGoogleDriveSyncing.collectAsStateWithLifecycle()
     val gdSyncMode by viewModel.googleDriveSyncMode.collectAsStateWithLifecycle()
     val gdAccountEmail by viewModel.googleDriveAccountEmail.collectAsStateWithLifecycle()
+    val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
 
     val googleAccountPickerLauncherForDrive = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -381,84 +379,12 @@ fun SettingsScreen(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // User Session Profile Card
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                        .floating3D(rotationX = 2.5f, rotationY = -3f),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)),
-                    elevation = CardDefaults.cardElevation(2.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            val avatarChar = currentUser?.username?.firstOrNull()?.uppercase() ?: "?"
-                            val avatarBgColor = if (currentUser?.role == "Admin") Color(0xFF6366F1) else Color(0xFF0D9488)
-                            Box(
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .background(avatarBgColor, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = avatarChar,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                            }
-
-                            Column {
-                                Text(
-                                    text = currentUser?.username ?: "Guest User",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = if (currentUser?.role == "Admin") Color(0xFF6366F1).copy(alpha = 0.15f) else Color(0xFF0D9488).copy(alpha = 0.15f),
-                                    contentColor = if (currentUser?.role == "Admin") Color(0xFF6366F1) else Color(0xFF0D9488)
-                                ) {
-                                    Text(
-                                        text = currentUser?.role ?: "User",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        Button(
-                            onClick = { viewModel.logout() },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                            modifier = Modifier.testTag("logout_button")
-                        ) {
-                            Icon(Icons.Default.ExitToApp, contentDescription = "Logout icon", modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Logout", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
-                if (currentUser?.role == "Admin") {
-                    // Visual Banner introduction Card
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                            .floating3D(rotationX = 2.5f, rotationY = -3f)
+            // Visual Banner introduction Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .floating3D(rotationX = 2.5f, rotationY = -3f)
                     .drawBehind {
                         drawCircle(
                             color = Color(0xFF3B82F6).copy(alpha = 0.05f),
@@ -1399,6 +1325,72 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Active Session & Authentication Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .floating3D(rotationX = 2.5f, rotationY = -3f),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                elevation = CardDefaults.cardElevation(4.dp),
+                border = BorderStroke(
+                    1.dp,
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.4f),
+                            Color.White.copy(alpha = 0.05f),
+                            Color.Black.copy(alpha = 0.15f)
+                        )
+                    )
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "Active user profile",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Text(
+                            text = "Account Profile",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Text(
+                        text = "You are currently signed in as $userEmail.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Button(
+                        onClick = { viewModel.logoutUser() },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(42.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ExitToApp,
+                            contentDescription = "Sign Out",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Sign Out of App", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Google Drive Cloud Sync & Backup Card
             Card(
                 modifier = Modifier
@@ -1655,183 +1647,6 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Save Configuration Profile", fontSize = 15.sp)
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .floating3D(rotationX = 2.5f, rotationY = -3f)
-                    .testTag("admin_user_management_card"),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-                elevation = CardDefaults.cardElevation(4.dp),
-                border = BorderStroke(
-                    1.dp,
-                    Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.4f),
-                            Color.White.copy(alpha = 0.05f),
-                            Color.Black.copy(alpha = 0.15f)
-                        )
-                    )
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.People,
-                            contentDescription = "User Accounts Management",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Text(
-                            text = "User Accounts Management",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    Text(
-                        text = "Create and manage passcode-protected accounts for this device. Users are restricted from administrative controls and deletion capabilities.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    // Form to add a user
-                    var newUsername by remember { mutableStateOf("") }
-                    var newPasscode by remember { mutableStateOf("") }
-                    var newRole by remember { mutableStateOf("User") } // Default to "User"
-
-                    OutlinedTextField(
-                        value = newUsername,
-                        onValueChange = { newUsername = it },
-                        label = { Text("Username") },
-                        placeholder = { Text("e.g. billing_staff") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().testTag("new_username_input")
-                    )
-
-                    OutlinedTextField(
-                        value = newPasscode,
-                        onValueChange = { newPasscode = it },
-                        label = { Text("Passcode") },
-                        placeholder = { Text("e.g. 5678") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                        modifier = Modifier.fillMaxWidth().testTag("new_passcode_input")
-                    )
-
-                    // Role Selection Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Select Role: ", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                        listOf("Admin", "User").forEach { roleOption ->
-                            val isSelected = newRole == roleOption
-                            InputChip(
-                                selected = isSelected,
-                                onClick = { newRole = roleOption },
-                                label = { Text(roleOption) }
-                            )
-                        }
-                    }
-
-                    Button(
-                        onClick = {
-                            if (newUsername.isBlank() || newPasscode.isBlank()) {
-                                Toast.makeText(context, "Username and Passcode are required!", Toast.LENGTH_SHORT).show()
-                            } else if (userAccounts.any { it.username.equals(newUsername.trim(), ignoreCase = true) }) {
-                                Toast.makeText(context, "Username already exists!", Toast.LENGTH_SHORT).show()
-                            } else {
-                                viewModel.createUserAccount(newUsername.trim(), newPasscode.trim(), newRole)
-                                newUsername = ""
-                                newPasscode = ""
-                                Toast.makeText(context, "Account successfully created!", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(38.dp).testTag("create_account_btn")
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Create User Account", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-                    Text(
-                        text = "Registered Accounts (${userAccounts.size})",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        userAccounts.forEach { account ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                                    .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                    .padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .background(if (account.role == "Admin") Color(0xFF6366F1) else Color(0xFF0D9488), CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = (account.username.firstOrNull()?.uppercase() ?: "?"),
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White,
-                                            fontSize = 11.sp
-                                        )
-                                    }
-                                    Column {
-                                        Text(account.username, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                                        Text("Role: ${account.role}", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
-                                    }
-                                }
-
-                                // Do not allow deleting themselves
-                                if (currentUser?.id != account.id) {
-                                    IconButton(
-                                        onClick = {
-                                            viewModel.deleteUserAccount(account.id)
-                                            Toast.makeText(context, "Account deleted!", Toast.LENGTH_SHORT).show()
-                                        },
-                                        modifier = Modifier.size(24.dp).testTag("delete_account_btn_${account.username}")
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Delete account",
-                                            tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
 
             if (showSignatureDrawingDialog) {
                 SignatureDrawingDialog(

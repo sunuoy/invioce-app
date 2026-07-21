@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,7 +49,13 @@ class MainActivity : ComponentActivity() {
       MyApplicationTheme(darkTheme = isDarkTheme) {
         Surface(modifier = Modifier.fillMaxSize()) {
           val invoiceViewModel: InvoiceViewModel = viewModel()
-          MainAppNavigation(viewModel = invoiceViewModel)
+          val isLoggedIn by invoiceViewModel.isUserLoggedIn.collectAsState(initial = false)
+          
+          if (isLoggedIn) {
+            MainAppNavigation(viewModel = invoiceViewModel)
+          } else {
+            com.example.ui.screens.AuthScreen(viewModel = invoiceViewModel)
+          }
         }
       }
     }

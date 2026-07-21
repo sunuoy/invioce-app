@@ -22,44 +22,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         database.productDao(),
         database.customerDao(),
         database.businessProfileDao(),
-        database.savedBusinessProfileDao(),
-        database.userAccountDao()
+        database.savedBusinessProfileDao()
     )
-
-    val allUserAccounts: StateFlow<List<UserAccount>> = repository.allUserAccounts
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    private val _currentUser = MutableStateFlow<UserAccount?>(null)
-    val currentUser: StateFlow<UserAccount?> = _currentUser.asStateFlow()
-
-    fun loginUser(username: String, passcode: String, onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            val account = repository.getUserAccountByUsername(username)
-            if (account != null && account.passcode == passcode) {
-                _currentUser.value = account
-                onResult(true)
-            } else {
-                onResult(false)
-            }
-        }
-    }
-
-    fun logout() {
-        _currentUser.value = null
-    }
-
-    fun createUserAccount(username: String, passcode: String, role: String) {
-        viewModelScope.launch {
-            val newAccount = UserAccount(username = username, passcode = passcode, role = role)
-            repository.insertUserAccount(newAccount)
-        }
-    }
-
-    fun deleteUserAccount(id: Int) {
-        viewModelScope.launch {
-            repository.deleteUserAccount(id)
-        }
-    }
 
     private val prefs = application.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE)
 
@@ -1141,6 +1105,68 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             redirects++
         }
         return connection
+    }
+
+    // User Authentication States
+    private val _isUserLoggedIn = MutableStateFlow(prefs.getBoolean("is_logged_in", false))
+    val isUserLoggedIn: StateFlow<Boolean> = _isUserLoggedIn.asStateFlow()
+
+    private val _userEmail = MutableStateFlow(prefs.getString("user_email", "") ?: "")
+    val userEmail: StateFlow<String> = _userEmail.asStateFlow()
+
+    fun loginUser(email: String, password: String): Boolean {
+        val registeredPassword = prefs.getString("reg_pwd_$email", null)
+        return if (registeredPassword != null && registeredPassword == password) {
+            prefs.edit()
+                .putBoolean("is_logged_in", true)
+                .putString("user_email", email)
+                .apply()
+            _isUserLoggedIn.value = true
+            _userEmail.value = email
+            viewModelScope.launch {
+                _uiEvents.emit(UiEvent.ShowSuccess("Welcome back, $email!"))
+            }
+            true
+        } else {
+            viewModelScope.launch {
+                _uiEvents.emit(UiEvent.ShowError("Invalid email or password"))
+            }
+            false
+        }
+    }
+
+    fun registerUser(email: String, password: String): Boolean {
+        val existing = prefs.getString("reg_pwd_$email", null)
+        return if (existing != null) {
+            viewModelScope.launch {
+                _uiEvents.emit(UiEvent.ShowError("User already exists with this email"))
+            }
+            false
+        } else {
+            prefs.edit()
+                .putString("reg_pwd_$email", password)
+                .putBoolean("is_logged_in", true)
+                .putString("user_email", email)
+                .apply()
+            _isUserLoggedIn.value = true
+            _userEmail.value = email
+            viewModelScope.launch {
+                _uiEvents.emit(UiEvent.ShowSuccess("Account created successfully!"))
+            }
+            true
+        }
+    }
+
+    fun logoutUser() {
+        prefs.edit()
+            .putBoolean("is_logged_in", false)
+            .putString("user_email", "")
+            .apply()
+        _isUserLoggedIn.value = false
+        _userEmail.value = ""
+        viewModelScope.launch {
+            _uiEvents.emit(UiEvent.ShowSuccess("Logged out successfully"))
+        }
     }
 
     sealed interface UiEvent {
