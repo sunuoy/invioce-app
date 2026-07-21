@@ -177,7 +177,11 @@ fun AppSettingsScreen(
                         Icon(Icons.Default.Menu, contentDescription = "Open navigation menu")
                     }
                 },
-
+                actions = {
+                    IconButton(onClick = { viewModel.logoutUser() }) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out", tint = MaterialTheme.colorScheme.error)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )

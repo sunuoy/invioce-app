@@ -145,6 +145,20 @@ fun MainAppNavigation(
                         .padding(NavigationDrawerItemDefaults.ItemPadding)
                         .testTag("drawer_settings_item")
                 )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out", tint = MaterialTheme.colorScheme.error) },
+                    label = { Text("Sign Out", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        viewModel.logoutUser()
+                    },
+                    modifier = Modifier
+                        .padding(NavigationDrawerItemDefaults.ItemPadding)
+                        .testTag("drawer_logout_item")
+                )
                 Spacer(modifier = Modifier.height(12.dp))
             }
         },
