@@ -321,12 +321,12 @@ fun AuthScreen(
                     newPasswordState = ""
                 },
                 title = {
-                    Text("Reset Password", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Forgot Password", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            "Enter your registered business email address and a new password to reset your credentials.",
+                            "Enter your registered business email address to receive a secure password reset link in your email inbox.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -341,40 +341,25 @@ fun AuthScreen(
                             ),
                             modifier = Modifier.fillMaxWidth()
                         )
-                        OutlinedTextField(
-                            value = newPasswordState,
-                            onValueChange = { newPasswordState = it },
-                            label = { Text("New Password") },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
                     }
                 },
                 confirmButton = {
                     Button(
                         onClick = {
-                            if (forgotEmail.isBlank() || newPasswordState.isBlank()) {
-                                Toast.makeText(context, "All fields are required", Toast.LENGTH_SHORT).show()
+                            if (forgotEmail.isBlank()) {
+                                Toast.makeText(context, "Please enter your registered email", Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
-                            val prefs = context.getSharedPreferences("invoice_generator_prefs", android.content.Context.MODE_PRIVATE)
-                            val existing = prefs.getString("reg_pwd_${forgotEmail.trim()}", null)
-                            if (existing == null) {
-                                Toast.makeText(context, "Email is not registered", Toast.LENGTH_SHORT).show()
-                            } else {
-                                prefs.edit().putString("reg_pwd_${forgotEmail.trim()}", newPasswordState).apply()
-                                Toast.makeText(context, "Password updated successfully!", Toast.LENGTH_SHORT).show()
-                                showForgotPasswordDialog = false
-                                forgotEmail = ""
-                                newPasswordState = ""
+                            scope.launch {
+                                val success = viewModel.sendPasswordResetEmail(forgotEmail.trim())
+                                if (success) {
+                                    showForgotPasswordDialog = false
+                                    forgotEmail = ""
+                                }
                             }
                         }
                     ) {
-                        Text("Reset Password")
+                        Text("Send Reset Link")
                     }
                 },
                 dismissButton = {
@@ -382,7 +367,6 @@ fun AuthScreen(
                         onClick = { 
                             showForgotPasswordDialog = false
                             forgotEmail = ""
-                            newPasswordState = ""
                         }
                     ) {
                         Text("Cancel")

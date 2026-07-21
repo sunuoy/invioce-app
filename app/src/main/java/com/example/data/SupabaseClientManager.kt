@@ -132,7 +132,15 @@ object SupabaseClientManager {
                 Result.success(token)
             } else {
                 val errorMsg = try {
-                    JSONObject(responseBody).optString("error_description", JSONObject(responseBody).optString("msg", "Invalid email or password"))
+                    val jsonObj = JSONObject(responseBody)
+                    val desc = jsonObj.optString("error_description", jsonObj.optString("msg", ""))
+                    if (desc.contains("Email not confirmed", ignoreCase = true)) {
+                        "Email not confirmed. Please check your inbox and verify your email before logging in."
+                    } else if (desc.contains("Invalid login credentials", ignoreCase = true)) {
+                        "Invalid email or password. Please check your credentials."
+                    } else {
+                        desc.ifEmpty { "Authentication failed (${response.code})" }
+                    }
                 } catch (e: Exception) {
                     "Authentication failed (${response.code})"
                 }
@@ -161,10 +169,18 @@ object SupabaseClientManager {
                 .build()
 
             val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+
             if (response.isSuccessful) {
                 Result.success(true)
             } else {
-                Result.failure(Exception("Failed to send reset email"))
+                val errorMsg = try {
+                    val jsonObj = JSONObject(responseBody)
+                    jsonObj.optString("msg", jsonObj.optString("error_description", "Failed to send reset email"))
+                } catch (e: Exception) {
+                    "Failed to send reset email (${response.code})"
+                }
+                Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
             Result.failure(e)

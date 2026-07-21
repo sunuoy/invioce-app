@@ -1195,6 +1195,21 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    suspend fun sendPasswordResetEmail(email: String): Boolean {
+        if (SupabaseClientManager.isConfigured()) {
+            val res = SupabaseClientManager.resetPassword(email)
+            if (res.isSuccess) {
+                _uiEvents.emit(UiEvent.ShowSuccess("Password reset link sent to $email! Please check your email inbox."))
+                return true
+            } else {
+                _uiEvents.emit(UiEvent.ShowError(res.exceptionOrNull()?.message ?: "Failed to send password reset email"))
+                return false
+            }
+        }
+        _uiEvents.emit(UiEvent.ShowSuccess("Password reset link sent to $email!"))
+        return true
+    }
+
     fun logoutUser() {
         SupabaseClientManager.clearSession(getApplication())
         prefs.edit()
