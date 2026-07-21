@@ -21,17 +21,17 @@ object SupabaseClientManager {
 
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
-    // Default Supabase configuration placeholders (can be overridden via SharedPreferences)
-    private var supabaseUrl: String = "https://your-supabase-project.supabase.co"
-    private var supabaseAnonKey: String = "your-supabase-anon-key"
+    // Live Supabase project credentials
+    private var supabaseUrl: String = "https://hrjexnphspstixrfzunb.supabase.co"
+    private var supabaseAnonKey: String = "sb_publishable_wj0LpVyXXhRHQ2WgKvGGiw_Qe_uSWJW"
 
     private var currentUserToken: String = ""
     private var currentUserId: String = ""
 
     fun initialize(context: Context) {
         val prefs = context.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE)
-        supabaseUrl = prefs.getString("supabase_url", "https://your-supabase-project.supabase.co")?.trimEnd('/') ?: ""
-        supabaseAnonKey = prefs.getString("supabase_anon_key", "your-supabase-anon-key") ?: ""
+        supabaseUrl = prefs.getString("supabase_url", "https://hrjexnphspstixrfzunb.supabase.co")?.trimEnd('/') ?: "https://hrjexnphspstixrfzunb.supabase.co"
+        supabaseAnonKey = prefs.getString("supabase_anon_key", "sb_publishable_wj0LpVyXXhRHQ2WgKvGGiw_Qe_uSWJW") ?: "sb_publishable_wj0LpVyXXhRHQ2WgKvGGiw_Qe_uSWJW"
         currentUserToken = prefs.getString("supabase_user_token", "") ?: ""
         currentUserId = prefs.getString("supabase_user_id", "") ?: ""
     }
