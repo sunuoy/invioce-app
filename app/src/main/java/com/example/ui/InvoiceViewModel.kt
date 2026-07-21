@@ -1118,10 +1118,21 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     private val _userEmail = MutableStateFlow(prefs.getString("user_email", "") ?: "")
     val userEmail: StateFlow<String> = _userEmail.asStateFlow()
 
+    private fun checkAndClearOnAccountSwitch(newEmail: String) {
+        val lastEmail = prefs.getString("last_logged_account_email", "") ?: ""
+        if (lastEmail.isNotEmpty() && !lastEmail.equals(newEmail, ignoreCase = true)) {
+            viewModelScope.launch(Dispatchers.IO) {
+                database.clearAllTables()
+            }
+        }
+        prefs.edit().putString("last_logged_account_email", newEmail).apply()
+    }
+
     suspend fun loginUser(email: String, password: String): Boolean {
         if (SupabaseClientManager.isConfigured()) {
             val res = SupabaseClientManager.signInUser(getApplication(), email, password)
             if (res.isSuccess) {
+                checkAndClearOnAccountSwitch(email)
                 prefs.edit()
                     .putBoolean("is_logged_in", true)
                     .putString("user_email", email)
@@ -1138,6 +1149,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
         val registeredPassword = prefs.getString("reg_pwd_$email", null)
         return if (registeredPassword != null && registeredPassword == password) {
+            checkAndClearOnAccountSwitch(email)
             prefs.edit()
                 .putBoolean("is_logged_in", true)
                 .putString("user_email", email)
@@ -1161,8 +1173,9 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
                 if (status == "CONFIRMATION_REQUIRED") {
                     _uiEvents.emit(UiEvent.ShowSuccess("Registration successful! Please check your email inbox to confirm your account."))
-                    return false // Keep on auth screen so they can sign in after email confirmation
+                    return false
                 } else {
+                    checkAndClearOnAccountSwitch(email)
                     prefs.edit()
                         .putBoolean("is_logged_in", true)
                         .putString("user_email", email)
@@ -1183,6 +1196,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             _uiEvents.emit(UiEvent.ShowError("User already exists with this email"))
             false
         } else {
+            checkAndClearOnAccountSwitch(email)
             prefs.edit()
                 .putString("reg_pwd_$email", password)
                 .putBoolean("is_logged_in", true)
@@ -1218,6 +1232,11 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             .apply()
         _isUserLoggedIn.value = false
         _userEmail.value = ""
+
+        viewModelScope.launch(Dispatchers.IO) {
+            database.clearAllTables()
+        }
+
         viewModelScope.launch {
             _uiEvents.emit(UiEvent.ShowSuccess("Logged out successfully"))
         }
