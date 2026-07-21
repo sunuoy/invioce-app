@@ -227,10 +227,6 @@ fun AuthScreen(
                     }
 
                     scope.launch {
-                        isLoading = true
-                        delay(1200) // Aesthetic delay for progress simulation
-                        isLoading = false
-                        
                         val success = if (isSignUpMode) {
                             viewModel.registerUser(email.trim(), password)
                         } else {
