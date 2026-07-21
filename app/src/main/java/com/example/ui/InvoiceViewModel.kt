@@ -27,6 +27,10 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
     private val prefs = application.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE)
 
+    init {
+        SupabaseClientManager.initialize(application)
+    }
+
     // Low stock threshold
     private val _lowStockThreshold = MutableStateFlow(prefs.getFloat("low_stock_threshold", 5.0f))
     val lowStockThreshold: StateFlow<Float> = _lowStockThreshold
@@ -1114,7 +1118,24 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     private val _userEmail = MutableStateFlow(prefs.getString("user_email", "") ?: "")
     val userEmail: StateFlow<String> = _userEmail.asStateFlow()
 
-    fun loginUser(email: String, password: String): Boolean {
+    suspend fun loginUser(email: String, password: String): Boolean {
+        if (SupabaseClientManager.isConfigured()) {
+            val res = SupabaseClientManager.signInUser(getApplication(), email, password)
+            if (res.isSuccess) {
+                prefs.edit()
+                    .putBoolean("is_logged_in", true)
+                    .putString("user_email", email)
+                    .apply()
+                _isUserLoggedIn.value = true
+                _userEmail.value = email
+                _uiEvents.emit(UiEvent.ShowSuccess("Welcome back, $email!"))
+                return true
+            } else {
+                _uiEvents.emit(UiEvent.ShowError(res.exceptionOrNull()?.message ?: "Supabase auth failed"))
+                return false
+            }
+        }
+
         val registeredPassword = prefs.getString("reg_pwd_$email", null)
         return if (registeredPassword != null && registeredPassword == password) {
             prefs.edit()
@@ -1123,24 +1144,36 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 .apply()
             _isUserLoggedIn.value = true
             _userEmail.value = email
-            viewModelScope.launch {
-                _uiEvents.emit(UiEvent.ShowSuccess("Welcome back, $email!"))
-            }
+            _uiEvents.emit(UiEvent.ShowSuccess("Welcome back, $email!"))
             true
         } else {
-            viewModelScope.launch {
-                _uiEvents.emit(UiEvent.ShowError("Invalid email or password"))
-            }
+            _uiEvents.emit(UiEvent.ShowError("Invalid email or password"))
             false
         }
     }
 
-    fun registerUser(email: String, password: String): Boolean {
+    suspend fun registerUser(email: String, password: String): Boolean {
+        if (SupabaseClientManager.isConfigured()) {
+            val res = SupabaseClientManager.signUpUser(getApplication(), email, password)
+            if (res.isSuccess) {
+                prefs.edit()
+                    .putString("reg_pwd_$email", password)
+                    .putBoolean("is_logged_in", true)
+                    .putString("user_email", email)
+                    .apply()
+                _isUserLoggedIn.value = true
+                _userEmail.value = email
+                _uiEvents.emit(UiEvent.ShowSuccess("Account created in Supabase successfully!"))
+                return true
+            } else {
+                _uiEvents.emit(UiEvent.ShowError(res.exceptionOrNull()?.message ?: "Supabase signup failed"))
+                return false
+            }
+        }
+
         val existing = prefs.getString("reg_pwd_$email", null)
         return if (existing != null) {
-            viewModelScope.launch {
-                _uiEvents.emit(UiEvent.ShowError("User already exists with this email"))
-            }
+            _uiEvents.emit(UiEvent.ShowError("User already exists with this email"))
             false
         } else {
             prefs.edit()
@@ -1150,14 +1183,13 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 .apply()
             _isUserLoggedIn.value = true
             _userEmail.value = email
-            viewModelScope.launch {
-                _uiEvents.emit(UiEvent.ShowSuccess("Account created successfully!"))
-            }
+            _uiEvents.emit(UiEvent.ShowSuccess("Account created successfully!"))
             true
         }
     }
 
     fun logoutUser() {
+        SupabaseClientManager.clearSession(getApplication())
         prefs.edit()
             .putBoolean("is_logged_in", false)
             .putString("user_email", "")
