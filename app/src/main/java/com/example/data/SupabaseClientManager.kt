@@ -90,7 +90,13 @@ object SupabaseClientManager {
                 }
             } else {
                 val errorMsg = try {
-                    JSONObject(responseBody).optString("msg", JSONObject(responseBody).optString("error_description", "Sign up failed"))
+                    val jsonObj = JSONObject(responseBody)
+                    val rawMsg = jsonObj.optString("msg", jsonObj.optString("error_description", "Sign up failed"))
+                    if (rawMsg.contains("rate limit", ignoreCase = true)) {
+                        "Supabase email sending limit reached for this hour. Please confirm user manually in Supabase Dashboard > Auth > Users."
+                    } else {
+                        rawMsg
+                    }
                 } catch (e: Exception) {
                     "Sign up failed (${response.code})"
                 }
@@ -176,7 +182,12 @@ object SupabaseClientManager {
             } else {
                 val errorMsg = try {
                     val jsonObj = JSONObject(responseBody)
-                    jsonObj.optString("msg", jsonObj.optString("error_description", "Failed to send reset email"))
+                    val rawMsg = jsonObj.optString("msg", jsonObj.optString("error_description", "Failed to send reset email"))
+                    if (rawMsg.contains("rate limit", ignoreCase = true)) {
+                        "Supabase email sending limit reached for this hour. Please try again in 1 hour."
+                    } else {
+                        rawMsg
+                    }
                 } catch (e: Exception) {
                     "Failed to send reset email (${response.code})"
                 }
