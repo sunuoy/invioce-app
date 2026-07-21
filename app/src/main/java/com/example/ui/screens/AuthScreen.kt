@@ -45,14 +45,16 @@ fun AuthScreen(
     var newPasswordState by remember { mutableStateOf("") }
 
     var isSignUpMode by remember { mutableStateOf(false) }
-    var email by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val authPrefs = remember { context.getSharedPreferences("invoice_generator_prefs", android.content.Context.MODE_PRIVATE) }
+
+    var rememberMe by remember { mutableStateOf(authPrefs.getBoolean("remember_me", true)) }
+    var email by remember { mutableStateOf(if (rememberMe) authPrefs.getString("saved_email", "") ?: "" else "") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
-    
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
 
     // Aesthetic color definitions
     val gradientColors = listOf(
@@ -174,8 +176,30 @@ fun AuthScreen(
             if (!isSignUpMode) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { rememberMe = !rememberMe }
+                    ) {
+                        Checkbox(
+                            checked = rememberMe,
+                            onCheckedChange = { rememberMe = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = neonIndigo,
+                                uncheckedColor = Color.White.copy(alpha = 0.6f),
+                                checkmarkColor = Color.White
+                            )
+                        )
+                        Text(
+                            text = "Remind Me",
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
                     TextButton(
                         onClick = { showForgotPasswordDialog = true },
                         contentPadding = PaddingValues(vertical = 4.dp, horizontal = 0.dp)
@@ -234,8 +258,11 @@ fun AuthScreen(
                             viewModel.loginUser(email.trim(), password)
                         }
 
-                        if (!success) {
-                            // Validation failures handled inside ViewModel triggers via toast
+                        if (success) {
+                            authPrefs.edit()
+                                .putBoolean("remember_me", rememberMe)
+                                .putString("saved_email", if (rememberMe) email.trim() else "")
+                                .apply()
                         }
                     }
                 },
