@@ -28,6 +28,18 @@ enum class AppTab(val title: String, val icon: ImageVector, val tag: String) {
     PROFILE("Profile", Icons.Default.AccountCircle, "settings_tab")
 }
 
+fun android.content.Context.shareApp() {
+    val sendIntent = android.content.Intent().apply {
+        action = android.content.Intent.ACTION_SEND
+        putExtra(
+            android.content.Intent.EXTRA_TEXT,
+            "Hey! Check out Invoice Generator App for instant invoice creation, inventory tracking & billing: https://github.com/sunuoy/invioce-app"
+        )
+        type = "text/plain"
+    }
+    startActivity(android.content.Intent.createChooser(sendIntent, "Invite via"))
+}
+
 @Composable
 fun MainAppNavigation(
     viewModel: InvoiceViewModel,
@@ -140,16 +152,7 @@ fun MainAppNavigation(
                     selected = false,
                     onClick = {
                         scope.launch { drawerState.close() }
-                        val sendIntent = android.content.Intent().apply {
-                            action = android.content.Intent.ACTION_SEND
-                            putExtra(
-                                android.content.Intent.EXTRA_TEXT,
-                                "Hey! Check out Invoice Generator App for instant invoice creation, inventory tracking & billing: https://github.com/sunuoy/invioce-app"
-                            )
-                            type = "text/plain"
-                        }
-                        val shareIntent = android.content.Intent.createChooser(sendIntent, "Invite via")
-                        context.startActivity(shareIntent)
+                        context.shareApp()
                     },
                     modifier = Modifier
                         .padding(NavigationDrawerItemDefaults.ItemPadding)

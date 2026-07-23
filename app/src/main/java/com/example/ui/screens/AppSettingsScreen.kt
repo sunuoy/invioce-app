@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.content.Context
+import com.example.ui.shareApp
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -270,18 +271,7 @@ fun AppSettingsScreen(
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
-                modifier = Modifier.fillMaxWidth().clickable {
-                    val sendIntent = android.content.Intent().apply {
-                        action = android.content.Intent.ACTION_SEND
-                        putExtra(
-                            android.content.Intent.EXTRA_TEXT,
-                            "Hey! Check out Invoice Generator App for instant invoice creation, inventory tracking & billing: https://github.com/sunuoy/invioce-app"
-                        )
-                        type = "text/plain"
-                    }
-                    val shareIntent = android.content.Intent.createChooser(sendIntent, "Invite via")
-                    context.startActivity(shareIntent)
-                }
+                modifier = Modifier.fillMaxWidth().clickable { context.shareApp() }
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
