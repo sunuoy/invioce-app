@@ -28,7 +28,7 @@ class ShadowFileProvider {
 }
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], shadows = [ShadowFileProvider::class])
+@Config(sdk = [34], shadows = [ShadowFileProvider::class])
 class ExampleRobolectricTest {
 
   @Test

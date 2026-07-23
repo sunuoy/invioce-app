@@ -1,16 +1,13 @@
 {
-    "java.configuration.updateBuildConfiguration": "automatic",
-    "gradle.useGradleWrapper": true,
-    "java.import.gradle.wrapper.enabled": true,
-    "java.import.gradle.version": "9.3.1",
+    "java.configuration.updateBuildConfiguration": "interactive",
     "java.import.gradle.java.home": "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.19.10-hotspot",
     "gradle.java.home": "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.19.10-hotspot",
     "java.jdt.ls.java.home": "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.19.10-hotspot",
     "kotlin.java.home": "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.19.10-hotspot",
     "java.configuration.runtimes": [
         {
-            "name": "JavaSE-17",
-            "path": "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.19.10-hotspot",
+            "name": "JavaSE-21",
+            "path": "C:\\Program Files\\Android\\Android Studio\\jbr",
             "default": true
         }
     ],

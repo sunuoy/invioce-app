@@ -22,16 +22,16 @@ object SupabaseClientManager {
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
     // Live Supabase project credentials
-    private var supabaseUrl: String = "https://hrjexnphspstixrfzunb.supabase.co"
-    private var supabaseAnonKey: String = "sb_publishable_wj0LpVyXXhRHQ2WgKvGGiw_Qe_uSWJW"
+    private var supabaseUrl: String = "https://iznvsbwdhopikdejaolv.supabase.co"
+    private var supabaseAnonKey: String = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6bnZzYndkaG9waWtkZWphb2x2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTg1MjIsImV4cCI6MjEwMDM5NDUyMn0.tSCwXfzeAUtwPjWXvSrzjA9ak6CY740qkh_SChbMXl0"
 
     private var currentUserToken: String = ""
     private var currentUserId: String = ""
 
     fun initialize(context: Context) {
         val prefs = context.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE)
-        supabaseUrl = prefs.getString("supabase_url", "https://hrjexnphspstixrfzunb.supabase.co")?.trimEnd('/') ?: "https://hrjexnphspstixrfzunb.supabase.co"
-        supabaseAnonKey = prefs.getString("supabase_anon_key", "sb_publishable_wj0LpVyXXhRHQ2WgKvGGiw_Qe_uSWJW") ?: "sb_publishable_wj0LpVyXXhRHQ2WgKvGGiw_Qe_uSWJW"
+        supabaseUrl = prefs.getString("supabase_url", "https://iznvsbwdhopikdejaolv.supabase.co")?.trimEnd('/') ?: "https://iznvsbwdhopikdejaolv.supabase.co"
+        supabaseAnonKey = prefs.getString("supabase_anon_key", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6bnZzYndkaG9waWtkZWphb2x2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTg1MjIsImV4cCI6MjEwMDM5NDUyMn0.tSCwXfzeAUtwPjWXvSrzjA9ak6CY740qkh_SChbMXl0") ?: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6bnZzYndkaG9waWtkZWphb2x2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MTg1MjIsImV4cCI6MjEwMDM5NDUyMn0.tSCwXfzeAUtwPjWXvSrzjA9ak6CY740qkh_SChbMXl0"
         currentUserToken = prefs.getString("supabase_user_token", "") ?: ""
         currentUserId = prefs.getString("supabase_user_id", "") ?: ""
     }
