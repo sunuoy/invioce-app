@@ -40,6 +40,7 @@ fun MainAppNavigation(
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -132,6 +133,29 @@ fun MainAppNavigation(
                 Spacer(modifier = Modifier.weight(1f))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Spacer(modifier = Modifier.height(8.dp))
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Share, contentDescription = "Invite Friends", tint = MaterialTheme.colorScheme.primary) },
+                    label = { Text("Invite Friends / Share App", fontWeight = FontWeight.SemiBold) },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        val sendIntent = android.content.Intent().apply {
+                            action = android.content.Intent.ACTION_SEND
+                            putExtra(
+                                android.content.Intent.EXTRA_TEXT,
+                                "Hey! Check out Invoice Generator App for instant invoice creation, inventory tracking & billing: https://github.com/sunuoy/invioce-app"
+                            )
+                            type = "text/plain"
+                        }
+                        val shareIntent = android.content.Intent.createChooser(sendIntent, "Invite via")
+                        context.startActivity(shareIntent)
+                    },
+                    modifier = Modifier
+                        .padding(NavigationDrawerItemDefaults.ItemPadding)
+                        .testTag("drawer_invite_item")
+                )
+                Spacer(modifier = Modifier.height(6.dp))
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Settings, contentDescription = "Application preferences") },
