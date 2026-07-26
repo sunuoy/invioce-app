@@ -128,6 +128,7 @@ fun SettingsScreen(
     var pdfTheme by remember { mutableStateOf(prefs.getString("pdf_theme", "Classic Navy") ?: "Classic Navy") }
     var showTaxSummary by remember { mutableStateOf(prefs.getBoolean("show_tax_summary", true)) }
     var showSalesTrend by remember { mutableStateOf(prefs.getBoolean("show_sales_trend", true)) }
+    var showPdfQr by remember { mutableStateOf(prefs.getBoolean("show_pdf_qr", true)) }
 
     var customFontPath by remember { mutableStateOf(prefs.getString("custom_font_path", "") ?: "") }
     var customFontName by remember { mutableStateOf(prefs.getString("custom_font_name", "") ?: "") }
@@ -1319,9 +1320,36 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.testTag("sales_trend_toggle_settings")
                         )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "PDF UPI QR Code",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Show/Hide dynamic UPI payment QR code on generated PDF invoices.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = showPdfQr,
+                            onCheckedChange = { isChecked ->
+                                showPdfQr = isChecked
+                                prefs.edit().putBoolean("show_pdf_qr", isChecked).apply()
+                                Toast.makeText(context, if (isChecked) "PDF UPI QR Code Enabled!" else "PDF UPI QR Code Disabled!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.testTag("pdf_qr_toggle_settings")
+                        )
                     }
-                }
-            }
 
             Spacer(modifier = Modifier.height(16.dp))
 

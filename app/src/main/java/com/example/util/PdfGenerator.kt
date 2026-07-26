@@ -674,27 +674,23 @@ object PdfGenerator {
 
         // 7B: PANEL TWO - QR CODE & BANK INFORMATION (Middle Column)
         // Draw REAL dynamically sized Dynamic UPI QR Code containing exact bill total
-        val qrSizeInt = 120
+        // Decreased size by 5%: 120 * 0.95 = 114
+        val qrSizeInt = 114
         val qrX = pane2X + ((pane3X - pane2X) - qrSizeInt.toFloat()) / 2f
-        val qrY = 624f
+        val qrY = 628f
 
-        val qrBlackPaint = Paint().apply { color = Color.BLACK; style = Paint.Style.FILL }
+        val isQrEnabledInSettings = prefs.getBoolean("show_pdf_qr", true)
+        val hasValidUpiId = profile != null && profile.upiId.trim().isNotBlank()
 
-        if (profile != null && profile.upiId.isNotBlank()) {
+        if (isQrEnabledInSettings && hasValidUpiId) {
             try {
-                val encodedPn = android.net.Uri.encode(profile.businessName)
-                val upiUri = "upi://pay?pa=${profile.upiId}&pn=$encodedPn&am=${invoice.grandTotal}&cu=INR"
+                val encodedPn = android.net.Uri.encode(profile!!.businessName)
+                val upiUri = "upi://pay?pa=${profile.upiId.trim()}&pn=$encodedPn&am=${invoice.grandTotal}&cu=INR"
                 val upiBitmap = generateQrCodeBitmap(upiUri, qrSizeInt)
                 canvas.drawBitmap(upiBitmap, qrX, qrY, null)
-            } catch (e: Exception) {
-                // Draw a fallback framing
-                canvas.drawRect(qrX, qrY, qrX + qrSizeInt, qrY + qrSizeInt, borderPaint)
-                canvas.drawRect(qrX + 4f, qrY + 4f, qrX + qrSizeInt - 4f, qrY + qrSizeInt - 4f, qrBlackPaint)
+            } catch (_: Exception) {
+                // If bitmap generation fails, skip rendering QR frame
             }
-        } else {
-            // Draw fallback framing if upi id matches blank
-            canvas.drawRect(qrX, qrY, qrX + qrSizeInt, qrY + qrSizeInt, borderPaint)
-            canvas.drawRect(qrX + 4f, qrY + 4f, qrX + qrSizeInt - 4f, qrY + qrSizeInt - 4f, qrBlackPaint)
         }
 
         // Bank Details from Profile
