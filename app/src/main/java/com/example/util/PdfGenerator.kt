@@ -340,7 +340,8 @@ object PdfGenerator {
         }
         
         if (bGstin.isNotBlank()) {
-            val gstinAndPan = "GSTIN - $bGstin | PAN - ${bGstin.take(10)}"
+            val panNumber = if (bGstin.trim().length == 15) bGstin.trim().substring(2, 12) else bGstin.take(10)
+            val gstinAndPan = "GSTIN - $bGstin | PAN - $panNumber"
             canvas.drawText(gstinAndPan, 95f, currentHeaderY, boldTextPaint.apply { color = primaryColor; textSize = 12.5f })
             boldTextPaint.color = textDarkColor // reset
             boldTextPaint.textSize = 10.5f // reset
