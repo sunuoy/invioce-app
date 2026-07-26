@@ -1320,6 +1320,8 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.testTag("sales_trend_toggle_settings")
                         )
+                    }
+
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                     Row(
@@ -1350,6 +1352,8 @@ fun SettingsScreen(
                             modifier = Modifier.testTag("pdf_qr_toggle_settings")
                         )
                     }
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
