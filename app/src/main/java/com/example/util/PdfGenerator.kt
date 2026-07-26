@@ -344,7 +344,6 @@ object PdfGenerator {
             val gstinAndPan = "GSTIN - $bGstin | PAN - $panNumber"
             canvas.drawText(gstinAndPan, 95f, currentHeaderY, boldTextPaint.apply { color = primaryColor; textSize = 12.5f })
             boldTextPaint.color = textDarkColor // reset
-            boldTextPaint.textSize = 10.5f // reset
         }
 
         // --- 4. BILLING DETAILS & INVOICE META BLOCK (y: 125 to 245) ---
@@ -599,9 +598,8 @@ object PdfGenerator {
         val amountInWords = convertAmountToWords(invoice.grandTotal)
         canvas.drawRect(leftBorder + 0.5f, 598.5f, rightBorder - 0.5f, 611f, footerBgPaint)
         canvas.drawLine(leftBorder, 611f, rightBorder, 611f, borderPaint)
-        canvas.drawText("Rupees $amountInWords Only", leftBorder + 10f, 607.5f, boldTextPaint.apply { color = primaryColor; textSize = 9.0f })
+        drawKeyValue("Rupees $amountInWords Only", leftBorder + 10f, 607.5f, boldTextPaint.apply { color = primaryColor; textSize = 11.0f })
         boldTextPaint.color = textDarkColor // reset
-        boldTextPaint.textSize = 10.5f // reset
 
         // Row 7: Settlement/Balance Summary Row (611f to 624f)
         canvas.drawRect(leftBorder + 0.5f, 611.5f, rightBorder - 0.5f, 624f, footerBgPaint)
@@ -614,9 +612,8 @@ object PdfGenerator {
         } else {
             "Payment Pending for status: ${invoice.status} | Outstanding Balance: ${String.format(Locale.US, "%,.2f", outstandingVal)}"
         }
-        canvas.drawText(settledText, leftBorder + 10f, 620.5f, boldTextPaint.apply { color = textMutedColor; textSize = 7.5f })
+        canvas.drawText(settledText, leftBorder + 10f, 620.5f, boldTextPaint.apply { color = textMutedColor; textSize = 9.5f })
         boldTextPaint.color = textDarkColor // reset
-        boldTextPaint.textSize = 10.5f // reset
 
         // --- 7. THREE-PANE LOWER FOOTER BLOCK (y: 624 to 827) ---
         val footerPaneWidth = 233.33f
@@ -629,7 +626,6 @@ object PdfGenerator {
 
         // 7A: PANEL ONE - TERMS AND CONDITIONS (Left Column)
         canvas.drawText("Terms and Conditions", pane1X + 8f, 642f, boldTextPaint.apply { textSize = 13.5f })
-        boldTextPaint.textSize = 10.5f // reset
         
         canvas.drawText("E & O.E", pane1X + 8f, 658f, footerSmallPaint)
         canvas.drawText("1. Goods once sold will not be taken", pane1X + 8f, 676f, textPaint.apply { textSize = 12.0f })
@@ -639,12 +635,10 @@ object PdfGenerator {
         canvas.drawText("   payment is not made on time.", pane1X + 8f, 722f, textPaint)
         
         canvas.drawText("3. Subject to 'Delhi' Jurisdiction only.", pane1X + 8f, 740f, textPaint)
-        textPaint.textSize = 10.5f // reset
 
         // Note details printed below terms & conditions
         if (invoice.notes.isNotBlank()) {
             canvas.drawText("Note:", pane1X + 8f, 762f, boldTextPaint.apply { textSize = 12.0f })
-            boldTextPaint.textSize = 10.5f // reset
             
             val notesText = invoice.notes
             val maxNotesWidth = footerPaneWidth - 16f
@@ -700,8 +694,8 @@ object PdfGenerator {
         val displayBranch = if (!profile?.bankBranch.isNullOrBlank()) profile!!.bankBranch else "Noida"
         val displayIfsc = if (!profile?.bankIfsc.isNullOrBlank()) profile!!.bankIfsc else "ICICI1234"
 
-        textPaint.textSize = 14.0f
-        boldTextPaint.textSize = 14.0f
+        textPaint.textSize = 12.5f
+        boldTextPaint.textSize = 12.5f
 
         // Draw with Key bold and Value normal for ultra high quality output styling
         fun drawKeyValue(label: String, value: String, x: Float, y: Float) {
@@ -716,15 +710,11 @@ object PdfGenerator {
         drawKeyValue("Branch Name: ", displayBranch, pane2X + 8f, 799f)
         drawKeyValue("IFSC Code: ", displayIfsc, pane2X + 8f, 814f)
 
-        textPaint.textSize = 10.5f // reset
-        boldTextPaint.textSize = 10.5f // reset
-
         // 7C: PANEL THREE - SIGNATURES & CLOSE (Right Column)
         val companySignatureLabel = "For $bName"
-        boldTextPaint.textSize = 11.5f
+        boldTextPaint.textSize = 12.5f
         val centerSigX = pane3X + ((rightBorder - pane3X) - boldTextPaint.measureText(companySignatureLabel)) / 2f
         canvas.drawText(companySignatureLabel, centerSigX, 642f, boldTextPaint)
-        boldTextPaint.textSize = 10.5f // reset
 
         // Draw optional digital signature if configured and enabled
         val isSigEnabled = prefs.getBoolean("authorized_signature_enabled", false)
