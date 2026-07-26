@@ -598,7 +598,7 @@ object PdfGenerator {
         val amountInWords = convertAmountToWords(invoice.grandTotal)
         canvas.drawRect(leftBorder + 0.5f, 598.5f, rightBorder - 0.5f, 611f, footerBgPaint)
         canvas.drawLine(leftBorder, 611f, rightBorder, 611f, borderPaint)
-        drawKeyValue("Rupees $amountInWords Only", leftBorder + 10f, 607.5f, boldTextPaint.apply { color = primaryColor; textSize = 11.0f })
+        canvas.drawText("Rupees $amountInWords Only", leftBorder + 10f, 607.5f, boldTextPaint.apply { color = primaryColor; textSize = 11.0f })
         boldTextPaint.color = textDarkColor // reset
 
         // Row 7: Settlement/Balance Summary Row (611f to 624f)
