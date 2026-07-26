@@ -212,21 +212,21 @@ object PdfGenerator {
 
         val textPaint = Paint().apply {
             color = textDarkColor
-            textSize = 10.5f
+            textSize = 12.5f
             typeface = getNormalTypeface()
             isAntiAlias = true
         }
 
         val boldTextPaint = Paint().apply {
             color = textDarkColor
-            textSize = 10.5f
+            textSize = 12.5f
             typeface = getBoldTypeface()
             isAntiAlias = true
         }
 
         val whiteTextPaint = Paint().apply {
             color = Color.WHITE
-            textSize = 10.5f
+            textSize = 12.5f
             typeface = getBoldTypeface()
             isAntiAlias = true
         }
