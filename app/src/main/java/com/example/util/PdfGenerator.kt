@@ -455,19 +455,19 @@ object PdfGenerator {
         // Table-specific dedicated text paints to ensure high precision alignment and zero overlap
         val tableTextPaint = Paint().apply {
             color = textDarkColor
-            textSize = 8.2f
+            textSize = 11.5f
             typeface = getNormalTypeface()
             isAntiAlias = true
         }
         val tableBoldTextPaint = Paint().apply {
             color = textDarkColor
-            textSize = 8.2f
+            textSize = 11.5f
             typeface = getBoldTypeface()
             isAntiAlias = true
         }
         val tableWhiteTextPaint = Paint().apply {
             color = Color.WHITE
-            textSize = 8.2f
+            textSize = 11.5f
             typeface = getBoldTypeface()
             isAntiAlias = true
         }
