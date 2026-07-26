@@ -305,29 +305,8 @@ fun AuthScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Toggle Mode Link
-            Row(
-                modifier = Modifier.clickable {
-                    isSignUpMode = !isSignUpMode
-                    // Reset field entries
-                    email = ""
-                    password = ""
-                    confirmPassword = ""
-                },
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (isSignUpMode) "Already have an account? " else "Don't have an account? ",
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 14.sp
-                )
-                Text(
-                    text = if (isSignUpMode) "Sign In" else "Sign Up",
-                    color = neonPink,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            }
+            // Sign up option is temporarily paused pending Resend DNS verification.
+            // Only Log In / Sign In option is allowed.
             Spacer(modifier = Modifier.height(8.dp))
         }
 
