@@ -49,13 +49,8 @@ class MainActivity : ComponentActivity() {
       MyApplicationTheme(darkTheme = isDarkTheme) {
         Surface(modifier = Modifier.fillMaxSize()) {
           val invoiceViewModel: InvoiceViewModel = viewModel()
-          val isLoggedIn by invoiceViewModel.isUserLoggedIn.collectAsState(initial = false)
-          
-          if (isLoggedIn) {
-            MainAppNavigation(viewModel = invoiceViewModel)
-          } else {
-            com.example.ui.screens.AuthScreen(viewModel = invoiceViewModel)
-          }
+          // Auth / Sign-in requirement temporarily paused
+          MainAppNavigation(viewModel = invoiceViewModel)
         }
       }
     }
