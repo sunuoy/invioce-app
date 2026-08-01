@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.content.Context
 import android.widget.Toast
 import android.content.Intent
 import java.io.File
@@ -98,6 +99,26 @@ fun InvoicesScreen(
 
     var showPaidDetailsDialogForInvoice by remember { mutableStateOf<InvoiceWithDetails?>(null) }
     var showClosedReasonDialogForInvoice by remember { mutableStateOf<InvoiceWithDetails?>(null) }
+
+    val generatorPrefs = remember { context.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE) }
+    var pendingModelSelectionAction by remember { mutableStateOf<Triple<InvoiceWithDetails, String, (String) -> Unit>?>(null) }
+
+    pendingModelSelectionAction?.let { (billing, actionName, onExecute) ->
+        val currentModelPref = remember { generatorPrefs.getString("pdf_model", "Model 1") ?: "Model 1" }
+        PdfModelSelectionDialog(
+            invoiceNumber = billing.invoice.invoiceNumber,
+            actionName = actionName,
+            initialModel = currentModelPref,
+            onDismiss = { pendingModelSelectionAction = null },
+            onConfirm = { selectedModel, saveAsDefault ->
+                if (saveAsDefault) {
+                    generatorPrefs.edit().putString("pdf_model", selectedModel).apply()
+                }
+                pendingModelSelectionAction = null
+                onExecute(selectedModel)
+            }
+        )
+    }
 
     // Filter invoices
     val filteredInvoices = remember(invoices, selectedFilter, searchQuery) {
@@ -680,89 +701,95 @@ fun InvoicesScreen(
                     Toast.makeText(context, "Invoice Deleted", Toast.LENGTH_SHORT).show()
                 },
                 onExportPdf = {
-                    scope.launch(Dispatchers.IO) {
-                        try {
-                            val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
-                            withContext(Dispatchers.Main) {
-                                val exportedMessage = PdfGenerator.exportPdfToDownloads(context, pdfFile, billing.invoice.invoiceNumber)
-                                if (exportedMessage != null) {
-                                    // Increment download count since they exported the copy
-                                    viewModel.incrementDownloadCount(billing.invoice.id)
-                                    // Update local sheet details state statically to reflect the increment
-                                    activeInvoiceDetails = billing.copy(
-                                        invoice = billing.invoice.copy(downloadCount = billing.invoice.downloadCount + 1)
-                                    )
-                                    Toast.makeText(context, "$exportedMessage", Toast.LENGTH_LONG).show()
-                                    
-                                    // Automatically open the exported PDF file
-                                    try {
-                                        PdfGenerator.previewPdf(context, pdfFile)
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Unable to auto-open PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+                    pendingModelSelectionAction = Triple(billing, "Export") { chosenModel ->
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile, overrideModel = chosenModel)
+                                withContext(Dispatchers.Main) {
+                                    val exportedMessage = PdfGenerator.exportPdfToDownloads(context, pdfFile, billing.invoice.invoiceNumber)
+                                    if (exportedMessage != null) {
+                                        viewModel.incrementDownloadCount(billing.invoice.id)
+                                        activeInvoiceDetails = billing.copy(
+                                            invoice = billing.invoice.copy(downloadCount = billing.invoice.downloadCount + 1)
+                                        )
+                                        Toast.makeText(context, "$exportedMessage", Toast.LENGTH_LONG).show()
+                                        try {
+                                            PdfGenerator.previewPdf(context, pdfFile)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Unable to auto-open PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        Toast.makeText(context, "Failed to export PDF locally.", Toast.LENGTH_LONG).show()
                                     }
-                                } else {
-                                    Toast.makeText(context, "Failed to export PDF locally.", Toast.LENGTH_LONG).show()
                                 }
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(context, "Export Error: ${e.message}", Toast.LENGTH_LONG).show()
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(context, "Export Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
                     }
                 },
                 onSharePdf = {
-                    scope.launch(Dispatchers.IO) {
-                        try {
-                            val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
-                            withContext(Dispatchers.Main) {
-                                PdfGenerator.shareInvoicePdf(context, pdfFile)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(context, "Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    pendingModelSelectionAction = Triple(billing, "Share") { chosenModel ->
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile, overrideModel = chosenModel)
+                                withContext(Dispatchers.Main) {
+                                    PdfGenerator.shareInvoicePdf(context, pdfFile)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(context, "Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
                     }
                 },
                 onPreviewPdf = {
-                    scope.launch(Dispatchers.IO) {
-                        try {
-                            val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
-                            withContext(Dispatchers.Main) {
-                                PdfGenerator.previewPdf(context, pdfFile)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(context, "Preview Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    pendingModelSelectionAction = Triple(billing, "Preview") { chosenModel ->
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile, overrideModel = chosenModel)
+                                withContext(Dispatchers.Main) {
+                                    PdfGenerator.previewPdf(context, pdfFile)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(context, "Preview Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
                     }
                 },
                 onShareWhatsApp = {
-                    scope.launch(Dispatchers.IO) {
-                        try {
-                            val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
-                            withContext(Dispatchers.Main) {
-                                PdfGenerator.shareViaWhatsApp(context, pdfFile)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(context, "WhatsApp Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    pendingModelSelectionAction = Triple(billing, "WhatsApp Share") { chosenModel ->
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile, overrideModel = chosenModel)
+                                withContext(Dispatchers.Main) {
+                                    PdfGenerator.shareViaWhatsApp(context, pdfFile)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(context, "WhatsApp Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
                     }
                 },
                 onShareEmail = {
-                    scope.launch(Dispatchers.IO) {
-                        try {
-                            val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile)
-                            withContext(Dispatchers.Main) {
-                                PdfGenerator.shareViaEmail(context, pdfFile)
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(context, "Email Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    pendingModelSelectionAction = Triple(billing, "Email Share") { chosenModel ->
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                val pdfFile = PdfGenerator.generateInvoicePdf(context, billing, profile, overrideModel = chosenModel)
+                                withContext(Dispatchers.Main) {
+                                    PdfGenerator.shareViaEmail(context, pdfFile)
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(context, "Email Share Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
                     }
@@ -2846,6 +2873,138 @@ fun CatalogInvoiceItemRow(
             }
         }
     }
+}
+
+@Composable
+fun PdfModelSelectionDialog(
+    invoiceNumber: String,
+    actionName: String,
+    initialModel: String,
+    onDismiss: () -> Unit,
+    onConfirm: (selectedModel: String, saveAsDefault: Boolean) -> Unit
+) {
+    var selectedModel by remember { mutableStateOf(initialModel) }
+    var saveAsDefault by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PictureAsPdf,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text("Select PDF Template Model")
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Choose layout format to $actionName invoice #$invoiceNumber:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // Option 1: Model 1
+                Surface(
+                    onClick = { selectedModel = "Model 1" },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (selectedModel == "Model 1") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    border = BorderStroke(1.dp, if (selectedModel == "Model 1") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        RadioButton(
+                            selected = selectedModel == "Model 1",
+                            onClick = { selectedModel = "Model 1" }
+                        )
+                        Column {
+                            Text(
+                                text = "Model 1 (Classic Compact)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Standard layout with clean header, item list, tax totals & bank UPI QR.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Option 2: Model 2
+                Surface(
+                    onClick = { selectedModel = "Model 2" },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (selectedModel == "Model 2") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    border = BorderStroke(1.dp, if (selectedModel == "Model 2") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        RadioButton(
+                            selected = selectedModel == "Model 2",
+                            onClick = { selectedModel = "Model 2" }
+                        )
+                        Column {
+                            Text(
+                                text = "Model 2 (GST & E-Way Format)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Tax invoice layout with transporter info, IRN/Ack bar & dual QR codes.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { saveAsDefault = !saveAsDefault }
+                ) {
+                    Checkbox(
+                        checked = saveAsDefault,
+                        onCheckedChange = { saveAsDefault = it }
+                    )
+                    Text(
+                        text = "Save selected model as default preference",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(selectedModel, saveAsDefault) },
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Generate & $actionName")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 

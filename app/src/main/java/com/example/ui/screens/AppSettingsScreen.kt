@@ -185,8 +185,8 @@ fun AppSettingsScreen(
     var pdfModelSetting by remember {
         mutableStateOf(generatorPrefs.getString("pdf_model", "Model 1") ?: "Model 1")
     }
-    var isDemoDataEnabled by remember(invoices, products) {
-        mutableStateOf(generatorPrefs.getBoolean("demo_data_enabled", invoices.isNotEmpty() || products.isNotEmpty()))
+    var isDemoDataEnabled by remember {
+        mutableStateOf(generatorPrefs.getBoolean("demo_data_enabled", false))
     }
 
     Scaffold(
