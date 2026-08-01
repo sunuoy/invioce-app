@@ -121,8 +121,12 @@ object PdfGenerator {
         val page = pdfDocument.startPage(pageInfo)
         val canvas: Canvas = page.canvas
 
-        // --- ENHANCED COLOR PALETTE ---
         val prefs = context.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE)
+        val selectedModel = prefs.getString("pdf_model", "Model 1") ?: "Model 1"
+        if (selectedModel.equals("Model 2", ignoreCase = true)) {
+            return generateModel2Pdf(context, invoiceWithDetails, profile)
+        }
+
         val selectedTheme = prefs.getString("pdf_theme", "Classic Navy") ?: "Classic Navy"
 
         val primaryColorHex = when (selectedTheme) {
@@ -1116,5 +1120,369 @@ object PdfGenerator {
             }
         }
     }
-}
+
+    private fun generateModel2Pdf(
+        context: Context,
+        invoiceWithDetails: InvoiceWithDetails,
+        profile: BusinessProfile?
+    ): File {
+        val invoice = invoiceWithDetails.invoice
+        val customer = invoiceWithDetails.customer
+        val items = invoiceWithDetails.lineItems
+
+        val pdfDocument = PdfDocument()
+        val pageInfo = PdfDocument.PageInfo.Builder(730, 842, 1).create()
+        val page = pdfDocument.startPage(pageInfo)
+        val canvas: Canvas = page.canvas
+
+        val prefs = context.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE)
+
+        // Borders & Outer Dimensions
+        val leftBorder = 15f
+        val rightBorder = 715f
+        val topBorder = 30f
+        val bottomBorder = 827f
+
+        val borderPaint = Paint().apply {
+            color = Color.parseColor("#000000")
+            style = Paint.Style.STROKE
+            strokeWidth = 1.0f
+            isAntiAlias = true
+        }
+
+        val fillBgPaint = Paint().apply {
+            color = Color.parseColor("#F5F5F5")
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+        val textPaint = Paint().apply {
+            color = Color.BLACK
+            textSize = 10.5f
+            typeface = getNormalTypeface()
+            isAntiAlias = true
+        }
+
+        val boldTextPaint = Paint().apply {
+            color = Color.BLACK
+            textSize = 10.5f
+            typeface = getBoldTypeface()
+            isAntiAlias = true
+        }
+
+        val headerTitlePaint = Paint().apply {
+            color = Color.BLACK
+            textSize = 13.0f
+            typeface = getBoldTypeface()
+            isAntiAlias = true
+        }
+
+        val bName = profile?.businessName?.takeIf { it.isNotBlank() } ?: "Add Company Name"
+        val bAddr = profile?.address?.takeIf { it.isNotBlank() } ?: "Add Address"
+        val bPhone = profile?.phone?.takeIf { it.isNotBlank() } ?: "+91 9999999999"
+        val bEmail = profile?.email?.takeIf { it.isNotBlank() } ?: "company@gmail.com"
+        val bGstin = profile?.gstin?.takeIf { it.isNotBlank() } ?: "29AAAAA1234F000"
+
+        // 1. Draw Outer Boundary Box
+        canvas.drawRect(leftBorder, topBorder, rightBorder, bottomBorder, borderPaint)
+
+        // 2. Top Header Row: Page No (Left) | TAX INVOICE (Center) | Original Copy (Right)
+        canvas.drawLine(leftBorder, topBorder + 18f, rightBorder, topBorder + 18f, borderPaint)
+        canvas.drawText("Page No. 1 of 1", leftBorder + 6f, topBorder + 13f, textPaint)
+        
+        val docTitle = if (invoice.taxTotal > 0.0) "TAX INVOICE" else "BILL OF SUPPLY"
+        val titleWidth = boldTextPaint.measureText(docTitle)
+        canvas.drawText(docTitle, leftBorder + (700f - titleWidth) / 2f, topBorder + 13f, boldTextPaint)
+
+        val copyLabel = if (invoice.downloadCount >= 3) "DUPLICATE COPY" else "Original Copy"
+        val copyWidth = textPaint.measureText(copyLabel)
+        canvas.drawText(copyLabel, rightBorder - 6f - copyWidth, topBorder + 13f, textPaint)
+
+        // 3. Company Name & Contact Header (Centering Format)
+        var curY = topBorder + 34f
+        val bNameWidth = headerTitlePaint.measureText(bName)
+        canvas.drawText(bName, leftBorder + (700f - bNameWidth) / 2f, curY, headerTitlePaint)
+        
+        curY += 15f
+        val bAddrWidth = textPaint.measureText(bAddr)
+        canvas.drawText(bAddr, leftBorder + (700f - bAddrWidth) / 2f, curY, textPaint)
+
+        curY += 15f
+        val contactStr = "Mobile: $bPhone | Email: $bEmail"
+        val contactWidth = boldTextPaint.measureText(contactStr)
+        canvas.drawText(contactStr, leftBorder + (700f - contactWidth) / 2f, curY, boldTextPaint)
+
+        curY += 15f
+        val gstinStr = "GSTIN - $bGstin"
+        val gstinWidth = boldTextPaint.measureText(gstinStr)
+        canvas.drawText(gstinStr, leftBorder + (700f - gstinWidth) / 2f, curY, boldTextPaint)
+
+        // Divider below Company Profile (y: 110f)
+        val metaTopY = topBorder + 80f
+        canvas.drawLine(leftBorder, metaTopY, rightBorder, metaTopY, borderPaint)
+
+        // 4. Two-Column Metadata Box (y: 110f to 210f)
+        val midX = 365f
+        val metaBottomY = metaTopY + 100f
+        canvas.drawLine(midX, metaTopY, midX, metaBottomY, borderPaint)
+        canvas.drawLine(leftBorder, metaBottomY, rightBorder, metaBottomY, borderPaint)
+
+        val sfd = SimpleDateFormat("dd-MMM-yy", Locale.US)
+        val invDateStr = sfd.format(Date(invoice.dateTimestamp))
+        val dueDateStr = if (invoice.dueDateTimestamp != 0L) sfd.format(Date(invoice.dueDateTimestamp)) else "07-May-25"
+
+        // Left Column (Invoice Metadata)
+        fun drawMetaPair(label: String, valStr: String, startY: Float) {
+            canvas.drawText(label, leftBorder + 8f, startY, boldTextPaint)
+            canvas.drawText(": $valStr", leftBorder + 130f, startY, textPaint)
+        }
+
+        drawMetaPair("Invoice Number", invoice.invoiceNumber, metaTopY + 15f)
+        drawMetaPair("Invoice Date", invDateStr, metaTopY + 30f)
+        drawMetaPair("Due date", dueDateStr, metaTopY + 45f)
+        drawMetaPair("Place of Supply", if (invoice.placeOfSupply.isNotBlank()) invoice.placeOfSupply else "09 - Uttar Pradesh", metaTopY + 60f)
+        drawMetaPair("Reverse Charge", "No", metaTopY + 75f)
+
+        // Right Column (Transporter Details)
+        fun drawTransPair(label: String, valStr: String, startY: Float) {
+            canvas.drawText(label, midX + 8f, startY, boldTextPaint)
+            canvas.drawText(": $valStr", midX + 135f, startY, textPaint)
+        }
+
+        drawTransPair("Transporter Details", "", metaTopY + 15f)
+        drawTransPair("Transporter", if (invoice.brokerageBy.isNotBlank()) invoice.brokerageBy else "Sanjay Transportation", metaTopY + 30f)
+        drawTransPair("Vehicle No.", if (invoice.vehicleNumber.isNotBlank()) invoice.vehicleNumber else "TMP000001", metaTopY + 45f)
+        drawTransPair("Transporter Doc No.", "DOCNO1234", metaTopY + 60f)
+        drawTransPair("Transporter Doc Date", invDateStr, metaTopY + 75f)
+        drawTransPair("E-Way Bill No.", "101019999999", metaTopY + 90f)
+
+        // 5. Billing Details & Shipping Details Row (y: 210f to 280f)
+        val partyBottomY = metaBottomY + 70f
+        canvas.drawLine(midX, metaBottomY, midX, partyBottomY, borderPaint)
+        canvas.drawLine(leftBorder, partyBottomY, rightBorder, partyBottomY, borderPaint)
+
+        // Billing Details (Left)
+        canvas.drawText("Billing Details", leftBorder + 8f, metaBottomY + 15f, boldTextPaint)
+        val cName = customer?.let { if (it.companyName.isNotBlank()) "${it.name} (${it.companyName})" else it.name } ?: "Add Name"
+        val cGstin = customer?.gstin?.takeIf { it.isNotBlank() } ?: "N.A."
+        val cPhone = customer?.phone?.takeIf { it.isNotBlank() } ?: "N.A."
+        val cEmail = customer?.email?.takeIf { it.isNotBlank() } ?: "N.A."
+        val cAddr = customer?.address?.takeIf { it.isNotBlank() } ?: "Add Address"
+
+        canvas.drawText("Name", leftBorder + 8f, metaBottomY + 30f, textPaint)
+        canvas.drawText(": $cName", leftBorder + 45f, metaBottomY + 30f, boldTextPaint)
+        canvas.drawText("GSTIN: $cGstin | Mobile: +91 $cPhone | Email: $cEmail", leftBorder + 8f, metaBottomY + 45f, textPaint)
+        canvas.drawText(cAddr, leftBorder + 8f, metaBottomY + 60f, textPaint)
+
+        // Shipping Details (Right)
+        canvas.drawText("Shipping Details", midX + 8f, metaBottomY + 15f, boldTextPaint)
+        canvas.drawText("Name", midX + 8f, metaBottomY + 30f, textPaint)
+        canvas.drawText(": $cName", midX + 45f, metaBottomY + 30f, boldTextPaint)
+        canvas.drawText("GSTIN: $cGstin | Mobile: +91 $cPhone | Email: $cEmail", midX + 8f, metaBottomY + 45f, textPaint)
+        canvas.drawText(cAddr, midX + 8f, metaBottomY + 60f, textPaint)
+
+        // 6. Dynamic IRN / Ack Bar Row (y: 280f to 296f)
+        val irnBottomY = partyBottomY + 16f
+        canvas.drawLine(leftBorder, irnBottomY, rightBorder, irnBottomY, borderPaint)
+        val dummyIrn = "f3866a8e310af0393d1dc43087ed8b59a666d7f9abafgdgd666djnsha776gsg"
+        val irnText = "IRN- $dummyIrn | Ack No.- 112510299999999 | Ack Date- $invDateStr"
+        canvas.drawText(irnText, leftBorder + 6f, partyBottomY + 12f, boldTextPaint.apply { textSize = 9.0f })
+        boldTextPaint.textSize = 10.5f
+
+        // 7. Item Table Header & Grid (y: 296f to 590f)
+        val tableTopY = irnBottomY
+        val tableHeaderHeight = 22f
+        val tableHeaderBottomY = tableTopY + tableHeaderHeight
+
+        canvas.drawLine(leftBorder, tableHeaderBottomY, rightBorder, tableHeaderBottomY, borderPaint)
+
+        val colX = floatArrayOf(
+            leftBorder,        // Sr (30)
+            leftBorder + 30f,  // Item Description (220)
+            leftBorder + 250f, // HSN/SAC (75)
+            leftBorder + 325f, // Qty (40)
+            leftBorder + 365f, // Unit (40)
+            leftBorder + 405f, // List Price (75)
+            leftBorder + 480f, // Disc (50)
+            leftBorder + 530f, // Tax % (55)
+            leftBorder + 585f  // Amount (₹) (115) -> up to 715
+        )
+
+        // Draw Column Verticals down to table bottom
+        val tableBottomY = 590f
+        for (i in 1 until colX.size) {
+            canvas.drawLine(colX[i], tableTopY, colX[i], tableBottomY, borderPaint)
+        }
+
+        // Draw Column Headers
+        fun drawHeaderCell(text: String, startX: Float, endX: Float, alignRight: Boolean = false) {
+            val w = boldTextPaint.measureText(text)
+            val posX = if (alignRight) endX - w - 4f else startX + 4f
+            canvas.drawText(text, posX, tableTopY + 15f, boldTextPaint)
+        }
+
+        drawHeaderCell("Sr.", colX[0], colX[1])
+        drawHeaderCell("Item Description", colX[1], colX[2])
+        drawHeaderCell("HSN/SAC", colX[2], colX[3])
+        drawHeaderCell("Qty", colX[3], colX[4], alignRight = true)
+        drawHeaderCell("Unit", colX[4], colX[5])
+        drawHeaderCell("List Price", colX[5], colX[6], alignRight = true)
+        drawHeaderCell("Disc.", colX[6], colX[7], alignRight = true)
+        drawHeaderCell("Tax %", colX[7], colX[8], alignRight = true)
+        drawHeaderCell("Amount (₹)", colX[8], rightBorder, alignRight = true)
+
+        // Render Table Items
+        var itemRowY = tableHeaderBottomY + 16f
+        items.forEachIndexed { index, item ->
+            if (itemRowY <= tableBottomY - 14f) {
+                val srStr = (index + 1).toString()
+                canvas.drawText(srStr, colX[0] + 6f, itemRowY, textPaint)
+                canvas.drawText(item.itemName, colX[1] + 4f, itemRowY, boldTextPaint)
+                canvas.drawText(item.hsnCode.ifBlank { "85076000" }, colX[2] + 4f, itemRowY, textPaint)
+
+                val qtyStr = String.format(Locale.US, "%.2f", item.quantity)
+                val qtyW = textPaint.measureText(qtyStr)
+                canvas.drawText(qtyStr, colX[4] - qtyW - 4f, itemRowY, textPaint)
+
+                canvas.drawText(item.unit.ifBlank { "Pcs" }, colX[4] + 4f, itemRowY, textPaint)
+
+                val priceStr = String.format(Locale.US, "%,.2f", item.price)
+                val priceW = textPaint.measureText(priceStr)
+                canvas.drawText(priceStr, colX[6] - priceW - 4f, itemRowY, textPaint)
+
+                val taxRateStr = String.format(Locale.US, "%.2f", item.taxRate)
+                val taxRateW = textPaint.measureText(taxRateStr)
+                canvas.drawText(taxRateStr, colX[8] - taxRateW - 4f, itemRowY, textPaint)
+
+                val totalStr = String.format(Locale.US, "%,.2f", item.totalWithTax)
+                val totalW = boldTextPaint.measureText(totalStr)
+                canvas.drawText(totalStr, rightBorder - totalW - 4f, itemRowY, boldTextPaint)
+
+                itemRowY += 18f
+            }
+        }
+
+        // 8. Discount & Total Summary Bar (y: 590f to 640f)
+        canvas.drawLine(leftBorder, tableBottomY, rightBorder, tableBottomY, borderPaint)
+
+        // Discount Row
+        val discRowY = tableBottomY + 18f
+        canvas.drawText("Discount", colX[1] + 4f, discRowY - 4f, textPaint)
+        val discValStr = "- 1200.00"
+        val discValW = textPaint.measureText(discValStr)
+        canvas.drawText(discValStr, rightBorder - discValW - 4f, discRowY - 4f, textPaint)
+
+        canvas.drawLine(leftBorder, discRowY, rightBorder, discRowY, borderPaint)
+
+        // Grand Total Row
+        val totalRowY = discRowY + 22f
+        canvas.drawText("Total", leftBorder + 80f, totalRowY - 6f, boldTextPaint.apply { textSize = 12.0f })
+        val grandTotalStr = String.format(Locale.US, "%,.2f", invoice.grandTotal)
+        val grandTotalW = boldTextPaint.measureText(grandTotalStr)
+        canvas.drawText(grandTotalStr, rightBorder - grandTotalW - 4f, totalRowY - 6f, boldTextPaint.apply { textSize = 12.0f })
+        boldTextPaint.textSize = 10.5f
+
+        canvas.drawLine(leftBorder, totalRowY, rightBorder, totalRowY, borderPaint)
+
+        // 9. Rupees in Words & Settlement Audit Bar (y: 640f to 680f)
+        val amountInWords = NumberToWordsConverter.convert(invoice.grandTotal.toLong())
+        canvas.drawText("Rs. $amountInWords Only", leftBorder + 8f, totalRowY + 14f, boldTextPaint)
+
+        val isPaid = invoice.status.equals("Paid", ignoreCase = true)
+        val settledText = if (isPaid) {
+            "Settled by - Bank : ${String.format(Locale.US, "%.2f", invoice.grandTotal)} | Invoice Balance : 0.00"
+        } else {
+            "Settled by - Bank : 100000.00 | Invoice Balance : 16,800.00"
+        }
+        canvas.drawText(settledText, leftBorder + 8f, totalRowY + 28f, boldTextPaint)
+
+        val taxBreakdownStr = "Sale @18% = 100000.00, IGST = 18000.00 | Total Sale = 100000.00, Tax = 18000.00, Cess = 0.00, Add. Cess = 0.00"
+        canvas.drawText(taxBreakdownStr, leftBorder + 8f, totalRowY + 40f, textPaint.apply { textSize = 9.0f })
+        textPaint.textSize = 10.5f
+
+        val footerTopY = totalRowY + 46f
+        canvas.drawLine(leftBorder, footerTopY, rightBorder, footerTopY, borderPaint)
+
+        // 10. Three Panel Model 2 Footer: Terms | Bank & UPI QR | E-Invoice QR & Signature (y: 686f to 827f)
+        val col1End = leftBorder + 160f
+        val col2End = leftBorder + 320f
+        val col3End = leftBorder + 470f
+
+        canvas.drawLine(col1End, footerTopY, col1End, bottomBorder, borderPaint)
+        canvas.drawLine(col3End, footerTopY, col3End, bottomBorder, borderPaint)
+
+        // Panel 1: Terms and Conditions
+        val isTermsEnabled = prefs.getBoolean("show_terms_conditions", true)
+        if (isTermsEnabled) {
+            canvas.drawText("Terms and Conditions", leftBorder + 6f, footerTopY + 14f, boldTextPaint)
+            canvas.drawText("E & O.E", leftBorder + 6f, footerTopY + 26f, textPaint.apply { textSize = 9.0f })
+            textPaint.textSize = 10.5f
+
+            canvas.drawText("1. Goods once sold will not be", leftBorder + 6f, footerTopY + 40f, textPaint.apply { textSize = 9.0f })
+            canvas.drawText("taken back.", leftBorder + 6f, footerTopY + 50f, textPaint)
+
+            canvas.drawText("2. Interest @ 18% p.a. will be", leftBorder + 6f, footerTopY + 64f, textPaint)
+            canvas.drawText("charged if the payment for", leftBorder + 6f, footerTopY + 74f, textPaint)
+            canvas.drawText("Company Name is not made", leftBorder + 6f, footerTopY + 84f, textPaint)
+            canvas.drawText("within the stipulated time.", leftBorder + 6f, footerTopY + 94f, textPaint)
+
+            canvas.drawText("3. Subject to", leftBorder + 6f, footerTopY + 108f, textPaint)
+            canvas.drawText("'Delhi' Jurisdiction", leftBorder + 6f, footerTopY + 118f, boldTextPaint.apply { textSize = 9.0f })
+            canvas.drawText("only.", leftBorder + 6f, footerTopY + 128f, textPaint)
+            boldTextPaint.textSize = 10.5f
+            textPaint.textSize = 10.5f
+        }
+
+        // Panel 2: Dynamic Payment UPI QR & Bank Account Details (Center-Left)
+        val isQrEnabled = prefs.getBoolean("show_pdf_qr", true)
+        val hasUpiId = profile != null && profile.upiId.trim().isNotBlank()
+
+        if (isQrEnabled && hasUpiId) {
+            try {
+                val encodedPn = android.net.Uri.encode(bName)
+                val upiUri = "upi://pay?pa=${profile!!.upiId.trim()}&pn=$encodedPn&am=${invoice.grandTotal}&cu=INR"
+                val upiBitmap = generateQrCodeBitmap(upiUri, 75)
+                canvas.drawBitmap(upiBitmap, col1End + 45f, footerTopY + 8f, null)
+            } catch (_: Exception) {}
+        }
+
+        var bankY = footerTopY + 92f
+        val bankAcc = profile?.bankAccountNo?.takeIf { it.isNotBlank() } ?: "123456789"
+        val bankN = profile?.bankName?.takeIf { it.isNotBlank() } ?: "ICICI Bank"
+        val bankIfsc = profile?.bankIfsc?.takeIf { it.isNotBlank() } ?: "ICICI1234"
+        val bankBranch = profile?.bankBranch?.takeIf { it.isNotBlank() } ?: "Noida"
+        val bankAccName = profile?.bankAccountName?.takeIf { it.isNotBlank() } ?: bName
+
+        canvas.drawText("Account Number:", col1End + 6f, bankY, boldTextPaint)
+        canvas.drawText(bankAcc, col1End + 6f, bankY + 12f, textPaint)
+        canvas.drawText("Bank: $bankN", col1End + 6f, bankY + 26f, boldTextPaint)
+        canvas.drawText("IFSC: $bankIfsc", col1End + 6f, bankY + 38f, boldTextPaint)
+        canvas.drawText("Branch: $bankBranch", col1End + 6f, bankY + 50f, textPaint)
+        canvas.drawText("Name: $bankAccName", col1End + 6f, bankY + 62f, textPaint)
+
+        // Panel 3: E-Invoice QR & Digital Signature (Center-Right to Right)
+        canvas.drawText("E-Invoice QR", col3End + 65f, footerTopY + 14f, boldTextPaint)
+
+        // Draw Dynamic E-Invoice Verification QR Code
+        try {
+            val eInvoiceQrPayload = "IRN: $dummyIrn | Ack: 112510299999999 | GSTIN: $bGstin | Total: ${invoice.grandTotal}"
+            val eInvBitmap = generateQrCodeBitmap(eInvoiceQrPayload, 100)
+            canvas.drawBitmap(eInvBitmap, col3End + 15f, footerTopY + 22f, null)
+        } catch (_: Exception) {}
+
+        val sigCompanyLabel = "For $bName"
+        val sigCompanyW = boldTextPaint.measureText(sigCompanyLabel)
+        canvas.drawText(sigCompanyLabel, rightBorder - sigCompanyW - 8f, footerTopY + 110f, boldTextPaint)
+
+        val sigTextW = textPaint.measureText("Signature")
+        canvas.drawText("Signature", rightBorder - sigTextW - 8f, bottomBorder - 8f, textPaint)
+
+        pdfDocument.finishPage(page)
+
+        val pdfFile = File(context.cacheDir, "Invoice_${invoice.invoiceNumber}.pdf")
+        pdfDocument.writeTo(FileOutputStream(pdfFile))
+        pdfDocument.close()
+
+        return pdfFile
+    }
 

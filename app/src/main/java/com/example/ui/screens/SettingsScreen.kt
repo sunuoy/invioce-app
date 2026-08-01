@@ -130,6 +130,7 @@ fun SettingsScreen(
     var showSalesTrend by remember { mutableStateOf(prefs.getBoolean("show_sales_trend", true)) }
     var showPdfQr by remember { mutableStateOf(prefs.getBoolean("show_pdf_qr", true)) }
     var showTermsConditions by remember { mutableStateOf(prefs.getBoolean("show_terms_conditions", true)) }
+    var pdfModel by remember { mutableStateOf(prefs.getString("pdf_model", "Model 1") ?: "Model 1") }
 
     var customFontPath by remember { mutableStateOf(prefs.getString("custom_font_path", "") ?: "") }
     var customFontName by remember { mutableStateOf(prefs.getString("custom_font_name", "") ?: "") }
@@ -1383,6 +1384,43 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.testTag("terms_conditions_toggle_settings")
                         )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "PDF Layout Template",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Choose template format (Model 1: Classic Compact, Model 2: E-Way & Dynamic IRN/QR Format)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            listOf("Model 1", "Model 2").forEach { m ->
+                                FilterChip(
+                                    selected = pdfModel == m,
+                                    onClick = {
+                                        pdfModel = m
+                                        prefs.edit().putString("pdf_model", m).apply()
+                                        Toast.makeText(context, "PDF Template layout set to $m", Toast.LENGTH_SHORT).show()
+                                    },
+                                    label = { Text(if (m == "Model 1") "Model 1 (Classic)" else "Model 2 (GST & E-Way)") },
+                                    leadingIcon = if (pdfModel == m) {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    } else null,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
                     }
                 }
             }
