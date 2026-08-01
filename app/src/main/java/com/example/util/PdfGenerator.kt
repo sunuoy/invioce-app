@@ -665,28 +665,8 @@ object PdfGenerator {
             }
         }
 
-        // 7B: PANEL TWO - QR CODE & BANK INFORMATION (Middle Column)
-        // Draw REAL dynamically sized Dynamic UPI QR Code containing exact bill total
-        // Decreased size by 5%: 120 * 0.95 = 114
-        val qrSizeInt = 114
-        val qrX = pane2X + ((pane3X - pane2X) - qrSizeInt.toFloat()) / 2f
-        val qrY = 628f
-
-        val isQrEnabledInSettings = prefs.getBoolean("show_pdf_qr", true)
-        val hasValidUpiId = profile != null && profile.upiId.trim().isNotBlank()
-
-        if (isQrEnabledInSettings && hasValidUpiId) {
-            try {
-                val encodedPn = android.net.Uri.encode(profile!!.businessName)
-                val upiUri = "upi://pay?pa=${profile.upiId.trim()}&pn=$encodedPn&am=${invoice.grandTotal}&cu=INR"
-                val upiBitmap = generateQrCodeBitmap(upiUri, qrSizeInt)
-                canvas.drawBitmap(upiBitmap, qrX, qrY, null)
-            } catch (_: Exception) {
-                // If bitmap generation fails, skip rendering QR frame
-            }
-        }
-
-        // Bank Details from Profile
+        // 7B: PANEL TWO - BANK INFORMATION & QR CODE (Middle Column)
+        // Bank Details from Profile (Printed on top)
         val displayAccountName = if (!profile?.bankAccountName.isNullOrBlank()) profile!!.bankAccountName else bName
         val displayBank = if (!profile?.bankName.isNullOrBlank()) profile!!.bankName else "ICICI Bank"
         val displayAccountNo = if (!profile?.bankAccountNo.isNullOrBlank()) profile!!.bankAccountNo else if (!profile?.upiId.isNullOrBlank()) profile!!.upiId else "123456789"
@@ -703,11 +683,30 @@ object PdfGenerator {
             canvas.drawText(value, x + labelWidth, y, textPaint)
         }
 
-        drawKeyValue("Name: ", displayAccountName, pane2X + 8f, 754f)
-        drawKeyValue("Bank: ", displayBank, pane2X + 8f, 769f)
-        drawKeyValue("A/c No: ", displayAccountNo, pane2X + 8f, 784f)
-        drawKeyValue("Branch Name: ", displayBranch, pane2X + 8f, 799f)
-        drawKeyValue("IFSC Code: ", displayIfsc, pane2X + 8f, 814f)
+        drawKeyValue("Name: ", displayAccountName, pane2X + 8f, 642f)
+        drawKeyValue("Bank: ", displayBank, pane2X + 8f, 657f)
+        drawKeyValue("A/c No: ", displayAccountNo, pane2X + 8f, 672f)
+        drawKeyValue("Branch Name: ", displayBranch, pane2X + 8f, 687f)
+        drawKeyValue("IFSC Code: ", displayIfsc, pane2X + 8f, 702f)
+
+        // Draw REAL dynamically sized Dynamic UPI QR Code containing exact bill total (Printed below bank details)
+        val qrSizeInt = 114
+        val qrX = pane2X + ((pane3X - pane2X) - qrSizeInt.toFloat()) / 2f
+        val qrY = 708f
+
+        val isQrEnabledInSettings = prefs.getBoolean("show_pdf_qr", true)
+        val hasValidUpiId = profile != null && profile.upiId.trim().isNotBlank()
+
+        if (isQrEnabledInSettings && hasValidUpiId) {
+            try {
+                val encodedPn = android.net.Uri.encode(profile!!.businessName)
+                val upiUri = "upi://pay?pa=${profile.upiId.trim()}&pn=$encodedPn&am=${invoice.grandTotal}&cu=INR"
+                val upiBitmap = generateQrCodeBitmap(upiUri, qrSizeInt)
+                canvas.drawBitmap(upiBitmap, qrX, qrY, null)
+            } catch (_: Exception) {
+                // If bitmap generation fails, skip rendering QR frame
+            }
+        }
 
         // 7C: PANEL THREE - SIGNATURES & CLOSE (Right Column)
         val companySignatureLabel = "For $bName"
