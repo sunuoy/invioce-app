@@ -69,6 +69,9 @@ class ExampleRobolectricTest {
     viewModel.populateDummyData()
     
     // Let any background/main thread tasks run to completion
+    org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+    org.robolectric.shadows.ShadowLooper.idleMainLooper()
+    kotlinx.coroutines.delay(500)
     org.robolectric.shadows.ShadowLooper.idleMainLooper()
     
     val db = InvoiceDatabase.getDatabase(context)

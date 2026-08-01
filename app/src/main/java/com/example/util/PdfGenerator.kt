@@ -1486,4 +1486,5 @@ object PdfGenerator {
 
         return pdfFile
     }
+}
 

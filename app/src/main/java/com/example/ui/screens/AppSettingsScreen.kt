@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -57,7 +58,7 @@ fun AppSettingsScreen(
         mutableStateOf(prefs.getString("app_theme_mode", "system") ?: "system") 
     }
     
-    // Database collections for Backup
+    // Database collections for Backup & Stats
     val businessProfile by viewModel.businessProfile.collectAsStateWithLifecycle()
     val savedBusinessProfiles by viewModel.savedBusinessProfiles.collectAsStateWithLifecycle()
     val products by viewModel.products.collectAsStateWithLifecycle()
@@ -148,7 +149,6 @@ fun AppSettingsScreen(
             val file = File(backupDir, "invoice_easy_backup.json")
             file.writeText(jsonString)
             
-            // Adjust package identifier dynamically - usually from manifest or build configuration
             val fileUri = FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.fileprovider",
@@ -169,10 +169,58 @@ fun AppSettingsScreen(
         }
     }
 
+    val generatorPrefs = remember { context.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE) }
+    var showTaxSummarySetting by remember {
+        mutableStateOf(generatorPrefs.getBoolean("show_tax_summary", true))
+    }
+    var showSalesTrendSetting by remember {
+        mutableStateOf(generatorPrefs.getBoolean("show_sales_trend", true))
+    }
+    var showPdfQrSetting by remember {
+        mutableStateOf(generatorPrefs.getBoolean("show_pdf_qr", true))
+    }
+    var showTermsConditionsSetting by remember {
+        mutableStateOf(generatorPrefs.getBoolean("show_terms_conditions", true))
+    }
+    var pdfModelSetting by remember {
+        mutableStateOf(generatorPrefs.getString("pdf_model", "Model 1") ?: "Model 1")
+    }
+    var isDemoDataEnabled by remember(invoices, products) {
+        mutableStateOf(generatorPrefs.getBoolean("demo_data_enabled", invoices.isNotEmpty() || products.isNotEmpty()))
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("App Settings", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Column {
+                            Text("App Control Center", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text(
+                                "System Preferences & Database",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick, modifier = Modifier.testTag("app_settings_menu_btn")) {
                         Icon(Icons.Default.Menu, contentDescription = "Open navigation menu")
@@ -195,86 +243,139 @@ fun AppSettingsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 0. Active Company Profile Details Card
-            businessProfile?.let { profile ->
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-                    ),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
-                    modifier = Modifier.fillMaxWidth().testTag("active_company_card")
+            // 0. Hero Header Card & Database Snapshot Overview
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().testTag("active_company_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    businessProfile?.let { profile ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                text = profile.shortIcon.takeIf { it.isNotEmpty() } ?: "💼",
-                                fontSize = 24.sp
-                            )
-                            Column {
-                                Text(
-                                    text = profile.businessName,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = "Active Company Profile",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                    modifier = Modifier.size(46.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = profile.shortIcon.takeIf { it.isNotEmpty() } ?: "💼",
+                                            fontSize = 24.sp
+                                        )
+                                    }
+                                }
+                                Column {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = profile.businessName,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                "ACTIVE",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = Color.White,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = if (profile.gstin.isNotBlank()) "GSTIN: ${profile.gstin}" else "No GSTIN Configured",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
-                        
+
                         HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            thickness = 1.dp
                         )
-                        
-                        if (profile.phone.isNotBlank()) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.outline)
-                                Text(profile.phone, style = MaterialTheme.typography.bodySmall)
-                            }
+                    }
+
+                    // Database Live Snapshot Stats Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceAround
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "${invoices.size}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text("Invoices", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                         }
-                        if (profile.email.isNotBlank()) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.outline)
-                                Text(profile.email, style = MaterialTheme.typography.bodySmall)
-                            }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "${customers.size}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                            Text("Clients", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                         }
-                        if (profile.gstin.isNotBlank()) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.outline)
-                                Text("GSTIN: ${profile.gstin}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                            }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "${products.size}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.tertiary
+                            )
+                            Text("Products", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                         }
-                        if (profile.address.isNotBlank()) {
-                            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.outline)
-                                Text(profile.address, style = MaterialTheme.typography.bodySmall)
-                            }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = if (gdAccessToken.isNotEmpty()) "Synced" else "Offline",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (gdAccessToken.isNotEmpty()) Color(0xFF2E7D32) else MaterialTheme.colorScheme.outline
+                            )
+                            Text("Cloud Status", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                         }
                     }
                 }
             }
-            
-            // Invite Friends / Share App Card
+
+            // Invite / Share App Card Banner
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().clickable { context.shareApp() }
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -283,23 +384,23 @@ fun AppSettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(40.dp)
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(38.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Share, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                             }
                         }
                         Column {
                             Text(
                                 text = "Invite Friends & Businesses",
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Share Invoice App via WhatsApp, Email, or SMS",
+                                text = "Share Invoice Easy via WhatsApp, Email, or SMS",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -309,15 +410,16 @@ fun AppSettingsScreen(
                 }
             }
 
-            // 1. Interactive Theme Preferences Section
+            // 1. Visual Theme Configuration Card
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth().testTag("theme_selection_card")
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -327,53 +429,56 @@ fun AppSettingsScreen(
                             imageVector = Icons.Default.Palette,
                             contentDescription = "Theme style Selection icon",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "Visual Theme Configuration",
+                            text = "Visual Theme & Appearance",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-                    
+
                     Text(
-                        text = "Customize how the app display options appear. Choosing a specific theme mode modifies UI background scales dynamic lighting properties:",
+                        text = "Customize the interface style across all screens:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    
-                    Column(
+
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         listOf(
-                            Triple("system", "System Default Theme", Icons.Default.Settings),
-                            Triple("light", "Light Interface Style", Icons.Default.LightMode),
-                            Triple("dark", "Dark Obsidian Style", Icons.Default.DarkMode)
+                            Triple("system", "System", Icons.Default.Settings),
+                            Triple("light", "Light", Icons.Default.LightMode),
+                            Triple("dark", "Dark", Icons.Default.DarkMode)
                         ).forEach { (mode, label, icon) ->
                             val isSelected = currentThemeMode == mode
                             Surface(
                                 onClick = {
                                     currentThemeMode = mode
                                     prefs.edit().putString("app_theme_mode", mode).apply()
-                                    Toast.makeText(context, "$label activated (restart to apply fully)!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "$label Theme activated!", Toast.LENGTH_SHORT).show()
                                 },
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                                modifier = Modifier.fillMaxWidth()
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                ),
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                Column(
+                                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Icon(
                                         imageVector = icon,
                                         contentDescription = null,
                                         tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                     Text(
                                         text = label,
@@ -381,15 +486,6 @@ fun AppSettingsScreen(
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                         color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                     )
-                                    Spacer(modifier = Modifier.weight(1f))
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Default.CheckCircle,
-                                            contentDescription = "Theme Selected",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -398,24 +494,15 @@ fun AppSettingsScreen(
             }
 
             // 1.25. Dashboard Configuration Preferences Card
-            val generatorPrefs = remember { context.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE) }
-            var showTaxSummarySetting by remember {
-                mutableStateOf(generatorPrefs.getBoolean("show_tax_summary", true))
-            }
-            var showSalesTrendSetting by remember {
-                mutableStateOf(generatorPrefs.getBoolean("show_sales_trend", true))
-            }
-            var isDemoDataEnabled by remember(invoices, products) {
-                mutableStateOf(generatorPrefs.getBoolean("demo_data_enabled", invoices.isNotEmpty() || products.isNotEmpty()))
-            }
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth().testTag("dashboard_settings_card")
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -425,10 +512,10 @@ fun AppSettingsScreen(
                             imageVector = Icons.Default.Dashboard,
                             contentDescription = "Dashboard settings icon",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "Dashboard Configuration",
+                            text = "Dashboard Layout & Widgets",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -436,12 +523,12 @@ fun AppSettingsScreen(
                     }
 
                     Text(
-                        text = "Toggle visibility of elements displayed on the main report overview and dashboard home page:",
+                        text = "Toggle visibility of interactive components on the home dashboard:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -456,7 +543,7 @@ fun AppSettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Show/Hide interactive tax calculation widgets on dashboard.",
+                                text = "Show/Hide tax calculation breakdown widgets on dashboard.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -472,7 +559,7 @@ fun AppSettingsScreen(
                         )
                     }
 
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -505,11 +592,148 @@ fun AppSettingsScreen(
                 }
             }
 
-            // 1.5. Demo & Dummy Data Seeding Card
+            // 1.35. PDF Invoice Format & Layout Preferences Card
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().testTag("pdf_preferences_card_app_settings")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PictureAsPdf,
+                            contentDescription = "PDF Preferences Icon",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "PDF Document Preferences",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Text(
+                        text = "Customize layout format, UPI payment QR display, and terms visibility on generated PDF invoices:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "PDF UPI Payment QR Code",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Show/Hide dynamic UPI payment QR code on generated PDF invoices.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = showPdfQrSetting,
+                            onCheckedChange = { isChecked ->
+                                showPdfQrSetting = isChecked
+                                generatorPrefs.edit().putBoolean("show_pdf_qr", isChecked).apply()
+                                Toast.makeText(context, if (isChecked) "PDF UPI QR Code Enabled!" else "PDF UPI QR Code Disabled!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.testTag("pdf_qr_toggle_app_settings")
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "PDF Terms & Conditions",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Show/Hide Terms & Conditions section on generated PDF invoices.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = showTermsConditionsSetting,
+                            onCheckedChange = { isChecked ->
+                                showTermsConditionsSetting = isChecked
+                                generatorPrefs.edit().putBoolean("show_terms_conditions", isChecked).apply()
+                                Toast.makeText(context, if (isChecked) "PDF Terms & Conditions Enabled!" else "PDF Terms & Conditions Disabled!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.testTag("terms_conditions_toggle_app_settings")
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "PDF Layout Template Format",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Select format style (Model 1: Classic Compact, Model 2: E-Way & Dynamic IRN/QR Format)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            listOf("Model 1", "Model 2").forEach { m ->
+                                FilterChip(
+                                    selected = pdfModelSetting == m,
+                                    onClick = {
+                                        pdfModelSetting = m
+                                        generatorPrefs.edit().putString("pdf_model", m).apply()
+                                        Toast.makeText(context, "PDF Template layout set to $m", Toast.LENGTH_SHORT).show()
+                                    },
+                                    label = { Text(if (m == "Model 1") "Model 1 (Classic)" else "Model 2 (GST & E-Way)") },
+                                    leadingIcon = if (pdfModelSetting == m) {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    } else null,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 1.5. Demo & Dummy Data Seeding Card with ON/OFF Toggle Switch
             Card(
                 modifier = Modifier.fillMaxWidth().testTag("demo_seeding_card_settings"),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.35f)),
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -529,7 +753,7 @@ fun AppSettingsScreen(
                                 imageVector = Icons.Default.Star,
                                 contentDescription = "Load Sample Data Icon",
                                 tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                             Text(
                                 text = "Instant Demo Data Seeding",
@@ -557,7 +781,7 @@ fun AppSettingsScreen(
                     }
 
                     Text(
-                        text = "Seed the database with sample business profiles, ready-to-bill products/services, clients, and mock invoices. This gives you beautiful charts, metrics, and instant test templates on the streaming simulator!",
+                        text = "Seed the database with sample business profiles, ready-to-bill products/services, clients, and mock invoices. This gives you instant metrics, test templates, and interactive charts!",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -574,7 +798,7 @@ fun AppSettingsScreen(
                             containerColor = MaterialTheme.colorScheme.tertiary,
                             contentColor = MaterialTheme.colorScheme.onTertiary
                         ),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(10.dp)
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = "Repopulate", modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -583,61 +807,12 @@ fun AppSettingsScreen(
                 }
             }
 
-            // 1.75. Danger Zone - Wipe Database Card
-            Card(
-                modifier = Modifier.fillMaxWidth().testTag("danger_zone_card_settings"),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f))
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteForever,
-                            contentDescription = "Danger Zone Icon",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Text(
-                            text = "Danger Zone",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-
-                    Text(
-                        text = "Permanently wipe all database records including your business profiles, products stock, customer registry, and invoices. This action is irreversible.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Button(
-                        onClick = { showClearDataConfirmation = true },
-                        modifier = Modifier.fillMaxWidth().testTag("clear_all_data_button_settings"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = "Clear All Data", modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Wipe All Database Data", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            // 2. Data Backup & Recovery Section
+            // 2. Data Backup & Recovery Section Card
             Card(
                 modifier = Modifier.fillMaxWidth().testTag("backup_recovery_card_settings"),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -651,10 +826,10 @@ fun AppSettingsScreen(
                             imageVector = Icons.Default.CloudSync,
                             contentDescription = "Database Sync and Backup",
                             tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "Central Database Backups",
+                            text = "Database Backup & Offline Restore",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.secondary
@@ -662,7 +837,7 @@ fun AppSettingsScreen(
                     }
 
                     Text(
-                        text = "Take complete backups of your local billing databases (Business template configuration, stock product items, customers directory list, and past generated invoices) into a portable JSON file, or restore data backward.",
+                        text = "Export complete backups of your billing database (profiles, inventory items, clients, and invoices) as JSON files or restore from an existing file.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -682,14 +857,10 @@ fun AppSettingsScreen(
                                     containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = MaterialTheme.colorScheme.onPrimary
                                 ),
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 contentPadding = PaddingValues(vertical = 10.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share backup",
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Icon(Icons.Default.Share, contentDescription = "Share backup", modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Share Backup", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                             }
@@ -701,14 +872,10 @@ fun AppSettingsScreen(
                                     containerColor = MaterialTheme.colorScheme.tertiary,
                                     contentColor = MaterialTheme.colorScheme.onTertiary
                                 ),
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 contentPadding = PaddingValues(vertical = 10.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Save,
-                                    contentDescription = "Save Offline",
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Icon(Icons.Default.Save, contentDescription = "Save Offline", modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Save Offline", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                             }
@@ -721,28 +888,23 @@ fun AppSettingsScreen(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                             ),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(vertical = 10.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CloudUpload,
-                                contentDescription = "Import and overwrite backup",
-                                modifier = Modifier.size(16.dp)
-                            )
+                            Icon(Icons.Default.CloudUpload, contentDescription = "Import backup", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Import Restore", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Import Restore File", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // 2.5. Accounting Spreadsheet Export Section (Excel)
+            // 2.5. Accounting Spreadsheet Export Section (Excel) Card
             Card(
                 modifier = Modifier.fillMaxWidth().testTag("excel_export_card_settings"),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -756,10 +918,10 @@ fun AppSettingsScreen(
                             imageVector = Icons.Default.TableView,
                             contentDescription = "Excel Accounting Spreadsheets",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "Excel & Accounting Export",
+                            text = "Accounting & Excel Ledger Export",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -767,7 +929,7 @@ fun AppSettingsScreen(
                     }
 
                     Text(
-                        text = "Export your entire customer roster and invoice register transactions as standard Excel (.csv) spreadsheets. Ideal for your accountant, tax returns, auditing, or importing transactions directly into Tally/Microsoft Excel.",
+                        text = "Export client roster and invoice ledger entries as standard CSV spreadsheets for Tally, Excel, or tax returns.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -795,16 +957,12 @@ fun AppSettingsScreen(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(vertical = 10.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.FileDownload,
-                                contentDescription = "Download CSV",
-                                modifier = Modifier.size(16.dp)
-                            )
+                            Icon(Icons.Default.FileDownload, contentDescription = "Download CSV", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Save Ledger", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Save Ledger CSV", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
 
                         Button(
@@ -821,14 +979,10 @@ fun AppSettingsScreen(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                             ),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(vertical = 10.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Share CSV via other apps",
-                                modifier = Modifier.size(16.dp)
-                            )
+                            Icon(Icons.Default.Share, contentDescription = "Share CSV", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Share Spreadsheet", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
@@ -836,13 +990,12 @@ fun AppSettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
             // 2.65. Google Drive Cloud Sync Card
             Card(
                 modifier = Modifier.fillMaxWidth().testTag("google_drive_sync_card"),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -853,7 +1006,7 @@ fun AppSettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         val primaryColor = MaterialTheme.colorScheme.primary
-                        Canvas(modifier = Modifier.size(24.dp)) {
+                        Canvas(modifier = Modifier.size(22.dp)) {
                             val path = Path().apply {
                                 moveTo(4.dp.toPx(), 16.dp.toPx())
                                 cubicTo(2.dp.toPx(), 16.dp.toPx(), 1.dp.toPx(), 14.dp.toPx(), 1.dp.toPx(), 12.dp.toPx())
@@ -865,18 +1018,11 @@ fun AppSettingsScreen(
                                 lineTo(4.dp.toPx(), 17.dp.toPx())
                                 close()
                             }
-                            drawPath(
-                                path = path,
-                                color = primaryColor.copy(alpha = 0.08f)
-                            )
-                            drawPath(
-                                path = path,
-                                color = primaryColor.copy(alpha = 0.6f),
-                                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
-                            )
+                            drawPath(path = path, color = primaryColor.copy(alpha = 0.12f))
+                            drawPath(path = path, color = primaryColor.copy(alpha = 0.8f), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
                         }
                         Text(
-                            text = "Google Drive Sync",
+                            text = "Google Drive Cloud Sync",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -884,18 +1030,18 @@ fun AppSettingsScreen(
                     }
 
                     Text(
-                        text = "Auto-save your business profile, stock items, customer data, and invoices to your personal Google Drive account in the background.",
+                        text = "Auto-save your business profile, stock items, customer data, and invoices to Google Drive in the background.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Status: ${if (gdAccessToken.isNotEmpty()) "Connected (Auto-sync Active)" else "Disconnected"}",
+                            text = "Status: ${if (gdAccessToken.isNotEmpty()) "Connected" else "Disconnected"}",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
                             color = if (gdAccessToken.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
@@ -911,56 +1057,54 @@ fun AppSettingsScreen(
                         }
                     }
 
-                    Text(
-                        text = "Last Synced: $gdLastSyncTime",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+                    if (gdAccessToken.isNotEmpty() && gdLastSyncTime.isNotEmpty()) {
+                        Text(
+                            text = "Last Synced: $gdLastSyncTime",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
 
                     if (gdAccessToken.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "Sync Frequency",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                .padding(4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            listOf("auto" to "Automatic", "hourly" to "Hourly", "manual" to "Manual").forEach { (value, label) ->
-                                val selected = gdSyncMode == value
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable { viewModel.setGoogleDriveSyncMode(value) },
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                    contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                ) {
-                                    Text(
-                                        text = label,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(vertical = 8.dp),
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                    )
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "Sync Frequency Mode",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                    .padding(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                listOf("auto" to "Automatic", "hourly" to "Hourly", "manual" to "Manual").forEach { (value, label) ->
+                                    val selected = gdSyncMode == value
+                                    Surface(
+                                        modifier = Modifier.weight(1f).clickable { viewModel.setGoogleDriveSyncMode(value) },
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(vertical = 8.dp),
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
                     if (gdAccessToken.isEmpty()) {
                         Button(
                             modifier = Modifier.fillMaxWidth().height(42.dp),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             onClick = {
                                 val intent = android.accounts.AccountManager.newChooseAccountIntent(
                                     null, null, arrayOf("com.google"), null, null, null, null
@@ -970,7 +1114,7 @@ fun AppSettingsScreen(
                         ) {
                             Icon(Icons.Default.CloudQueue, contentDescription = "Connect Google Drive", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Connect Google Drive", fontSize = 12.sp)
+                            Text("Connect Google Drive Account", fontSize = 12.sp)
                         }
                     } else {
                         Row(
@@ -979,7 +1123,7 @@ fun AppSettingsScreen(
                         ) {
                             Button(
                                 modifier = Modifier.weight(1f).height(42.dp),
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 enabled = !gdSyncing,
                                 onClick = {
                                     viewModel.backupToGoogleDrive { success, msg ->
@@ -998,7 +1142,7 @@ fun AppSettingsScreen(
 
                             OutlinedButton(
                                 modifier = Modifier.weight(1f).height(42.dp),
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 enabled = !gdSyncing,
                                 onClick = {
                                     viewModel.restoreFromGoogleDrive { success, msg ->
@@ -1019,8 +1163,6 @@ fun AppSettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
             // 2.75. GitHub Application Updates Card
             val updateInfoState by viewModel.updateInfo.collectAsStateWithLifecycle()
             val updateInfo = updateInfoState
@@ -1031,21 +1173,12 @@ fun AppSettingsScreen(
 
             Card(
                 modifier = Modifier.fillMaxWidth().testTag("github_updates_card_settings"),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (updateInfo?.isUpdateAvailable == true) {
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                    }
-                ),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(
                     1.dp,
-                    if (updateInfo?.isUpdateAvailable == true) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                    } else {
-                        MaterialTheme.colorScheme.outlineVariant
-                    }
-                )
+                    if (updateInfo?.isUpdateAvailable == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                ),
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -1058,54 +1191,36 @@ fun AppSettingsScreen(
                         Icon(
                             imageVector = Icons.Default.SystemUpdate,
                             contentDescription = "App Update Checker Icon",
-                            tint = if (updateInfo?.isUpdateAvailable == true) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.secondary
-                            },
-                            modifier = Modifier.size(22.dp)
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "Application Updates",
+                            text = "Software Updates",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = if (updateInfo?.isUpdateAvailable == true) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.secondary
-                            }
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
 
                     if (updateInfo == null) {
                         Text(
-                            text = "Check if a newer version of Invoice Easy is available on GitHub.",
+                            text = "Check for newer updates or release patches directly from GitHub.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else if (updateInfo.isUpdateAvailable) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
-                                text = "New version available: ${updateInfo.latestVersion}",
+                                text = "New release version available: ${updateInfo.latestVersion}",
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "Current version: ${updateInfo.currentVersion}",
+                                text = "Current installed: v${updateInfo.currentVersion}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            if (updateInfo.releaseNotes.isNotBlank()) {
-                                Text(
-                                    text = "Release notes:\n${updateInfo.releaseNotes}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 4,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                            }
                         }
                     } else {
                         Row(
@@ -1128,10 +1243,9 @@ fun AppSettingsScreen(
                     }
 
                     if (isDownloading) {
-                        Spacer(modifier = Modifier.height(8.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             LinearProgressIndicator(
-                                progress = dlProgress,
+                                progress = { dlProgress },
                                 modifier = Modifier.fillMaxWidth(),
                                 color = MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -1142,7 +1256,7 @@ fun AppSettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = dlStatus ?: "Downloading...",
+                                    text = dlStatus ?: "Downloading update...",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1168,24 +1282,16 @@ fun AppSettingsScreen(
                                 containerColor = MaterialTheme.colorScheme.secondary,
                                 contentColor = MaterialTheme.colorScheme.onSecondary
                             ),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(vertical = 10.dp)
                         ) {
                             if (isCheckingForUpdates) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onSecondary
-                                )
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onSecondary)
                             } else {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Check now",
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Icon(Icons.Default.Refresh, contentDescription = "Check now", modifier = Modifier.size(16.dp))
                             }
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(if (isCheckingForUpdates) "Checking..." else "Check Now", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Text(if (isCheckingForUpdates) "Checking..." else "Check For Updates", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
 
                         if (updateInfo?.isUpdateAvailable == true && !isDownloading) {
@@ -1196,14 +1302,10 @@ fun AppSettingsScreen(
                                     containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = MaterialTheme.colorScheme.onPrimary
                                 ),
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 contentPadding = PaddingValues(vertical = 10.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.CloudDownload,
-                                    contentDescription = "Download release update",
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Icon(Icons.Default.CloudDownload, contentDescription = "Install update", modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Install Update", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                             }
@@ -1212,12 +1314,62 @@ fun AppSettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            // 1.75. Danger Zone - Wipe Database Card
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("danger_zone_card_settings"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteForever,
+                            contentDescription = "Danger Zone Icon",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "Danger Zone",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
 
-            // 3. Billing Features Documentation & Help Guide
+                    Text(
+                        text = "Permanently wipe database records including business profiles, stock items, customer directory, and past invoices.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Button(
+                        onClick = { showClearDataConfirmation = true },
+                        modifier = Modifier.fillMaxWidth().testTag("clear_all_data_button_settings"),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "Clear All Data", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Wipe All Database Records", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            // 3. Billing Features Documentation & Support Quick Guide
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -1242,17 +1394,17 @@ fun AppSettingsScreen(
                     }
                     
                     listOf(
-                        "📄 Real-time PDF Export" to "Fully formatted PDF invoices are auto-generated from active bills using high-performance graphic canvases.",
-                        "✨ Personalized Branding" to "Define custom business letterheads, include authorized signature overlays, and insert preset or custom logos.",
-                        "📦 Active Product Inventory" to "Add, update, and manage products instantly with automatic CGST / SGST tax classifications.",
-                        "👥 Client Directory Manager" to "Secure contact profiles to quickly lookup and populate clients when generating bills."
+                        "📄 Real-time PDF Export" to "Fully formatted PDF invoices generated from active bills with custom themes.",
+                        "✨ Branding Customization" to "Configure headers, authorized signatures, bank details, and business logo.",
+                        "📦 Inventory Management" to "Track products with stock count, HSN/SAC codes, and tax rates.",
+                        "👥 Client Directory" to "Quick customer lookup when issuing bills with place of supply metadata."
                     ).forEach { (feature, explanation) ->
-                        Column {
+                        Column(modifier = Modifier.padding(vertical = 2.dp)) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
                                 Text(feature, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
                             }
                             Text(
@@ -1260,18 +1412,16 @@ fun AppSettingsScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 18.dp, bottom = 4.dp)
+                                modifier = Modifier.padding(start = 20.dp)
                             )
                         }
                     }
                 }
             }
 
-
-
             // App Version Footer
             Box(
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1282,9 +1432,9 @@ fun AppSettingsScreen(
                         color = MaterialTheme.colorScheme.outline
                     )
                     Text(
-                        text = "v${com.example.BuildConfig.VERSION_NAME} • Developed in Google AI Studio",
+                        text = "v${com.example.BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.8f)
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
                     )
                 }
             }
