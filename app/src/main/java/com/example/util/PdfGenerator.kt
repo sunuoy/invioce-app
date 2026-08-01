@@ -1083,7 +1083,7 @@ object PdfGenerator {
             )
 
             // 4. Create Share Intent
-            val shareText = "Hello, please pay ₹${String.format(Locale.US, "%.2f", amount)} to $businessName via UPI ID: $upiId\nPayment Link: $upiUri"
+            val shareText = "Hello, please pay ₹${String.format(Locale.US, "%,.2f", amount)} to $businessName via UPI ID: $upiId\nPayment Link: $upiUri"
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "image/png"
                 putExtra(Intent.EXTRA_STREAM, uri)
@@ -1099,7 +1099,7 @@ object PdfGenerator {
             e.printStackTrace()
             // Fallback to text-only share
             try {
-                val shareText = "Hello, please pay ₹${String.format(Locale.US, "%.2f", amount)} to $businessName via UPI ID: $upiId\nPayment Link: $upiUri"
+                val shareText = "Hello, please pay ₹${String.format(Locale.US, "%,.2f", amount)} to $businessName via UPI ID: $upiId\nPayment Link: $upiUri"
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
                     putExtra(Intent.EXTRA_TEXT, shareText)

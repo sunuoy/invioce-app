@@ -1859,9 +1859,9 @@ fun CreateInvoiceScreen(
                                 val discountVal = maxOf(0.0, origSub - lineItem.subtotal)
                                 Text(
                                     buildString {
-                                        append("${lineItem.quantity} ${lineItem.unit} @ ₹${lineItem.price}")
+                                        append("${lineItem.quantity} ${lineItem.unit} @ ₹${String.format(Locale.US, "%,.2f", lineItem.price)}")
                                         if (discountVal > 0.0) {
-                                            append(" (-₹${String.format(Locale.US, "%.2f", discountVal)})")
+                                            append(" (-₹${String.format(Locale.US, "%,.2f", discountVal)})")
                                         }
                                         append(" (GST: ${lineItem.taxRate}%)")
                                     },
