@@ -361,7 +361,7 @@ fun DashboardScreen(
                                 }
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Text(
-                                    text = String.format(Locale.US, "₹%.2f", totalSales ?: 0.0),
+                                    text = String.format(Locale.US, "₹%,.2f", totalSales ?: 0.0),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -457,7 +457,7 @@ fun DashboardScreen(
                                 }
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Text(
-                                    text = String.format(Locale.US, "₹%.2f", outstandingAmount ?: 0.0),
+                                    text = String.format(Locale.US, "₹%,.2f", outstandingAmount ?: 0.0),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -728,21 +728,21 @@ fun DashboardScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text("Taxable turnover (Subtotal)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(String.format(Locale.US, "₹%.2f", totalTaxableTurnover), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                                    Text(String.format(Locale.US, "₹%,.2f", totalTaxableTurnover), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                                 }
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text("Aggregated GST Collected", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                                    Text(String.format(Locale.US, "₹%.2f", totalGstCollected), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                    Text(String.format(Locale.US, "₹%,.2f", totalGstCollected), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
                                 }
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text("Total gross business sales", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(String.format(Locale.US, "₹%.2f", totalGrossSales), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                                    Text(String.format(Locale.US, "₹%,.2f", totalGrossSales), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }
@@ -777,7 +777,7 @@ fun DashboardScreen(
                                             fontWeight = FontWeight.Medium
                                         )
                                         Text(
-                                            text = String.format(Locale.US, "₹%.2f", taxVal),
+                                            text = String.format(Locale.US, "₹%,.2f", taxVal),
                                             style = MaterialTheme.typography.bodySmall,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurface
@@ -929,7 +929,7 @@ fun RecentInvoiceItemRow(
                 horizontalAlignment = Alignment.End
             ) {
                 Text(
-                    text = String.format(Locale.US, "₹%.2f", item.invoice.grandTotal),
+                    text = String.format(Locale.US, "₹%,.2f", item.invoice.grandTotal),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary

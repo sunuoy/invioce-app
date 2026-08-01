@@ -14,8 +14,8 @@ android {
     applicationId = "com.invoice.generator"
     minSdk = 24
     targetSdk = 36
-    versionCode = 211
-    versionName = "1.21.1"
+    versionCode = 212
+    versionName = "1.21.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

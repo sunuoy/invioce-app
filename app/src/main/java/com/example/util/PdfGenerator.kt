@@ -517,9 +517,9 @@ object PdfGenerator {
             canvas.drawText("${idx + 1}", tableColsX[0] + 5f, tableRowY, tableTextPaint)
             canvas.drawText(displayName, tableColsX[1] + 5f, tableRowY, tableTextPaint)
             canvas.drawText(hsnSacVal, tableColsX[2] + 4f, tableRowY, tableTextPaint)
-            canvas.drawText(String.format(Locale.US, "%.2f", item.quantity), tableColsX[3] + 4f, tableRowY, tableTextPaint)
+            canvas.drawText(String.format(Locale.US, "%,.2f", item.quantity), tableColsX[3] + 4f, tableRowY, tableTextPaint)
             canvas.drawText(item.unit.takeIf { it.isNotBlank() } ?: "N.A.", tableColsX[4] + 4f, tableRowY, tableTextPaint)
-            canvas.drawText(String.format(Locale.US, "%.2f", item.price), tableColsX[5] + 4f, tableRowY, tableTextPaint)
+            canvas.drawText(String.format(Locale.US, "%,.2f", item.price), tableColsX[5] + 4f, tableRowY, tableTextPaint)
             
             // Computed discount representation
             val lineTotalOriginal = item.price * item.quantity
@@ -540,7 +540,7 @@ object PdfGenerator {
             val sgstRate = modelTaxRate / 2.0
             canvas.drawText(String.format(Locale.US, "%.2f", cgstRate), tableColsX[7] + 4f, tableRowY, tableTextPaint)
             canvas.drawText(String.format(Locale.US, "%.2f", sgstRate), tableColsX[8] + 4f, tableRowY, tableTextPaint)
-            canvas.drawText(String.format(Locale.US, "%.2f", item.total), tableColsX[9] + 6f, tableRowY, tableTextPaint)
+            canvas.drawText(String.format(Locale.US, "%,.2f", item.total), tableColsX[9] + 6f, tableRowY, tableTextPaint)
 
             tableRowY += 16f
         }
@@ -585,7 +585,7 @@ object PdfGenerator {
         canvas.drawRect(leftBorder + 0.5f, 562.5f, rightBorder - 0.5f, 578f, footerBgPaint)
         canvas.drawLine(leftBorder, 578f, rightBorder, 578f, borderPaint)
         canvas.drawText("Discount", leftBorder + 10f, 573.5f, textPaint)
-        canvas.drawText(String.format(Locale.US, "- %.2f", totalDiscountValue), tableColsX[9] + 6f, 573.5f, textPaint)
+        canvas.drawText(String.format(Locale.US, "- %,.2f", totalDiscountValue), tableColsX[9] + 6f, 573.5f, textPaint)
 
         // Row 5: Total Amount (Incl. Taxes) (578f to 598f)
         canvas.drawRect(leftBorder + 0.5f, 578.5f, rightBorder - 0.5f, 598f, footerBgPaint)

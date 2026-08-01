@@ -1033,7 +1033,7 @@ fun InvoiceDetailLayout(
                             Text("Business UPI Payment Details:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(businessProfile.upiId, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Text("Total Bill: ₹${String.format(Locale.US, "%.2f", item.invoice.grandTotal)}", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Total Bill: ₹${String.format(Locale.US, "%,.2f", item.invoice.grandTotal)}", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Button(
                             onClick = {
@@ -1205,7 +1205,7 @@ fun InvoiceDetailLayout(
                         )
                     }
                     Text(
-                        text = String.format(Locale.US, "₹%.2f", line.total),
+                        text = String.format(Locale.US, "₹%,.2f", line.total),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -1218,11 +1218,11 @@ fun InvoiceDetailLayout(
         // Receipt Summary Calculations
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Subtotal", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(String.format(Locale.US, "₹%.2f", item.invoice.subtotal))
+            Text(String.format(Locale.US, "₹%,.2f", item.invoice.subtotal))
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("GST Tax total", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(String.format(Locale.US, "₹%.2f", item.invoice.taxTotal))
+            Text(String.format(Locale.US, "₹%,.2f", item.invoice.taxTotal))
         }
         if (item.invoice.taxTotal > 0) {
             val sub = item.invoice.subtotal
@@ -1241,7 +1241,7 @@ fun InvoiceDetailLayout(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("CGST (Central GST - $percentStr)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                Text(String.format(Locale.US, "₹%.2f", item.invoice.taxTotal / 2.0), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                Text(String.format(Locale.US, "₹%,.2f", item.invoice.taxTotal / 2.0), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
             }
             Row(
                 modifier = Modifier
@@ -1250,7 +1250,7 @@ fun InvoiceDetailLayout(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("SGST (State GST - $percentStr)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                Text(String.format(Locale.US, "₹%.2f", item.invoice.taxTotal / 2.0), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                Text(String.format(Locale.US, "₹%,.2f", item.invoice.taxTotal / 2.0), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
             }
         }
         Row(
@@ -1261,7 +1261,7 @@ fun InvoiceDetailLayout(
         ) {
             Text("Grand Total", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             Text(
-                text = String.format(Locale.US, "₹%.2f", item.invoice.grandTotal),
+                text = String.format(Locale.US, "₹%,.2f", item.invoice.grandTotal),
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
@@ -1875,7 +1875,7 @@ fun CreateInvoiceScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    String.format(Locale.US, "₹%.2f", lineItem.total),
+                                    String.format(Locale.US, "₹%,.2f", lineItem.total),
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(end = 8.dp)
@@ -1900,7 +1900,7 @@ fun CreateInvoiceScreen(
                         Divider()
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Subtotal", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(String.format(Locale.US, "₹%.2f", subtotal))
+                            Text(String.format(Locale.US, "₹%,.2f", subtotal))
                         }
                         val totalAmountBeforeDisc = addedItems.sumOf { it.price * it.quantity }
                         val totalDiscountValue = maxOf(0.0, totalAmountBeforeDisc - subtotal)
@@ -1908,7 +1908,7 @@ fun CreateInvoiceScreen(
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Total Discount", color = MaterialTheme.colorScheme.error)
                                 Text(
-                                    String.format(Locale.US, "-₹%.2f", totalDiscountValue),
+                                    String.format(Locale.US, "-₹%,.2f", totalDiscountValue),
                                     color = MaterialTheme.colorScheme.error,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -1916,7 +1916,7 @@ fun CreateInvoiceScreen(
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("GST Tax total", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(String.format(Locale.US, "₹%.2f", taxTotal))
+                            Text(String.format(Locale.US, "₹%,.2f", taxTotal))
                         }
                         if (taxTotal > 0) {
                             val baseGstPercent = if (subtotal > 0) (taxTotal / subtotal) * 100.0 else 0.0
@@ -1933,7 +1933,7 @@ fun CreateInvoiceScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text("CGST (Central GST - $percentStr)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                                Text(String.format(Locale.US, "₹%.2f", taxTotal / 2.0), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                Text(String.format(Locale.US, "₹%,.2f", taxTotal / 2.0), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                             }
                             Row(
                                 modifier = Modifier
@@ -2815,7 +2815,7 @@ fun CatalogInvoiceItemRow(
                         }
                     }
                     Text(
-                        text = String.format(Locale.US, "₹%.2f", item.invoice.grandTotal),
+                        text = String.format(Locale.US, "₹%,.2f", item.invoice.grandTotal),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
