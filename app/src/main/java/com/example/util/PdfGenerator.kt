@@ -320,9 +320,8 @@ object PdfGenerator {
 
         var currentHeaderY = topBorder + 43f
         if (bName.isNotBlank()) {
-            canvas.drawText(bName, 95f, currentHeaderY, titlePaint.apply { textSize = 16.0f })
-            titlePaint.textSize = 14.0f // reset
-            currentHeaderY += 16f
+            canvas.drawText(bName, 95f, currentHeaderY, titlePaint.apply { textSize = 18.0f })
+            currentHeaderY += 18f
         }
         if (bAddr.isNotBlank()) {
             canvas.drawText(bAddr, 95f, currentHeaderY, textPaint.apply { textSize = 12.5f })
