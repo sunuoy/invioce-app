@@ -624,26 +624,30 @@ object PdfGenerator {
         canvas.drawLine(pane3X, 624f, pane3X, bottomBorder, borderPaint)
 
         // 7A: PANEL ONE - TERMS AND CONDITIONS (Left Column)
-        canvas.drawText("Terms and Conditions", pane1X + 8f, 642f, boldTextPaint.apply { textSize = 13.5f })
-        
-        canvas.drawText("E & O.E", pane1X + 8f, 658f, footerSmallPaint)
-        canvas.drawText("1. Goods once sold will not be taken", pane1X + 8f, 676f, textPaint.apply { textSize = 12.0f })
-        canvas.drawText("   back.", pane1X + 8f, 690f, textPaint)
-        
-        canvas.drawText("2. Interest @ 18% p.a. will be charged if", pane1X + 8f, 708f, textPaint)
-        canvas.drawText("   payment is not made on time.", pane1X + 8f, 722f, textPaint)
-        
-        canvas.drawText("3. Subject to 'Delhi' Jurisdiction only.", pane1X + 8f, 740f, textPaint)
+        val isTermsEnabledInSettings = prefs.getBoolean("show_terms_conditions", true)
+        if (isTermsEnabledInSettings) {
+            canvas.drawText("Terms and Conditions", pane1X + 8f, 642f, boldTextPaint.apply { textSize = 13.5f })
+            
+            canvas.drawText("E & O.E", pane1X + 8f, 658f, footerSmallPaint)
+            canvas.drawText("1. Goods once sold will not be taken", pane1X + 8f, 676f, textPaint.apply { textSize = 12.0f })
+            canvas.drawText("   back.", pane1X + 8f, 690f, textPaint)
+            
+            canvas.drawText("2. Interest @ 18% p.a. will be charged if", pane1X + 8f, 708f, textPaint)
+            canvas.drawText("   payment is not made on time.", pane1X + 8f, 722f, textPaint)
+            
+            canvas.drawText("3. Subject to 'Delhi' Jurisdiction only.", pane1X + 8f, 740f, textPaint)
+        }
 
         // Note details printed below terms & conditions
         if (invoice.notes.isNotBlank()) {
-            canvas.drawText("Note:", pane1X + 8f, 762f, boldTextPaint.apply { textSize = 12.0f })
+            val noteStartY = if (isTermsEnabledInSettings) 762f else 642f
+            canvas.drawText("Note:", pane1X + 8f, noteStartY, boldTextPaint.apply { textSize = 12.0f })
             
             val notesText = invoice.notes
             val maxNotesWidth = footerPaneWidth - 16f
             val words = notesText.split("\\s+".toRegex())
             var currentLine = StringBuilder()
-            var currentY = 776f
+            var currentY = noteStartY + 14f
             val notePaint = Paint(textPaint).apply { textSize = 11.5f }
             
             for (word in words) {

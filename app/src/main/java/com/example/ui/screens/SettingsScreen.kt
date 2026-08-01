@@ -129,6 +129,7 @@ fun SettingsScreen(
     var showTaxSummary by remember { mutableStateOf(prefs.getBoolean("show_tax_summary", true)) }
     var showSalesTrend by remember { mutableStateOf(prefs.getBoolean("show_sales_trend", true)) }
     var showPdfQr by remember { mutableStateOf(prefs.getBoolean("show_pdf_qr", true)) }
+    var showTermsConditions by remember { mutableStateOf(prefs.getBoolean("show_terms_conditions", true)) }
 
     var customFontPath by remember { mutableStateOf(prefs.getString("custom_font_path", "") ?: "") }
     var customFontName by remember { mutableStateOf(prefs.getString("custom_font_name", "") ?: "") }
@@ -1350,6 +1351,37 @@ fun SettingsScreen(
                                 Toast.makeText(context, if (isChecked) "PDF UPI QR Code Enabled!" else "PDF UPI QR Code Disabled!", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.testTag("pdf_qr_toggle_settings")
+                        )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "PDF Terms & Conditions",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Show/Hide Terms & Conditions section on generated PDF invoices.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = showTermsConditions,
+                            onCheckedChange = { isChecked ->
+                                showTermsConditions = isChecked
+                                prefs.edit().putBoolean("show_terms_conditions", isChecked).apply()
+                                Toast.makeText(context, if (isChecked) "PDF Terms & Conditions Enabled!" else "PDF Terms & Conditions Disabled!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.testTag("terms_conditions_toggle_settings")
                         )
                     }
                 }
