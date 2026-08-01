@@ -405,6 +405,9 @@ fun AppSettingsScreen(
             var showSalesTrendSetting by remember {
                 mutableStateOf(generatorPrefs.getBoolean("show_sales_trend", true))
             }
+            var isDemoDataEnabled by remember(invoices, products) {
+                mutableStateOf(generatorPrefs.getBoolean("demo_data_enabled", invoices.isNotEmpty() || products.isNotEmpty()))
+            }
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -513,20 +516,43 @@ fun AppSettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = "Load Sample Data Icon",
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Text(
-                            text = "Instant Demo Data Seeding",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.tertiary
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = "Load Sample Data Icon",
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Text(
+                                text = "Instant Demo Data Seeding",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.tertiary
+                            )
+                        }
+
+                        Switch(
+                            checked = isDemoDataEnabled,
+                            onCheckedChange = { isChecked ->
+                                isDemoDataEnabled = isChecked
+                                generatorPrefs.edit().putBoolean("demo_data_enabled", isChecked).apply()
+                                if (isChecked) {
+                                    viewModel.populateDummyData()
+                                    Toast.makeText(context, "Demo Data Enabled & Seeded!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    viewModel.clearAllData()
+                                    Toast.makeText(context, "Demo Data Disabled & Cleared!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.testTag("demo_data_toggle_settings")
                         )
                     }
 
@@ -538,6 +564,8 @@ fun AppSettingsScreen(
 
                     Button(
                         onClick = {
+                            isDemoDataEnabled = true
+                            generatorPrefs.edit().putBoolean("demo_data_enabled", true).apply()
                             viewModel.populateDummyData()
                             Toast.makeText(context, "Sample dataset seeded! Go back to Home / Products to explore.", Toast.LENGTH_LONG).show()
                         },

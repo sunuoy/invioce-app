@@ -1337,8 +1337,8 @@ object PdfGenerator {
             if (itemRowY <= tableBottomY - 14f) {
                 val srStr = (index + 1).toString()
                 canvas.drawText(srStr, colX[0] + 6f, itemRowY, textPaint)
-                canvas.drawText(item.itemName, colX[1] + 4f, itemRowY, boldTextPaint)
-                canvas.drawText(item.hsnCode.ifBlank { "85076000" }, colX[2] + 4f, itemRowY, textPaint)
+                canvas.drawText(item.productName, colX[1] + 4f, itemRowY, boldTextPaint)
+                canvas.drawText(item.hsnSac.ifBlank { "85076000" }, colX[2] + 4f, itemRowY, textPaint)
 
                 val qtyStr = String.format(Locale.US, "%.2f", item.quantity)
                 val qtyW = textPaint.measureText(qtyStr)
@@ -1354,7 +1354,8 @@ object PdfGenerator {
                 val taxRateW = textPaint.measureText(taxRateStr)
                 canvas.drawText(taxRateStr, colX[8] - taxRateW - 4f, itemRowY, textPaint)
 
-                val totalStr = String.format(Locale.US, "%,.2f", item.totalWithTax)
+                val itemTotal = item.subtotal + (item.subtotal * (item.taxRate / 100.0))
+                val totalStr = String.format(Locale.US, "%,.2f", itemTotal)
                 val totalW = boldTextPaint.measureText(totalStr)
                 canvas.drawText(totalStr, rightBorder - totalW - 4f, itemRowY, boldTextPaint)
 
@@ -1385,7 +1386,7 @@ object PdfGenerator {
         canvas.drawLine(leftBorder, totalRowY, rightBorder, totalRowY, borderPaint)
 
         // 9. Rupees in Words & Settlement Audit Bar (y: 640f to 680f)
-        val amountInWords = NumberToWordsConverter.convert(invoice.grandTotal.toLong())
+        val amountInWords = convertAmountToWords(invoice.grandTotal)
         canvas.drawText("Rs. $amountInWords Only", leftBorder + 8f, totalRowY + 14f, boldTextPaint)
 
         val isPaid = invoice.status.equals("Paid", ignoreCase = true)
