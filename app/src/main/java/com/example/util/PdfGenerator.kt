@@ -673,26 +673,27 @@ object PdfGenerator {
         val displayBranch = if (!profile?.bankBranch.isNullOrBlank()) profile!!.bankBranch else "Noida"
         val displayIfsc = if (!profile?.bankIfsc.isNullOrBlank()) profile!!.bankIfsc else "ICICI1234"
 
-        textPaint.textSize = 12.5f
-        boldTextPaint.textSize = 12.5f
+        // Bank details set size 14.0f
+        val bankTextPaint = Paint(textPaint).apply { textSize = 14.0f }
+        val bankBoldPaint = Paint(boldTextPaint).apply { textSize = 14.0f }
 
         // Draw with Key bold and Value normal for ultra high quality output styling
         fun drawKeyValue(label: String, value: String, x: Float, y: Float) {
-            canvas.drawText(label, x, y, boldTextPaint)
-            val labelWidth = boldTextPaint.measureText(label)
-            canvas.drawText(value, x + labelWidth, y, textPaint)
+            canvas.drawText(label, x, y, bankBoldPaint)
+            val labelWidth = bankBoldPaint.measureText(label)
+            canvas.drawText(value, x + labelWidth, y, bankTextPaint)
         }
 
         drawKeyValue("Name: ", displayAccountName, pane2X + 8f, 642f)
-        drawKeyValue("Bank: ", displayBank, pane2X + 8f, 657f)
-        drawKeyValue("A/c No: ", displayAccountNo, pane2X + 8f, 672f)
-        drawKeyValue("Branch Name: ", displayBranch, pane2X + 8f, 687f)
-        drawKeyValue("IFSC Code: ", displayIfsc, pane2X + 8f, 702f)
+        drawKeyValue("Bank: ", displayBank, pane2X + 8f, 660f)
+        drawKeyValue("A/c No: ", displayAccountNo, pane2X + 8f, 678f)
+        drawKeyValue("Branch Name: ", displayBranch, pane2X + 8f, 696f)
+        drawKeyValue("IFSC Code: ", displayIfsc, pane2X + 8f, 714f)
 
         // Draw REAL dynamically sized Dynamic UPI QR Code containing exact bill total (Printed below bank details)
-        val qrSizeInt = 114
+        val qrSizeInt = 98
         val qrX = pane2X + ((pane3X - pane2X) - qrSizeInt.toFloat()) / 2f
-        val qrY = 708f
+        val qrY = 724f
 
         val isQrEnabledInSettings = prefs.getBoolean("show_pdf_qr", true)
         val hasValidUpiId = profile != null && profile.upiId.trim().isNotBlank()
