@@ -1013,7 +1013,8 @@ fun InvoiceDetailLayout(
         }
 
         // UPI Pay Card if Business profile has UPI ID
-        if (businessProfile != null && businessProfile.upiId.isNotBlank()) {
+        val activeUpiId = businessProfile?.upiId?.trim() ?: ""
+        if (activeUpiId.isNotBlank()) {
             Spacer(modifier = Modifier.height(10.dp))
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -1032,23 +1033,24 @@ fun InvoiceDetailLayout(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Business UPI Payment Details:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.height(2.dp))
-                            Text(businessProfile.upiId, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(activeUpiId, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             Text("Total Bill: ₹${String.format(Locale.US, "%,.2f", item.invoice.grandTotal)}", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Button(
                             onClick = {
                                 try {
-                                    val encodedPn = android.net.Uri.encode(businessProfile.businessName)
-                                    val upiUri = "upi://pay?pa=${businessProfile.upiId}&pn=$encodedPn&am=${item.invoice.grandTotal}&cu=INR"
+                                    val bName = businessProfile?.businessName?.takeIf { it.isNotBlank() } ?: "My Business"
+                                    val encodedPn = android.net.Uri.encode(bName)
+                                    val upiUri = "upi://pay?pa=$activeUpiId&pn=$encodedPn&am=${item.invoice.grandTotal}&cu=INR"
                                     PdfGenerator.shareUpiQrAndLink(
                                         context = context,
                                         upiUri = upiUri,
                                         amount = item.invoice.grandTotal,
-                                        businessName = businessProfile.businessName,
-                                        upiId = businessProfile.upiId
+                                        businessName = bName,
+                                        upiId = activeUpiId
                                     )
                                 } catch (e: Exception) {
-                                    Toast.makeText(context, "Cannot share UPI link", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Cannot share UPI link: ${e.message}", Toast.LENGTH_SHORT).show()
                                 }
                             },
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
@@ -1061,11 +1063,11 @@ fun InvoiceDetailLayout(
                     }
 
                     // REAL UPI QR Code scan & pay visualization
-                    Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
                     Text("Scan to Pay Instantly", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     UpiQrImage(
-                        upiId = businessProfile.upiId,
-                        businessName = businessProfile.businessName,
+                        upiId = activeUpiId,
+                        businessName = businessProfile?.businessName?.takeIf { it.isNotBlank() } ?: "My Business",
                         amount = item.invoice.grandTotal
                     )
                 }
