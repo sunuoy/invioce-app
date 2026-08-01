@@ -1431,8 +1431,11 @@ object PdfGenerator {
         }
         canvas.drawText(settledText, leftBorder + 8f, totalRowY + 28f, boldTextPaint)
 
-        val taxBreakdownStr = "Taxable Value = ${String.format(Locale.US, "%,.2f", invoice.subtotal)} | Total Tax (GST) = ${String.format(Locale.US, "%,.2f", invoice.taxTotal)} | Total Invoice Value = ${String.format(Locale.US, "%,.2f", invoice.grandTotal)}"
-        canvas.drawText(taxBreakdownStr, leftBorder + 8f, totalRowY + 40f, textPaint.apply { textSize = 9.0f })
+        val totalCgst = invoice.taxTotal / 2.0
+        val totalSgst = invoice.taxTotal / 2.0
+        val taxBreakdownStr = "Taxable Value: ${String.format(Locale.US, "%,.2f", invoice.subtotal)} | CGST: ${String.format(Locale.US, "%,.2f", totalCgst)} | SGST: ${String.format(Locale.US, "%,.2f", totalSgst)} | Total GST: ${String.format(Locale.US, "%,.2f", invoice.taxTotal)} | Grand Total: ${String.format(Locale.US, "%,.2f", invoice.grandTotal)}"
+        canvas.drawText(taxBreakdownStr, leftBorder + 8f, totalRowY + 40f, boldTextPaint.apply { textSize = 8.5f })
+        boldTextPaint.textSize = 10.5f
         textPaint.textSize = 10.5f
 
         val footerTopY = totalRowY + 46f
