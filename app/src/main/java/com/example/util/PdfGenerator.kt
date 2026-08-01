@@ -1473,28 +1473,31 @@ object PdfGenerator {
         val isQrEnabled = prefs.getBoolean("show_pdf_qr", true)
         val upiId = profile?.upiId?.trim() ?: ""
 
-        if (isQrEnabled && upiId.isNotBlank()) {
+        val hasQr = isQrEnabled && upiId.isNotBlank()
+        if (hasQr) {
             try {
                 val encodedPn = android.net.Uri.encode(bName)
                 val upiUri = "upi://pay?pa=$upiId&pn=$encodedPn&am=${invoice.grandTotal}&cu=INR"
-                val upiBitmap = generateQrCodeBitmap(upiUri, 75)
-                canvas.drawBitmap(upiBitmap, col1End + 45f, footerTopY + 8f, null)
+                val upiBitmap = generateQrCodeBitmap(upiUri, 65)
+                canvas.drawBitmap(upiBitmap, col1End + 45f, footerTopY + 4f, null)
             } catch (_: Exception) {}
         }
 
-        var bankY = footerTopY + 92f
+        var bankY = if (hasQr) footerTopY + 72f else footerTopY + 14f
         val bankAcc = profile?.bankAccountNo?.takeIf { it.isNotBlank() } ?: "N.A."
         val bankN = profile?.bankName?.takeIf { it.isNotBlank() } ?: "N.A."
         val bankIfsc = profile?.bankIfsc?.takeIf { it.isNotBlank() } ?: "N.A."
         val bankBranch = profile?.bankBranch?.takeIf { it.isNotBlank() } ?: "N.A."
         val bankAccName = profile?.bankAccountName?.takeIf { it.isNotBlank() } ?: bName
 
-        canvas.drawText("Account Number:", col1End + 6f, bankY, boldTextPaint)
-        canvas.drawText(bankAcc, col1End + 6f, bankY + 12f, textPaint)
-        canvas.drawText("Bank: $bankN", col1End + 6f, bankY + 26f, boldTextPaint)
-        canvas.drawText("IFSC: $bankIfsc", col1End + 6f, bankY + 38f, boldTextPaint)
-        canvas.drawText("Branch: $bankBranch", col1End + 6f, bankY + 50f, textPaint)
-        canvas.drawText("Name: $bankAccName", col1End + 6f, bankY + 62f, textPaint)
+        canvas.drawText("Account Number:", col1End + 6f, bankY, boldTextPaint.apply { textSize = 9.5f })
+        canvas.drawText(bankAcc, col1End + 6f, bankY + 11f, textPaint.apply { textSize = 9.5f })
+        canvas.drawText("Bank: $bankN", col1End + 6f, bankY + 22f, boldTextPaint.apply { textSize = 9.5f })
+        canvas.drawText("IFSC: $bankIfsc", col1End + 6f, bankY + 33f, boldTextPaint.apply { textSize = 9.5f })
+        canvas.drawText("Branch: $bankBranch", col1End + 6f, bankY + 44f, textPaint.apply { textSize = 9.5f })
+        canvas.drawText("Name: $bankAccName", col1End + 6f, bankY + 55f, textPaint.apply { textSize = 9.5f })
+        boldTextPaint.textSize = 10.5f
+        textPaint.textSize = 10.5f
 
         // Panel 3: E-Invoice QR & Digital Signature (Center-Right to Right)
         canvas.drawText("E-Invoice QR", col3End + 65f, footerTopY + 14f, boldTextPaint)
