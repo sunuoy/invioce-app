@@ -1495,19 +1495,19 @@ object PdfGenerator {
             } catch (_: Exception) {}
         }
 
-        var bankY = if (hasQr) footerTopY + 72f else footerTopY + 14f
+        var bankY = if (hasQr) footerTopY + 56f else footerTopY + 10f
         val bankAcc = profile?.bankAccountNo?.takeIf { it.isNotBlank() } ?: "N.A."
         val bankN = profile?.bankName?.takeIf { it.isNotBlank() } ?: "N.A."
         val bankIfsc = profile?.bankIfsc?.takeIf { it.isNotBlank() } ?: "N.A."
         val bankBranch = profile?.bankBranch?.takeIf { it.isNotBlank() } ?: "N.A."
         val bankAccName = profile?.bankAccountName?.takeIf { it.isNotBlank() } ?: bName
 
-        canvas.drawText("Account Number:", col1End + 6f, bankY, boldTextPaint.apply { textSize = 9.5f })
-        canvas.drawText(bankAcc, col1End + 6f, bankY + 11f, textPaint.apply { textSize = 9.5f })
-        canvas.drawText("Bank: $bankN", col1End + 6f, bankY + 22f, boldTextPaint.apply { textSize = 9.5f })
-        canvas.drawText("IFSC: $bankIfsc", col1End + 6f, bankY + 33f, boldTextPaint.apply { textSize = 9.5f })
-        canvas.drawText("Branch: $bankBranch", col1End + 6f, bankY + 44f, textPaint.apply { textSize = 9.5f })
-        canvas.drawText("Name: $bankAccName", col1End + 6f, bankY + 55f, textPaint.apply { textSize = 9.5f })
+        canvas.drawText("Account Number:", col1End + 6f, bankY, boldTextPaint.apply { textSize = 9.0f })
+        canvas.drawText(bankAcc, col1End + 6f, bankY + 10f, textPaint.apply { textSize = 9.0f })
+        canvas.drawText("Bank: $bankN", col1End + 6f, bankY + 20f, boldTextPaint.apply { textSize = 9.0f })
+        canvas.drawText("IFSC: $bankIfsc", col1End + 6f, bankY + 30f, boldTextPaint.apply { textSize = 9.0f })
+        canvas.drawText("Branch: $bankBranch", col1End + 6f, bankY + 40f, textPaint.apply { textSize = 9.0f })
+        canvas.drawText("Name: $bankAccName", col1End + 6f, bankY + 50f, textPaint.apply { textSize = 9.0f })
         boldTextPaint.textSize = 10.5f
         textPaint.textSize = 10.5f
 
