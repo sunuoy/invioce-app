@@ -86,6 +86,8 @@ data class Invoice(
     val vehicleNumber: String = "",
     val brokerageBy: String = "",
     val placeOfSupply: String = "",
+    val transporterDocNo: String = "",
+    val eWayBillNo: String = "",
     val downloadCount: Int = 0,
     val dueDateTimestamp: Long = 0L,
     val paymentMethod: String = "",
@@ -272,7 +274,7 @@ interface SavedBusinessProfileDao {
         Invoice::class,
         InvoiceLineItem::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class InvoiceDatabase : RoomDatabase() {
@@ -287,23 +289,30 @@ abstract class InvoiceDatabase : RoomDatabase() {
         private var INSTANCE: InvoiceDatabase? = null
 
         val MIGRATION_10_11 = object : androidx.room.migration.Migration(10, 11) {
-            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE products ADD COLUMN dateTimestamp INTEGER NOT NULL DEFAULT " + System.currentTimeMillis())
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE products ADD COLUMN dateTimestamp INTEGER NOT NULL DEFAULT " + System.currentTimeMillis())
             }
         }
 
         val MIGRATION_11_12 = object : androidx.room.migration.Migration(11, 12) {
-            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE invoices ADD COLUMN paymentMethod TEXT NOT NULL DEFAULT ''")
-                database.execSQL("ALTER TABLE invoices ADD COLUMN paymentNote TEXT NOT NULL DEFAULT ''")
-                database.execSQL("ALTER TABLE invoices ADD COLUMN paymentAttachmentPath TEXT NOT NULL DEFAULT ''")
-                database.execSQL("ALTER TABLE invoices ADD COLUMN closeReason TEXT NOT NULL DEFAULT ''")
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE invoices ADD COLUMN paymentMethod TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE invoices ADD COLUMN paymentNote TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE invoices ADD COLUMN paymentAttachmentPath TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE invoices ADD COLUMN closeReason TEXT NOT NULL DEFAULT ''")
             }
         }
 
         val MIGRATION_12_13 = object : androidx.room.migration.Migration(12, 13) {
-            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE customers ADD COLUMN isClosed INTEGER NOT NULL DEFAULT 0")
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE customers ADD COLUMN isClosed INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_13_14 = object : androidx.room.migration.Migration(13, 14) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE invoices ADD COLUMN transporterDocNo TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE invoices ADD COLUMN eWayBillNo TEXT NOT NULL DEFAULT ''")
             }
         }
 
@@ -314,7 +323,7 @@ abstract class InvoiceDatabase : RoomDatabase() {
                     InvoiceDatabase::class.java,
                     "invoice_database"
                 )
-                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

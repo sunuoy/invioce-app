@@ -1320,6 +1320,8 @@ fun CreateInvoiceScreen(
     var vehicleNumber by remember { mutableStateOf(editingInvoice?.invoice?.vehicleNumber ?: "") }
     var brokerageBy by remember { mutableStateOf(editingInvoice?.invoice?.brokerageBy ?: "") }
     var placeOfSupply by remember { mutableStateOf(editingInvoice?.invoice?.placeOfSupply ?: "") }
+    var transporterDocNo by remember { mutableStateOf(editingInvoice?.invoice?.transporterDocNo ?: "") }
+    var eWayBillNo by remember { mutableStateOf(editingInvoice?.invoice?.eWayBillNo ?: "") }
     var dueDateTimestamp by remember { mutableStateOf(editingInvoice?.invoice?.dueDateTimestamp ?: 0L) }
     var attachmentPathState by remember { mutableStateOf(editingInvoice?.invoice?.attachmentPath ?: "") }
 
@@ -1342,6 +1344,8 @@ fun CreateInvoiceScreen(
             paymentNoteState = it.invoice.paymentNote
             paymentAttachmentPathState = it.invoice.paymentAttachmentPath
             closeReasonState = it.invoice.closeReason
+            transporterDocNo = it.invoice.transporterDocNo
+            eWayBillNo = it.invoice.eWayBillNo
         }
     }
 
@@ -1383,6 +1387,8 @@ fun CreateInvoiceScreen(
                                     vehicleNumber = vehicleNumber,
                                     brokerageBy = brokerageBy,
                                     placeOfSupply = placeOfSupply,
+                                    transporterDocNo = transporterDocNo,
+                                    eWayBillNo = eWayBillNo,
                                     dueDateTimestamp = dueDateTimestamp,
                                     attachmentPath = attachmentPathState,
                                     paymentMethod = if (statusState == "Paid") paymentMethodState else "",
@@ -1729,6 +1735,27 @@ fun CreateInvoiceScreen(
                                 label = { Text("Brokerage By") },
                                 placeholder = { Text("e.g. Transit Logix") },
                                 modifier = Modifier.weight(1.2f),
+                                singleLine = true
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = transporterDocNo,
+                                onValueChange = { transporterDocNo = it.uppercase() },
+                                label = { Text("Transporter Doc No.") },
+                                placeholder = { Text("e.g. DOCNO1234") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = eWayBillNo,
+                                onValueChange = { eWayBillNo = it },
+                                label = { Text("E-Way Bill No.") },
+                                placeholder = { Text("e.g. 101019999999") },
+                                modifier = Modifier.weight(1f),
                                 singleLine = true
                             )
                         }

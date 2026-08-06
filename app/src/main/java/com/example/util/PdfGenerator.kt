@@ -437,6 +437,18 @@ object PdfGenerator {
             optionalY += 17f
         }
 
+        if (invoice.transporterDocNo.isNotBlank()) {
+            canvas.drawText("Trans. Doc No.", midX + 10f, optionalY, textPaint)
+            canvas.drawText(" : ${invoice.transporterDocNo}", midX + 115f, optionalY, textPaint)
+            optionalY += 17f
+        }
+
+        if (invoice.eWayBillNo.isNotBlank()) {
+            canvas.drawText("E-Way Bill No.", midX + 10f, optionalY, textPaint)
+            canvas.drawText(" : ${invoice.eWayBillNo}", midX + 115f, optionalY, textPaint)
+            optionalY += 17f
+        }
+
         // --- 5. PRODUCTS / SERVICES TABLE (y: 255 to 550) ---
         canvas.drawLine(leftBorder, topBorder + 240f, rightBorder, topBorder + 240f, borderPaint)
 
@@ -1258,9 +1270,9 @@ object PdfGenerator {
         drawTransPair("Transporter Details", "", metaTopY + 15f)
         drawTransPair("Transporter", if (invoice.brokerageBy.isNotBlank()) invoice.brokerageBy else "N.A.", metaTopY + 30f)
         drawTransPair("Vehicle No.", if (invoice.vehicleNumber.isNotBlank()) invoice.vehicleNumber else "N.A.", metaTopY + 45f)
-        drawTransPair("Transporter Doc No.", "N.A.", metaTopY + 60f)
+        drawTransPair("Transporter Doc No.", if (invoice.transporterDocNo.isNotBlank()) invoice.transporterDocNo else "N.A.", metaTopY + 60f)
         drawTransPair("Transporter Doc Date", invDateStr, metaTopY + 75f)
-        drawTransPair("E-Way Bill No.", "N.A.", metaTopY + 90f)
+        drawTransPair("E-Way Bill No.", if (invoice.eWayBillNo.isNotBlank()) invoice.eWayBillNo else "N.A.", metaTopY + 90f)
 
         // 5. Billing Details & Shipping Details Row (y: 210f to 280f)
         val partyBottomY = metaBottomY + 70f
