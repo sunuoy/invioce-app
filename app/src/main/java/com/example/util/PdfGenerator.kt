@@ -1502,12 +1502,11 @@ object PdfGenerator {
         val bankBranch = profile?.bankBranch?.takeIf { it.isNotBlank() } ?: "N.A."
         val bankAccName = profile?.bankAccountName?.takeIf { it.isNotBlank() } ?: bName
 
-        canvas.drawText("Account Number:", col1End + 6f, bankY, boldTextPaint.apply { textSize = 9.5f })
-        canvas.drawText(bankAcc, col1End + 6f, bankY + 11f, textPaint.apply { textSize = 9.5f })
-        canvas.drawText("Bank: $bankN", col1End + 6f, bankY + 22f, boldTextPaint.apply { textSize = 9.5f })
-        canvas.drawText("IFSC: $bankIfsc", col1End + 6f, bankY + 33f, boldTextPaint.apply { textSize = 9.5f })
-        canvas.drawText("Branch: $bankBranch", col1End + 6f, bankY + 44f, textPaint.apply { textSize = 9.5f })
-        canvas.drawText("Name: $bankAccName", col1End + 6f, bankY + 55f, textPaint.apply { textSize = 9.5f })
+        canvas.drawText("Account No: $bankAcc", col1End + 6f, bankY, boldTextPaint.apply { textSize = 9.5f })
+        canvas.drawText("Bank: $bankN", col1End + 6f, bankY + 13f, boldTextPaint.apply { textSize = 9.5f })
+        canvas.drawText("IFSC: $bankIfsc", col1End + 6f, bankY + 26f, boldTextPaint.apply { textSize = 9.5f })
+        canvas.drawText("Branch: $bankBranch", col1End + 6f, bankY + 39f, textPaint.apply { textSize = 9.5f })
+        canvas.drawText("Name: $bankAccName", col1End + 6f, bankY + 52f, textPaint.apply { textSize = 9.5f })
         boldTextPaint.textSize = 10.5f
         textPaint.textSize = 10.5f
 
