@@ -17,6 +17,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.border
 import com.example.ui.screens.*
 import kotlinx.coroutines.launch
 
@@ -57,17 +65,18 @@ fun MainAppNavigation(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
+            val businessProfile by viewModel.businessProfile.collectAsState()
             val surfaceColor = MaterialTheme.colorScheme.surface
             ModalDrawerSheet(
                 modifier = Modifier
-                    .width(300.dp)
+                    .width(310.dp)
                     .drawBehind {
-                        // Draw background with 80% (top) to 95% (bottom) opacity (20% transparency)
+                        // Draw background with 88% (top) to 98% (bottom) opacity
                         drawRect(
                             brush = Brush.verticalGradient(
                                 colors = listOf(
-                                    surfaceColor.copy(alpha = 0.82f),
-                                    surfaceColor.copy(alpha = 0.95f)
+                                    surfaceColor.copy(alpha = 0.88f),
+                                    surfaceColor.copy(alpha = 0.98f)
                                 )
                             ),
                             size = size
@@ -76,7 +85,7 @@ fun MainAppNavigation(
                         // Orb 1 (Top Left) - Brand Violet/Indigo
                         drawCircle(
                             brush = Brush.radialGradient(
-                                colors = listOf(Color(0xFF6366F1).copy(alpha = 0.12f), Color.Transparent),
+                                colors = listOf(Color(0xFF6366F1).copy(alpha = 0.15f), Color.Transparent),
                                 center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.15f),
                                 radius = size.maxDimension * 0.5f
                             ),
@@ -86,107 +95,242 @@ fun MainAppNavigation(
                         // Orb 2 (Bottom Right) - Brand Blue
                         drawCircle(
                             brush = Brush.radialGradient(
-                                colors = listOf(Color(0xFF3B82F6).copy(alpha = 0.10f), Color.Transparent),
+                                colors = listOf(Color(0xFF3B82F6).copy(alpha = 0.12f), Color.Transparent),
                                 center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.85f),
                                 radius = size.maxDimension * 0.4f
                             ),
                             radius = size.maxDimension * 0.4f,
                             center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.85f)
                         )
-                        // Orb 3 (Center Left) - Coral Pink
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(Color(0xFFEC4899).copy(alpha = 0.08f), Color.Transparent),
-                                center = androidx.compose.ui.geometry.Offset(size.width * 0.2f, size.height * 0.5f),
-                                radius = size.maxDimension * 0.35f
-                            ),
-                            radius = size.maxDimension * 0.35f,
-                            center = androidx.compose.ui.geometry.Offset(size.width * 0.2f, size.height * 0.5f)
-                        )
                     },
                 drawerContainerColor = Color.Transparent
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Column(
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // GORGEOUS GLASS BRAND CARD
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 20.dp)
+                        .padding(horizontal = 16.dp)
+                        .border(
+                            1.dp, 
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), 
+                            RoundedCornerShape(20.dp)
+                        ),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                    )
                 ) {
-                    Text(
-                        text = "⚡ Invoice Easy Pro",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Professional Billing Hub",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Glowing Brand Logo circle
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .shadow(8.dp, RoundedCornerShape(14.dp), ambientColor = MaterialTheme.colorScheme.primary)
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.secondary
+                                        )
+                                    ),
+                                    RoundedCornerShape(14.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = businessProfile?.shortIcon?.takeIf { it.isNotEmpty() } ?: "⚡",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.width(14.dp))
+                        
+                        Column {
+                            Text(
+                                text = businessProfile?.businessName ?: "Invoice Easy Pro",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "Professional Billing Hub",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                // MENU SECTION HEADER
+                Text(
+                    text = "MAIN HUB",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    letterSpacing = 1.2.sp
+                )
 
+                // Render main navigation menu items
                 AppTab.values().forEach { tab ->
-                    NavigationDrawerItem(
-                        icon = { Icon(tab.icon, contentDescription = null) },
-                        label = { Text(tab.title) },
+                    DrawerMenuItem(
+                        icon = tab.icon,
+                        title = tab.title,
                         selected = (!showSeparateSettingsPage && currentTab == tab),
                         onClick = {
                             currentTab = tab
                             showSeparateSettingsPage = false
                             scope.launch { drawerState.close() }
                         },
-                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        modifier = Modifier.testTag(tab.tag)
                     )
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                Spacer(modifier = Modifier.height(8.dp))
-
-                NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Share, contentDescription = "Invite Friends", tint = MaterialTheme.colorScheme.primary) },
-                    label = { Text("Invite Friends / Share App", fontWeight = FontWeight.SemiBold) },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        context.shareApp()
-                    },
+                
+                // USER PROFILE / BUSINESS SETTINGS FOOTER CARD
+                Card(
                     modifier = Modifier
-                        .padding(NavigationDrawerItemDefaults.ItemPadding)
-                        .testTag("drawer_invite_item")
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-
-                NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Settings, contentDescription = "Application preferences") },
-                    label = { Text("Application Settings") },
-                    selected = showSeparateSettingsPage,
-                    onClick = {
-                        showSeparateSettingsPage = true
-                        scope.launch { drawerState.close() }
-                    },
-                    modifier = Modifier
-                        .padding(NavigationDrawerItemDefaults.ItemPadding)
-                        .testTag("drawer_settings_item")
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-
-                NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out", tint = MaterialTheme.colorScheme.error) },
-                    label = { Text("Sign Out", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        viewModel.logoutUser()
-                    },
-                    modifier = Modifier
-                        .padding(NavigationDrawerItemDefaults.ItemPadding)
-                        .testTag("drawer_logout_item")
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .border(
+                            1.dp, 
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), 
+                            RoundedCornerShape(24.dp)
+                        ),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        // Company Info Row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.secondaryContainer,
+                                        RoundedCornerShape(12.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Business,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.width(12.dp))
+                            
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = businessProfile?.businessName ?: "Apex Tech Solutions",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = businessProfile?.email?.takeIf { it.isNotEmpty() } ?: "admin@invoiceeasy.com",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                        )
+                        
+                        // Action buttons row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Invite/Share App Button
+                            IconButton(
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    context.shareApp()
+                                },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .testTag("drawer_invite_item")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Invite Friends / Share App",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            
+                            // App Preferences/Settings Button
+                            IconButton(
+                                onClick = {
+                                    showSeparateSettingsPage = true
+                                    scope.launch { drawerState.close() }
+                                },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .testTag("drawer_settings_item")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "Application Preferences",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            
+                            // Sign Out Button
+                            IconButton(
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    viewModel.logoutUser()
+                                },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .testTag("drawer_logout_item")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ExitToApp,
+                                    contentDescription = "Sign Out",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
             }
         },
         gesturesEnabled = true
@@ -321,5 +465,75 @@ fun MainAppNavigation(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun DrawerMenuItem(
+    icon: ImageVector,
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 200),
+        label = "drawer_item_bg"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+        animationSpec = tween(durationMillis = 200),
+        label = "drawer_item_content"
+    )
+    val indicatorScale by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "drawer_item_indicator"
+    )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .graphicsLayer {
+                scaleX = if (selected) 1.01f else 1f
+                scaleY = if (selected) 1.01f else 1f
+            }
+            .clip(RoundedCornerShape(12.dp))
+            .background(backgroundColor)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Vertical indicator pill on the left
+        Box(
+            modifier = Modifier
+                .width(4.dp)
+                .height(16.dp)
+                .graphicsLayer { scaleY = indicatorScale }
+                .clip(RoundedCornerShape(2.dp))
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        
+        Spacer(modifier = Modifier.width(10.dp))
+        
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.size(20.dp)
+        )
+        
+        Spacer(modifier = Modifier.width(14.dp))
+        
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = contentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
