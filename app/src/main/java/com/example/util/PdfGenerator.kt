@@ -127,6 +127,9 @@ object PdfGenerator {
         if (selectedModel.equals("Model 2", ignoreCase = true)) {
             return generateModel2Pdf(context, invoiceWithDetails, profile)
         }
+        if (selectedModel.contains("Model 3", ignoreCase = true) || selectedModel.contains("Thermal", ignoreCase = true)) {
+            return generateThermalReceiptPdf(context, invoiceWithDetails, profile)
+        }
 
         val selectedTheme = prefs.getString("pdf_theme", "Classic Navy") ?: "Classic Navy"
 
@@ -278,7 +281,8 @@ object PdfGenerator {
         canvas.drawLine(leftBorder, topBorder + 23f, rightBorder, topBorder + 23f, borderPaint)
 
         // Document Info Title Type
-        val docTitle = if (invoice.taxTotal > 0.0) "TAX INVOICE" else "BILL OF SUPPLY"
+        val isEstimate = invoice.documentType.equals("ESTIMATE", ignoreCase = true) || invoice.documentType.equals("QUOTATION", ignoreCase = true)
+        val docTitle = if (isEstimate) "ESTIMATE / QUOTATION" else if (invoice.taxTotal > 0.0) "TAX INVOICE" else "BILL OF SUPPLY"
         
         val headerTextPaint = Paint().apply {
             color = Color.WHITE
@@ -622,11 +626,13 @@ object PdfGenerator {
         canvas.drawLine(leftBorder, 624f, rightBorder, 624f, borderPaint)
         
         val isPaidOrClosed = invoice.status.equals("Paid", ignoreCase = true) || invoice.status.equals("Closed", ignoreCase = true)
-        val outstandingVal = if (isPaidOrClosed) 0.0 else invoice.grandTotal
-        val settledText = if (isPaidOrClosed) {
-            "Settled completely by electronic transfer (Bank / UPI / Card) | Outstanding Balance: 0.00"
+        val remainingBalance = (invoice.grandTotal - invoice.paidAmount).coerceAtLeast(0.0)
+        val settledText = if (isPaidOrClosed || invoice.paidAmount >= invoice.grandTotal) {
+            "Settled completely by electronic transfer (Bank / UPI / Card) | Paid: ₹${String.format(Locale.US, "%,.2f", invoice.grandTotal)} | Outstanding Balance: 0.00"
+        } else if (invoice.paidAmount > 0.0) {
+            "Partially Paid: ₹${String.format(Locale.US, "%,.2f", invoice.paidAmount)} | Status: ${invoice.status} | Balance Due: ₹${String.format(Locale.US, "%,.2f", remainingBalance)}"
         } else {
-            "Payment Pending for status: ${invoice.status} | Outstanding Balance: ${String.format(Locale.US, "%,.2f", outstandingVal)}"
+            "Payment Pending for status: ${invoice.status} | Outstanding Balance: ${String.format(Locale.US, "%,.2f", invoice.grandTotal)}"
         }
         canvas.drawText(settledText, leftBorder + 10f, 620.5f, boldTextPaint.apply { color = textMutedColor; textSize = 9.5f })
         boldTextPaint.color = textDarkColor // reset
@@ -1203,7 +1209,8 @@ object PdfGenerator {
         canvas.drawLine(leftBorder, topBorder + 18f, rightBorder, topBorder + 18f, borderPaint)
         canvas.drawText("Page No. 1 of 1", leftBorder + 6f, topBorder + 13f, textPaint)
         
-        val docTitle = if (invoice.taxTotal > 0.0) "TAX INVOICE" else "BILL OF SUPPLY"
+        val isEstimateM2 = invoice.documentType.equals("ESTIMATE", ignoreCase = true) || invoice.documentType.equals("QUOTATION", ignoreCase = true)
+        val docTitle = if (isEstimateM2) "ESTIMATE / QUOTATION" else if (invoice.taxTotal > 0.0) "TAX INVOICE" else "BILL OF SUPPLY"
         val titleWidth = boldTextPaint.measureText(docTitle)
         canvas.drawText(docTitle, leftBorder + (700f - titleWidth) / 2f, topBorder + 13f, boldTextPaint)
 
@@ -1534,6 +1541,248 @@ object PdfGenerator {
         pdfDocument.close()
 
         return pdfFile
+    }
+
+    fun generateThermalReceiptPdf(
+        context: Context,
+        invoiceWithDetails: InvoiceWithDetails,
+        profile: BusinessProfile?,
+        widthMm: Int = 80
+    ): File {
+        val invoice = invoiceWithDetails.invoice
+        val customer = invoiceWithDetails.customer
+        val items = invoiceWithDetails.lineItems
+
+        // 80mm thermal paper width is ~226 pt (at 72 dpi)
+        val pageWidth = 226
+
+        // Dynamically compute height
+        val baseHeaderHeight = 110
+        val clientInfoHeight = if (customer != null) 35 else 15
+        val itemsHeight = items.size * 22 + 25
+        val totalsHeight = 95
+        val qrHeight = if (profile?.upiId?.isNotBlank() == true) 90 else 10
+        val footerHeight = 45
+        val pageHeight = baseHeaderHeight + clientInfoHeight + itemsHeight + totalsHeight + qrHeight + footerHeight
+
+        val pdfDocument = PdfDocument()
+        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create()
+        val page = pdfDocument.startPage(pageInfo)
+        val canvas: Canvas = page.canvas
+
+        val paint = Paint().apply {
+            color = Color.BLACK
+            isAntiAlias = true
+        }
+        val boldPaint = Paint().apply {
+            color = Color.BLACK
+            typeface = getBoldTypeface()
+            isAntiAlias = true
+        }
+
+        var currentY = 18f
+        val margin = 8f
+        val rightX = pageWidth - margin
+        val centerX = pageWidth / 2f
+
+        // 1. Business Header
+        val bName = profile?.businessName?.takeIf { it.isNotBlank() } ?: "STORE RECEIPT"
+        boldPaint.textSize = 11.5f
+        boldPaint.textAlign = Paint.Align.CENTER
+        canvas.drawText(bName, centerX, currentY, boldPaint)
+        currentY += 13f
+
+        paint.textSize = 7.5f
+        paint.textAlign = Paint.Align.CENTER
+        if (!profile?.address.isNullOrBlank()) {
+            val addrLine = if (profile!!.address.length > 38) profile.address.take(35) + "..." else profile.address
+            canvas.drawText(addrLine, centerX, currentY, paint)
+            currentY += 9.5f
+        }
+        if (!profile?.phone.isNullOrBlank()) {
+            canvas.drawText("Tel: ${profile!!.phone}", centerX, currentY, paint)
+            currentY += 9.5f
+        }
+        if (!profile?.gstin.isNullOrBlank()) {
+            canvas.drawText("GSTIN: ${profile!!.gstin}", centerX, currentY, paint)
+            currentY += 9.5f
+        }
+
+        // Title
+        val isEstimate = invoice.documentType.equals("ESTIMATE", ignoreCase = true) || invoice.documentType.equals("QUOTATION", ignoreCase = true)
+        val docTitle = if (isEstimate) "*** ESTIMATE / QUOTE ***" else "*** RETAIL INVOICE ***"
+        boldPaint.textSize = 8.5f
+        boldPaint.textAlign = Paint.Align.CENTER
+        currentY += 2f
+        canvas.drawText(docTitle, centerX, currentY, boldPaint)
+        currentY += 9f
+
+        // Dotted divider
+        drawDottedLine(canvas, margin, rightX, currentY, paint)
+        currentY += 9f
+
+        // Document & Customer Meta
+        paint.textSize = 7.5f
+        paint.textAlign = Paint.Align.LEFT
+        boldPaint.textSize = 7.5f
+        boldPaint.textAlign = Paint.Align.LEFT
+
+        val sfd = SimpleDateFormat("dd-MMM-yyyy hh:mm a", Locale.US)
+        val dateStr = sfd.format(Date(invoice.dateTimestamp))
+
+        canvas.drawText("No: ${invoice.invoiceNumber}", margin, currentY, boldPaint)
+        currentY += 9.5f
+        canvas.drawText("Date: $dateStr", margin, currentY, paint)
+        currentY += 9.5f
+
+        if (customer != null && customer.name.isNotBlank()) {
+            canvas.drawText("Client: ${customer.name}", margin, currentY, boldPaint)
+            currentY += 9.5f
+            if (customer.phone.isNotBlank()) {
+                canvas.drawText("Mobile: ${customer.phone}", margin, currentY, paint)
+                currentY += 9.5f
+            }
+        }
+
+        // Dotted divider
+        drawDottedLine(canvas, margin, rightX, currentY, paint)
+        currentY += 9f
+
+        // Table Header: Item (Left), Qty (Center-Right), Amount (Right)
+        boldPaint.textSize = 7.5f
+        canvas.drawText("ITEM", margin, currentY, boldPaint)
+        boldPaint.textAlign = Paint.Align.RIGHT
+        canvas.drawText("QTY", rightX - 45f, currentY, boldPaint)
+        canvas.drawText("AMOUNT", rightX, currentY, boldPaint)
+        boldPaint.textAlign = Paint.Align.LEFT
+        currentY += 9f
+
+        drawDottedLine(canvas, margin, rightX, currentY, paint)
+        currentY += 10f
+
+        // Line items
+        paint.textSize = 7.5f
+        for (item in items) {
+            val itemName = if (item.productName.length > 18) item.productName.take(16) + ".." else item.productName
+            canvas.drawText(itemName, margin, currentY, paint)
+
+            paint.textAlign = Paint.Align.RIGHT
+            val qtyStr = "${String.format(Locale.US, "%.0f", item.quantity)} ${item.unit}"
+            canvas.drawText(qtyStr, rightX - 45f, currentY, paint)
+            canvas.drawText(String.format(Locale.US, "%.2f", item.total), rightX, currentY, paint)
+            paint.textAlign = Paint.Align.LEFT
+            currentY += 10.5f
+
+            if (item.taxRate > 0.0) {
+                paint.textSize = 6.5f
+                canvas.drawText("  @₹${item.price} + ${item.taxRate}% tax", margin, currentY, paint)
+                paint.textSize = 7.5f
+                currentY += 8.5f
+            }
+        }
+
+        drawDottedLine(canvas, margin, rightX, currentY, paint)
+        currentY += 10f
+
+        // Totals
+        paint.textSize = 7.5f
+        boldPaint.textSize = 8.5f
+
+        // Subtotal
+        canvas.drawText("Subtotal:", margin, currentY, paint)
+        paint.textAlign = Paint.Align.RIGHT
+        canvas.drawText(String.format(Locale.US, "₹%,.2f", invoice.subtotal), rightX, currentY, paint)
+        paint.textAlign = Paint.Align.LEFT
+        currentY += 10f
+
+        // Taxes
+        if (invoice.taxTotal > 0.0) {
+            canvas.drawText("GST Tax:", margin, currentY, paint)
+            paint.textAlign = Paint.Align.RIGHT
+            canvas.drawText(String.format(Locale.US, "₹%,.2f", invoice.taxTotal), rightX, currentY, paint)
+            paint.textAlign = Paint.Align.LEFT
+            currentY += 10f
+        }
+
+        // Grand Total
+        boldPaint.textSize = 9.5f
+        canvas.drawText("TOTAL AMOUNT:", margin, currentY, boldPaint)
+        boldPaint.textAlign = Paint.Align.RIGHT
+        canvas.drawText(String.format(Locale.US, "₹%,.2f", invoice.grandTotal), rightX, currentY, boldPaint)
+        boldPaint.textAlign = Paint.Align.LEFT
+        currentY += 11f
+
+        // Paid & Balance
+        if (invoice.paidAmount > 0.0 || invoice.status.equals("Paid", ignoreCase = true)) {
+            val paidVal = if (invoice.status.equals("Paid", ignoreCase = true) && invoice.paidAmount == 0.0) invoice.grandTotal else invoice.paidAmount
+            val balDue = (invoice.grandTotal - paidVal).coerceAtLeast(0.0)
+
+            paint.textSize = 7.5f
+            canvas.drawText("Paid Amount:", margin, currentY, paint)
+            paint.textAlign = Paint.Align.RIGHT
+            canvas.drawText(String.format(Locale.US, "₹%,.2f", paidVal), rightX, currentY, paint)
+            paint.textAlign = Paint.Align.LEFT
+            currentY += 10f
+
+            boldPaint.textSize = 8.5f
+            val balLabel = if (balDue <= 0.0) "Balance Due: ₹0.00 (PAID)" else "BALANCE DUE:"
+            canvas.drawText(balLabel, margin, currentY, boldPaint)
+            boldPaint.textAlign = Paint.Align.RIGHT
+            canvas.drawText(String.format(Locale.US, "₹%,.2f", balDue), rightX, currentY, boldPaint)
+            boldPaint.textAlign = Paint.Align.LEFT
+            currentY += 11f
+        }
+
+        // UPI QR Code (if UPI ID is present)
+        val upiId = profile?.upiId ?: ""
+        if (upiId.isNotBlank()) {
+            drawDottedLine(canvas, margin, rightX, currentY, paint)
+            currentY += 8f
+
+            paint.textSize = 7f
+            paint.textAlign = Paint.Align.CENTER
+            canvas.drawText("SCAN & PAY VIA UPI", centerX, currentY, paint)
+            currentY += 5f
+
+            try {
+                val encodedPn = android.net.Uri.encode(bName)
+                val remainingAmount = (invoice.grandTotal - invoice.paidAmount).coerceAtLeast(0.0)
+                val amToPay = if (remainingAmount > 0.0) remainingAmount else invoice.grandTotal
+                val upiUri = "upi://pay?pa=$upiId&pn=$encodedPn&am=$amToPay&cu=INR"
+                val upiBitmap = generateQrCodeBitmap(upiUri, 65)
+                canvas.drawBitmap(upiBitmap, centerX - 32.5f, currentY, null)
+                currentY += 72f
+            } catch (_: Exception) {}
+        }
+
+        // Footer Thank You message
+        drawDottedLine(canvas, margin, rightX, currentY, paint)
+        currentY += 9f
+
+        paint.textSize = 7.5f
+        paint.textAlign = Paint.Align.CENTER
+        canvas.drawText("Thank you for your business!", centerX, currentY, paint)
+        currentY += 8.5f
+        paint.textSize = 6.5f
+        canvas.drawText("Generated via Invoice Easy Pro", centerX, currentY, paint)
+
+        pdfDocument.finishPage(page)
+
+        val outputDir = context.cacheDir
+        val outputFile = File(outputDir, "Receipt_${invoice.invoiceNumber.replace("/", "_")}.pdf")
+        if (outputFile.exists()) outputFile.delete()
+        pdfDocument.writeTo(FileOutputStream(outputFile))
+        pdfDocument.close()
+
+        return outputFile
+    }
+
+    private fun drawDottedLine(canvas: Canvas, startX: Float, endX: Float, y: Float, paint: Paint) {
+        val dashPaint = Paint(paint).apply {
+            pathEffect = android.graphics.DashPathEffect(floatArrayOf(2f, 2f), 0f)
+            strokeWidth = 0.8f
+        }
+        canvas.drawLine(startX, y, endX, y, dashPaint)
     }
 }
 

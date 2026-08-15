@@ -115,6 +115,12 @@ object BackupRestoreHelper {
                 put("placeOfSupply", inv.placeOfSupply)
                 put("downloadCount", inv.downloadCount)
                 put("dueDateTimestamp", inv.dueDateTimestamp)
+                put("paymentMethod", inv.paymentMethod)
+                put("paymentNote", inv.paymentNote)
+                put("paymentAttachmentPath", inv.paymentAttachmentPath)
+                put("closeReason", inv.closeReason)
+                put("documentType", inv.documentType)
+                put("paidAmount", inv.paidAmount)
             }
 
             val itemsArr = JSONArray()
@@ -136,6 +142,22 @@ object BackupRestoreHelper {
                 itemsArr.put(itemJson)
             }
             invJson.put("lineItems", itemsArr)
+
+            val paymentsArr = JSONArray()
+            for (pmt in invWithDetail.payments) {
+                val pmtJson = JSONObject().apply {
+                    put("id", pmt.id)
+                    put("invoiceId", pmt.invoiceId)
+                    put("amount", pmt.amount)
+                    put("paymentDate", pmt.paymentDate)
+                    put("paymentMethod", pmt.paymentMethod)
+                    put("transactionRef", pmt.transactionRef)
+                    put("note", pmt.note)
+                }
+                paymentsArr.put(pmtJson)
+            }
+            invJson.put("payments", paymentsArr)
+
             invoicesArr.put(invJson)
         }
         root.put("invoices", invoicesArr)
@@ -238,9 +260,10 @@ object BackupRestoreHelper {
             }
         }
 
-        // 4. Invoices and line items
+        // 4. Invoices, line items and payments
         val invoices = mutableListOf<Invoice>()
         val lineItems = mutableListOf<InvoiceLineItem>()
+        val payments = mutableListOf<InvoicePayment>()
         if (root.has("invoices")) {
             val arr = root.getJSONArray("invoices")
             for (i in 0 until arr.length()) {
@@ -263,7 +286,13 @@ object BackupRestoreHelper {
                         brokerageBy = invJson.optString("brokerageBy", ""),
                         placeOfSupply = invJson.optString("placeOfSupply", ""),
                         downloadCount = invJson.optInt("downloadCount", 0),
-                        dueDateTimestamp = invJson.optLong("dueDateTimestamp", 0L)
+                        dueDateTimestamp = invJson.optLong("dueDateTimestamp", 0L),
+                        paymentMethod = invJson.optString("paymentMethod", ""),
+                        paymentNote = invJson.optString("paymentNote", ""),
+                        paymentAttachmentPath = invJson.optString("paymentAttachmentPath", ""),
+                        closeReason = invJson.optString("closeReason", ""),
+                        documentType = invJson.optString("documentType", "INVOICE"),
+                        paidAmount = invJson.optDouble("paidAmount", 0.0)
                     )
                 )
 
@@ -289,10 +318,28 @@ object BackupRestoreHelper {
                         )
                     }
                 }
+
+                if (invJson.has("payments")) {
+                    val pmtArr = invJson.getJSONArray("payments")
+                    for (k in 0 until pmtArr.length()) {
+                        val pmtJson = pmtArr.getJSONObject(k)
+                        payments.add(
+                            InvoicePayment(
+                                id = pmtJson.optInt("id", 0),
+                                invoiceId = pmtJson.optInt("invoiceId", invId),
+                                amount = pmtJson.optDouble("amount", 0.0),
+                                paymentDate = pmtJson.optLong("paymentDate", System.currentTimeMillis()),
+                                paymentMethod = pmtJson.optString("paymentMethod", "Cash"),
+                                transactionRef = pmtJson.optString("transactionRef", ""),
+                                note = pmtJson.optString("note", "")
+                            )
+                        )
+                    }
+                }
             }
         }
 
-        return BackupData(profile, savedProfiles, products, customers, invoices, lineItems)
+        return BackupData(profile, savedProfiles, products, customers, invoices, lineItems, payments)
     }
 }
 
@@ -302,5 +349,6 @@ data class BackupData(
     val products: List<Product>,
     val customers: List<Customer>,
     val invoices: List<Invoice>,
-    val lineItems: List<InvoiceLineItem>
+    val lineItems: List<InvoiceLineItem>,
+    val payments: List<InvoicePayment> = emptyList()
 )

@@ -73,12 +73,12 @@ data class Customer(
 @Entity(tableName = "invoices")
 data class Invoice(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val invoiceNumber: String, // e.g., "INV-2026-0001"
+    val invoiceNumber: String, // e.g., "INV-2026-0001" or "EST-2026-0001"
     val customerId: Int,       // FK (conceptually) to Customer
     val businessName: String = "",
     val attachmentPath: String = "",
     val dateTimestamp: Long = System.currentTimeMillis(),
-    val status: String,        // "Draft", "Sent", "Paid", "Closed"
+    val status: String,        // "Draft", "Sent", "Partial", "Paid", "Closed"
     val subtotal: Double = 0.0,
     val taxTotal: Double = 0.0,
     val grandTotal: Double = 0.0,
@@ -93,7 +93,9 @@ data class Invoice(
     val paymentMethod: String = "",
     val paymentNote: String = "",
     val paymentAttachmentPath: String = "",
-    val closeReason: String = ""
+    val closeReason: String = "",
+    val documentType: String = "INVOICE", // "INVOICE", "ESTIMATE", "QUOTATION"
+    val paidAmount: Double = 0.0
 )
 
 @Entity(tableName = "invoice_line_items")
@@ -112,6 +114,17 @@ data class InvoiceLineItem(
     val hsnSac: String = ""
 )
 
+@Entity(tableName = "invoice_payments")
+data class InvoicePayment(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val invoiceId: Int, // FK to Invoice
+    val amount: Double,
+    val paymentDate: Long = System.currentTimeMillis(),
+    val paymentMethod: String = "Cash", // "Cash", "UPI", "Bank Transfer", "Cheque", "Card", "Other"
+    val transactionRef: String = "",
+    val note: String = ""
+)
+
 // ------------------ RELATIONS ------------------
 
 data class InvoiceWithDetails(
@@ -125,7 +138,12 @@ data class InvoiceWithDetails(
         parentColumn = "id",
         entityColumn = "invoiceId"
     )
-    val lineItems: List<InvoiceLineItem>
+    val lineItems: List<InvoiceLineItem>,
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "invoiceId"
+    )
+    val payments: List<InvoicePayment> = emptyList()
 )
 
 // ------------------ DAOs ------------------
@@ -170,6 +188,28 @@ interface InvoiceDao {
 
     @Query("DELETE FROM invoice_line_items")
     suspend fun clearAllLineItems()
+
+    // Invoice Payments queries
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPayment(payment: InvoicePayment): Long
+
+    @Delete
+    suspend fun deletePayment(payment: InvoicePayment)
+
+    @Query("SELECT * FROM invoice_payments WHERE invoiceId = :invoiceId ORDER BY paymentDate DESC")
+    fun getPaymentsByInvoiceId(invoiceId: Int): Flow<List<InvoicePayment>>
+
+    @Query("SELECT * FROM invoice_payments WHERE invoiceId = :invoiceId ORDER BY paymentDate DESC")
+    suspend fun getPaymentsByInvoiceIdSync(invoiceId: Int): List<InvoicePayment>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPaymentsBulk(payments: List<InvoicePayment>)
+
+    @Query("DELETE FROM invoice_payments WHERE invoiceId = :invoiceId")
+    suspend fun deletePaymentsByInvoiceId(invoiceId: Int)
+
+    @Query("DELETE FROM invoice_payments")
+    suspend fun clearAllPayments()
 
     // Simple analytics queries (Paid only counts towards sales, Draft/Sent can be tracked in code)
     @Query("SELECT SUM(grandTotal) FROM invoices WHERE status = 'Paid'")
@@ -272,9 +312,10 @@ interface SavedBusinessProfileDao {
         Product::class,
         Customer::class,
         Invoice::class,
-        InvoiceLineItem::class
+        InvoiceLineItem::class,
+        InvoicePayment::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class InvoiceDatabase : RoomDatabase() {
@@ -316,6 +357,26 @@ abstract class InvoiceDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_14_15 = object : androidx.room.migration.Migration(14, 15) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE invoices ADD COLUMN documentType TEXT NOT NULL DEFAULT 'INVOICE'")
+                db.execSQL("ALTER TABLE invoices ADD COLUMN paidAmount REAL NOT NULL DEFAULT 0.0")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS invoice_payments (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        invoiceId INTEGER NOT NULL,
+                        amount REAL NOT NULL,
+                        paymentDate INTEGER NOT NULL,
+                        paymentMethod TEXT NOT NULL DEFAULT 'Cash',
+                        transactionRef TEXT NOT NULL DEFAULT '',
+                        note TEXT NOT NULL DEFAULT ''
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getDatabase(context: Context): InvoiceDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -323,7 +384,7 @@ abstract class InvoiceDatabase : RoomDatabase() {
                     InvoiceDatabase::class.java,
                     "invoice_database"
                 )
-                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

@@ -234,6 +234,43 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         return "INV-$dateString-${String.format(java.util.Locale.US, "%04d", nextSuffix)}"
     }
 
+    // Support sequential generation: EST-YYYY-MMM-DD-XXXX for Estimates/Quotations
+    fun generateNextEstimateNumber(): String {
+        val existingInvoices = invoices.value
+        val calendar = java.util.Calendar.getInstance()
+        val currentYear = calendar.get(java.util.Calendar.YEAR)
+        val dateString = java.text.SimpleDateFormat("yyyy-MMM-dd", java.util.Locale.US).format(calendar.time).uppercase()
+        val currentCompany = businessProfile.value?.businessName ?: ""
+
+        var maxSuffix = 0
+        val regex = Regex("\\d+$")
+        for (inv in existingInvoices) {
+            if (inv.invoice.businessName != currentCompany || inv.invoice.documentType == "INVOICE") {
+                continue
+            }
+            val invCalendar = java.util.Calendar.getInstance().apply { timeInMillis = inv.invoice.dateTimestamp }
+            val invYear = invCalendar.get(java.util.Calendar.YEAR)
+            if (invYear != currentYear) {
+                continue
+            }
+
+            val numStr = inv.invoice.invoiceNumber
+            val matchResult = regex.find(numStr)
+            if (matchResult != null) {
+                try {
+                    val suffixVal = matchResult.value.toInt()
+                    if (suffixVal > maxSuffix) {
+                        maxSuffix = suffixVal
+                    }
+                } catch (e: Exception) {
+                    // Ignore parsing issues
+                }
+            }
+        }
+        val nextSuffix = maxSuffix + 1
+        return "EST-$dateString-${String.format(java.util.Locale.US, "%04d", nextSuffix)}"
+    }
+
     // ------------------ BUSINESS OPERATIONS ------------------
     fun saveBusinessProfile(
         name: String,
@@ -407,11 +444,13 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         paymentMethod: String = "",
         paymentNote: String = "",
         paymentAttachmentPath: String = "",
-        closeReason: String = ""
+        closeReason: String = "",
+        documentType: String = "INVOICE",
+        paidAmount: Double = 0.0
     ) {
         viewModelScope.launch {
             if (invoiceNumber.isBlank()) {
-                _uiEvents.emit(UiEvent.ShowError("Invoice number is empty"))
+                _uiEvents.emit(UiEvent.ShowError("Document number is empty"))
                 return@launch
             }
             if (customerId == 0) {
@@ -419,7 +458,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 return@launch
             }
             if (items.isEmpty()) {
-                _uiEvents.emit(UiEvent.ShowError("Invoice must have at least one line item"))
+                _uiEvents.emit(UiEvent.ShowError("Document must have at least one line item"))
                 return@launch
             }
 
@@ -444,11 +483,14 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 paymentMethod = paymentMethod,
                 paymentNote = paymentNote,
                 paymentAttachmentPath = paymentAttachmentPath,
-                closeReason = closeReason
+                closeReason = closeReason,
+                documentType = documentType,
+                paidAmount = paidAmount
             )
 
             val invoiceId = repository.saveInvoice(invoice, items)
-            _uiEvents.emit(UiEvent.ShowSuccess("Invoice #${invoiceNumber} saved! ID: $invoiceId"))
+            val docLabel = if (documentType == "ESTIMATE" || documentType == "QUOTATION") "Estimate" else "Invoice"
+            _uiEvents.emit(UiEvent.ShowSuccess("$docLabel #${invoiceNumber} saved! ID: $invoiceId"))
         }
     }
 
@@ -509,16 +551,114 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             val scopeInvoices = invoices.value
             val match = scopeInvoices.find { it.invoice.id == invoiceId }
             if (match != null) {
+                val updatedPaidAmount = if (newStatus == "Paid" && match.invoice.paidAmount < match.invoice.grandTotal) {
+                    match.invoice.grandTotal
+                } else match.invoice.paidAmount
+
                 val updatedInvoice = match.invoice.copy(
                     status = newStatus,
                     paymentMethod = paymentMethod,
                     paymentNote = paymentNote,
                     paymentAttachmentPath = paymentAttachmentPath,
-                    closeReason = closeReason
+                    closeReason = closeReason,
+                    paidAmount = updatedPaidAmount
                 )
                 repository.saveInvoice(updatedInvoice, match.lineItems)
                 _uiEvents.emit(UiEvent.ShowSuccess("Invoice status updated to $newStatus"))
             }
+        }
+    }
+
+    // ------------------ PARTIAL PAYMENTS ------------------
+    fun recordPayment(
+        invoiceId: Int,
+        amount: Double,
+        method: String = "Cash",
+        transactionRef: String = "",
+        note: String = ""
+    ) {
+        viewModelScope.launch {
+            if (amount <= 0.0) {
+                _uiEvents.emit(UiEvent.ShowError("Payment amount must be greater than zero"))
+                return@launch
+            }
+            val match = invoices.value.find { it.invoice.id == invoiceId }
+            if (match == null) {
+                _uiEvents.emit(UiEvent.ShowError("Invoice not found"))
+                return@launch
+            }
+
+            val payment = InvoicePayment(
+                invoiceId = invoiceId,
+                amount = amount,
+                paymentDate = System.currentTimeMillis(),
+                paymentMethod = method,
+                transactionRef = transactionRef.trim(),
+                note = note.trim()
+            )
+            repository.insertPayment(payment)
+
+            val newTotalPaid = match.invoice.paidAmount + amount
+            val newStatus = if (newTotalPaid >= match.invoice.grandTotal) "Paid" else "Partial"
+
+            val updatedInvoice = match.invoice.copy(
+                paidAmount = newTotalPaid,
+                status = newStatus,
+                paymentMethod = method,
+                paymentNote = if (transactionRef.isNotBlank()) "Ref: $transactionRef" else note
+            )
+            repository.saveInvoice(updatedInvoice, match.lineItems)
+
+            val remaining = (match.invoice.grandTotal - newTotalPaid).coerceAtLeast(0.0)
+            if (newStatus == "Paid") {
+                _uiEvents.emit(UiEvent.ShowSuccess("Payment recorded! Invoice fully paid."))
+            } else {
+                _uiEvents.emit(UiEvent.ShowSuccess("Payment of ₹${String.format(java.util.Locale.US, "%.2f", amount)} recorded! Remaining balance: ₹${String.format(java.util.Locale.US, "%.2f", remaining)}"))
+            }
+        }
+    }
+
+    fun deletePayment(payment: InvoicePayment) {
+        viewModelScope.launch {
+            repository.deletePayment(payment)
+            val match = invoices.value.find { it.invoice.id == payment.invoiceId }
+            if (match != null) {
+                val newPaid = (match.invoice.paidAmount - payment.amount).coerceAtLeast(0.0)
+                val newStatus = if (newPaid <= 0.0) {
+                    "Sent"
+                } else if (newPaid >= match.invoice.grandTotal) {
+                    "Paid"
+                } else {
+                    "Partial"
+                }
+                val updatedInvoice = match.invoice.copy(
+                    paidAmount = newPaid,
+                    status = newStatus
+                )
+                repository.saveInvoice(updatedInvoice, match.lineItems)
+                _uiEvents.emit(UiEvent.ShowSuccess("Payment record removed"))
+            }
+        }
+    }
+
+    // ------------------ 1-CLICK CONVERT ESTIMATE TO INVOICE ------------------
+    fun convertEstimateToInvoice(estimateId: Int) {
+        viewModelScope.launch {
+            val match = invoices.value.find { it.invoice.id == estimateId }
+            if (match == null) {
+                _uiEvents.emit(UiEvent.ShowError("Estimate not found"))
+                return@launch
+            }
+
+            val nextInvNumber = generateNextInvoiceNumber()
+            val convertedInvoice = match.invoice.copy(
+                invoiceNumber = nextInvNumber,
+                documentType = "INVOICE",
+                status = if (match.invoice.status == "Paid") "Paid" else "Sent",
+                dateTimestamp = System.currentTimeMillis()
+            )
+            repository.saveInvoice(convertedInvoice, match.lineItems)
+            _uiEvents.emit(UiEvent.ShowSuccess("Estimate converted to Tax Invoice #$nextInvNumber!"))
         }
     }
 
@@ -543,7 +683,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     products = backupData.products,
                     customers = backupData.customers,
                     invoices = backupData.invoices,
-                    lineItems = backupData.lineItems
+                    lineItems = backupData.lineItems,
+                    payments = backupData.payments
                 )
                 onSuccess()
                 _uiEvents.emit(UiEvent.ShowSuccess("Data backup restored successfully!"))

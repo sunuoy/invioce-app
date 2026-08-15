@@ -116,7 +116,17 @@ class InvoiceRepository(
         }
         invoiceDao.deleteInvoiceById(invoiceId)
         invoiceDao.deleteLineItemsByInvoiceId(invoiceId)
+        invoiceDao.deletePaymentsByInvoiceId(invoiceId)
     }
+
+    // ------------------ INVOICE PAYMENTS ------------------
+    suspend fun insertPayment(payment: InvoicePayment): Long = invoiceDao.insertPayment(payment)
+
+    suspend fun deletePayment(payment: InvoicePayment) = invoiceDao.deletePayment(payment)
+
+    fun getPaymentsByInvoiceId(invoiceId: Int): Flow<List<InvoicePayment>> = invoiceDao.getPaymentsByInvoiceId(invoiceId)
+
+    suspend fun getPaymentsByInvoiceIdSync(invoiceId: Int): List<InvoicePayment> = invoiceDao.getPaymentsByInvoiceIdSync(invoiceId)
 
     // ------------------ ANALYTICS ------------------
     val totalSales: Flow<Double?> = invoiceDao.getTotalSales()
@@ -129,7 +139,8 @@ class InvoiceRepository(
         products: List<Product>,
         customers: List<Customer>,
         invoices: List<Invoice>,
-        lineItems: List<InvoiceLineItem>
+        lineItems: List<InvoiceLineItem>,
+        payments: List<InvoicePayment> = emptyList()
     ) {
         businessProfileDao.clearBusinessProfile()
         savedBusinessProfileDao.clearAllSavedProfiles()
@@ -137,6 +148,7 @@ class InvoiceRepository(
         customerDao.clearAllCustomers()
         invoiceDao.clearAllInvoices()
         invoiceDao.clearAllLineItems()
+        invoiceDao.clearAllPayments()
 
         if (profile != null) {
             businessProfileDao.insertOrUpdateProfile(profile)
@@ -155,6 +167,9 @@ class InvoiceRepository(
         }
         if (lineItems.isNotEmpty()) {
             invoiceDao.insertLineItems(lineItems)
+        }
+        if (payments.isNotEmpty()) {
+            invoiceDao.insertPaymentsBulk(payments)
         }
     }
 }
