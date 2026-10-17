@@ -1547,41 +1547,81 @@ fun SettingsScreen(
                     )
 
                     val isDriveConnected = gdAccessToken.isNotEmpty() || gdAccountEmail.isNotEmpty()
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (isDriveConnected) {
-                                val emailText = if (gdAccountEmail.isNotEmpty()) "to $gdAccountEmail" else ""
-                                val modeText = when (gdSyncMode) {
-                                    "auto" -> "Auto-sync Active"
-                                    "hourly" -> "Hourly Sync"
-                                    else -> "Manual"
+                    if (isDriveConnected) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .background(Color(0xFF10B981), CircleShape)
+                                    )
+                                    Text(
+                                        text = "Status: Connected",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
                                 }
-                                "Status: Connected $emailText ($modeText)"
-                            } else "Status: Disconnected",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isDriveConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                        )
+                                if (gdAccountEmail.isNotEmpty()) {
+                                    Text(
+                                        text = gdAccountEmail,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                }
+                                if (gdLastSyncTime.isNotEmpty()) {
+                                    Text(
+                                        text = "Last Synced: $gdLastSyncTime",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                            }
 
-                        if (isDriveConnected) {
-                            TextButton(
+                            OutlinedButton(
                                 onClick = { viewModel.disableGoogleDriveSync() },
-                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(32.dp)
                             ) {
-                                Text("Disconnect", fontSize = 11.sp)
+                                Text("Disconnect", fontSize = 11.sp, maxLines = 1)
                             }
                         }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(MaterialTheme.colorScheme.outline, CircleShape)
+                            )
+                            Text(
+                                text = "Status: Disconnected",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
                     }
-
-                    Text(
-                        text = "Last Synced: $gdLastSyncTime",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
 
                     if (isDriveConnected) {
                         Spacer(modifier = Modifier.height(10.dp))
