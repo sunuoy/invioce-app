@@ -28,12 +28,15 @@ signingConfigs {
        keyAlias = "upload"
        keyPassword = System.getenv("KEY_PASSWORD") ?: project.findProperty("KEY_PASSWORD")?.toString() ?: "android"
      }
-     create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
-    }
+     val debugKeyFile = file("${rootDir}/debug.keystore")
+     if (debugKeyFile.exists()) {
+       create("debugConfig") {
+         storeFile = debugKeyFile
+         storePassword = "android"
+         keyAlias = "androiddebugkey"
+         keyPassword = "android"
+       }
+     }
   }
 
   buildTypes {
@@ -45,7 +48,9 @@ signingConfigs {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      signingConfig = signingConfigs.getByName("debugConfig")
+      signingConfigs.findByName("debugConfig")?.let {
+        signingConfig = it
+      }
     }
   }
   compileOptions {

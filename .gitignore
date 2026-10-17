@@ -15,7 +15,6 @@
 .cxx
 local.properties
 .env
-debug.keystore
 window_dump.xml
 .kilo
 .kilo/
