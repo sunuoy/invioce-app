@@ -70,6 +70,7 @@ fun AppSettingsScreen(
 
     // Google Drive States
     val gdAccessToken by viewModel.googleDriveAccessToken.collectAsStateWithLifecycle()
+    val gdAccountEmail by viewModel.googleDriveAccountEmail.collectAsStateWithLifecycle()
     val gdLastSyncTime by viewModel.googleDriveLastSyncTime.collectAsStateWithLifecycle()
     val gdSyncing by viewModel.isGoogleDriveSyncing.collectAsStateWithLifecycle()
     val gdSyncMode by viewModel.googleDriveSyncMode.collectAsStateWithLifecycle()
@@ -1035,19 +1036,28 @@ fun AppSettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
+                    val isDriveConnected = gdAccessToken.isNotEmpty() || gdAccountEmail.isNotEmpty()
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Status: ${if (gdAccessToken.isNotEmpty()) "Connected" else "Disconnected"}",
+                            text = if (isDriveConnected) {
+                                val emailText = if (gdAccountEmail.isNotEmpty()) "to $gdAccountEmail" else ""
+                                val modeText = when (gdSyncMode) {
+                                    "auto" -> "Auto-sync Active"
+                                    "hourly" -> "Hourly Sync"
+                                    else -> "Manual"
+                                }
+                                "Status: Connected $emailText ($modeText)"
+                            } else "Status: Disconnected",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
-                            color = if (gdAccessToken.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                            color = if (isDriveConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                         )
 
-                        if (gdAccessToken.isNotEmpty()) {
+                        if (isDriveConnected) {
                             TextButton(
                                 onClick = { viewModel.disableGoogleDriveSync() },
                                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
@@ -1057,7 +1067,7 @@ fun AppSettingsScreen(
                         }
                     }
 
-                    if (gdAccessToken.isNotEmpty() && gdLastSyncTime.isNotEmpty()) {
+                    if (isDriveConnected && gdLastSyncTime.isNotEmpty()) {
                         Text(
                             text = "Last Synced: $gdLastSyncTime",
                             style = MaterialTheme.typography.labelSmall,
@@ -1065,7 +1075,7 @@ fun AppSettingsScreen(
                         )
                     }
 
-                    if (gdAccessToken.isNotEmpty()) {
+                    if (isDriveConnected) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
                                 text = "Sync Frequency Mode",
@@ -1101,7 +1111,7 @@ fun AppSettingsScreen(
                         }
                     }
 
-                    if (gdAccessToken.isEmpty()) {
+                    if (!isDriveConnected) {
                         Button(
                             modifier = Modifier.fillMaxWidth().height(42.dp),
                             shape = RoundedCornerShape(10.dp),

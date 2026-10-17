@@ -86,7 +86,10 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
     fun setGoogleDriveSyncMode(mode: String) {
         val profileName = businessProfile.value?.businessName ?: "default"
-        prefs.edit().putString("gd_sync_mode_$profileName", mode).apply()
+        prefs.edit()
+            .putString("gd_sync_mode", mode)
+            .putString("gd_sync_mode_$profileName", mode)
+            .apply()
         _googleDriveSyncMode.value = mode
     }
 
@@ -134,20 +137,18 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         _googleDriveSyncEnabled.value = gdEnabled
         _googleDriveAccessToken.value = gdToken
         _googleDriveLastSyncTime.value = gdLastSync
+        _googleDriveAccountEmail.value = gdEmail
+        val gdSavedMode = prefs.getString("gd_sync_mode", "auto") ?: "auto"
+        _googleDriveSyncMode.value = gdSavedMode
 
         viewModelScope.launch {
             checkForUpdates(silent = true)
         }
 
-        // Auto-authenticate when business profile is loaded or on startup if enabled
+        // Silent background token refresh on app launch if account is configured
         viewModelScope.launch {
             if (gdEnabled && gdEmail.isNotEmpty()) {
-                fetchGoogleDriveTokenAutomatically(application, gdEmail)
-            }
-            businessProfile.collect { profile ->
-                if (profile != null && profile.gmailId.isNotEmpty()) {
-                    fetchGoogleDriveTokenAutomatically(application, profile.gmailId)
-                }
+                refreshGoogleDriveTokenSilently(gdEmail)
             }
         }
 
@@ -155,41 +156,47 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             repository.businessProfile.collect { profile ->
                 val profileName = profile?.businessName ?: "default"
-                _googleDriveSyncMode.value = prefs.getString("gd_sync_mode_$profileName", "auto") ?: "auto"
+                val mode = prefs.getString("gd_sync_mode_$profileName", null) 
+                    ?: prefs.getString("gd_sync_mode", "auto") ?: "auto"
+                _googleDriveSyncMode.value = mode
             }
         }
 
-        // Auto-run Google Drive background sync when data changes and token is configured
+        // Auto-run Google Drive background sync when data changes and sync is enabled
         viewModelScope.launch {
             combine(
                 repository.allProducts,
                 repository.allCustomers,
                 repository.allInvoices,
                 repository.businessProfile,
-                _googleDriveAccessToken
+                _googleDriveAccessToken,
+                _googleDriveAccountEmail
             ) { array: Array<Any?> ->
-                array[4] as String
+                Pair(array[4] as String, array[5] as String)
             }
             .debounce(3000)
-            .collect { token ->
-                val profileName = businessProfile.value?.businessName ?: "default"
-                val mode = prefs.getString("gd_sync_mode_$profileName", "auto") ?: "auto"
+            .collect { (token, email) ->
+                val accountEmail = email.ifEmpty { prefs.getString("gd_account_email", "") ?: "" }
+                val isEnabled = _googleDriveSyncEnabled.value || prefs.getBoolean("gd_sync_enabled", false)
+                if (!isEnabled || (token.isEmpty() && accountEmail.isEmpty())) {
+                    return@collect
+                }
+
+                val mode = _googleDriveSyncMode.value
                 if (mode == "manual") {
                     android.util.Log.d("GoogleDriveAutoSync", "Auto-backup skipped: manual mode is active.")
                     return@collect
                 }
-                if (token.isNotEmpty()) {
-                    if (mode == "hourly") {
-                        val lastSync = prefs.getLong("gd_last_sync_timestamp_$profileName", 0L)
-                        val elapsed = System.currentTimeMillis() - lastSync
-                        if (elapsed < 3600 * 1000) {
-                            android.util.Log.d("GoogleDriveAutoSync", "Auto-backup skipped: hourly mode active and less than 1 hour elapsed.")
-                            return@collect
-                        }
+                if (mode == "hourly") {
+                    val lastSync = prefs.getLong("gd_last_sync_timestamp", 0L)
+                    val elapsed = System.currentTimeMillis() - lastSync
+                    if (elapsed < 3600 * 1000) {
+                        android.util.Log.d("GoogleDriveAutoSync", "Auto-backup skipped: hourly mode active and less than 1 hour elapsed.")
+                        return@collect
                     }
-                    backupToGoogleDrive { success, msg ->
-                        android.util.Log.d("GoogleDriveAutoSync", "Background auto-backup ($mode): $msg")
-                    }
+                }
+                backupToGoogleDrive { success, msg ->
+                    android.util.Log.d("GoogleDriveAutoSync", "Background auto-backup ($mode): $msg")
                 }
             }
         }
@@ -922,14 +929,21 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         _googleDriveAccessToken.value = trimmed
         if (trimmed.isNotEmpty()) {
             _googleDriveSyncEnabled.value = true
+            val currentMode = _googleDriveSyncMode.value
+            val effectiveMode = if (currentMode == "manual") "auto" else currentMode
+            _googleDriveSyncMode.value = effectiveMode
+            val profileName = businessProfile.value?.businessName ?: "default"
             prefs.edit()
                 .putBoolean("gd_sync_enabled", true)
                 .putString("gd_access_token", trimmed)
+                .putString("gd_sync_mode", effectiveMode)
+                .putString("gd_sync_mode_$profileName", effectiveMode)
                 .apply()
         }
     }
 
     fun disableGoogleDriveSync() {
+        val oldToken = _googleDriveAccessToken.value
         _googleDriveSyncEnabled.value = false
         _googleDriveAccessToken.value = ""
         _googleDriveAccountEmail.value = ""
@@ -938,114 +952,222 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             .remove("gd_access_token")
             .remove("gd_account_email")
             .apply()
+        if (oldToken.isNotEmpty()) {
+            com.example.data.GoogleDriveService.revokeToken(oldToken)
+        }
     }
 
-    fun backupToGoogleDrive(onComplete: (Boolean, String) -> Unit) {
-        val token = _googleDriveAccessToken.value
-        if (token.isEmpty()) {
-            onComplete(false, "Google Drive not authorized. Please configure access token.")
-            return
+    suspend fun getOrRefreshGoogleDriveToken(forceRefresh: Boolean = false): String? = withContext(Dispatchers.IO) {
+        val email = _googleDriveAccountEmail.value.ifEmpty { prefs.getString("gd_account_email", "") ?: "" }
+        if (email.isEmpty()) return@withContext null
+
+        val accountManager = android.accounts.AccountManager.get(getApplication())
+        val currentToken = _googleDriveAccessToken.value
+
+        if (forceRefresh && currentToken.isNotEmpty()) {
+            try {
+                com.example.data.GoogleDriveService.invalidateToken(getApplication(), currentToken)
+                android.util.Log.d("GoogleDriveService", "Invalidated expired token in AccountManager cache for refresh")
+            } catch (e: Exception) {
+                android.util.Log.e("GoogleDriveService", "Failed to invalidate token locally: ${e.message}")
+            }
+        } else if (currentToken.isNotEmpty() && !forceRefresh) {
+            return@withContext currentToken
         }
 
-        viewModelScope.launch {
-            _isGoogleDriveSyncing.value = true
+        val account = android.accounts.Account(email, "com.google")
+        try {
+            val freshToken = accountManager.blockingGetAuthToken(account, "oauth2:https://www.googleapis.com/auth/drive.file", true)
+            if (!freshToken.isNullOrEmpty()) {
+                withContext(Dispatchers.Main) {
+                    setGoogleDriveAccessToken(freshToken)
+                    _googleDriveAccountEmail.value = email
+                }
+                return@withContext freshToken
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("GoogleDriveService", "blockingGetAuthToken error: ${e.message}")
+        }
+        null
+    }
+
+    fun refreshGoogleDriveTokenSilently(email: String) {
+        if (email.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val json = exportAppDataToJSON()
-                viewModelScope.launch(Dispatchers.IO) {
-                    try {
-                        val existingFileId = com.example.data.GoogleDriveService.findBackupFile(token)
-                        val success = com.example.data.GoogleDriveService.uploadBackupFile(token, json, existingFileId)
-                        
-                        withContext(Dispatchers.Main) {
-                            _isGoogleDriveSyncing.value = false
-                            if (success) {
-                                val nowStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-                                _googleDriveLastSyncTime.value = nowStr
-                                prefs.edit()
-                                    .putString("gd_last_sync_time", nowStr)
-                                    .putLong("gd_last_sync_timestamp", System.currentTimeMillis())
-                                    .apply()
-                                onComplete(true, "Successfully backed up data to Google Drive!")
-                            } else {
-                                com.example.data.GoogleDriveService.invalidateToken(getApplication(), token)
-                                _googleDriveAccessToken.value = ""
-                                prefs.edit().remove("gd_access_token").apply()
-                                onComplete(false, "Drive upload failed. Please connect Google Drive again.")
-                            }
-                        }
-                    } catch (e: Exception) {
-                        withContext(Dispatchers.Main) {
-                            _isGoogleDriveSyncing.value = false
-                            val errorMsg = e.message ?: ""
-                            if (errorMsg.contains("HTTP 401") || errorMsg.contains("HTTP 403")) {
-                                com.example.data.GoogleDriveService.invalidateToken(getApplication(), token)
-                                _googleDriveAccessToken.value = ""
-                                prefs.edit().remove("gd_access_token").apply()
-                                onComplete(false, "Google Drive session expired. Please connect Google Drive again.")
-                            } else {
-                                onComplete(false, "Sync failed: ${e.message}")
-                            }
-                        }
+                val accountManager = android.accounts.AccountManager.get(getApplication())
+                val account = android.accounts.Account(email, "com.google")
+                val token = accountManager.blockingGetAuthToken(account, "oauth2:https://www.googleapis.com/auth/drive.file", false)
+                if (!token.isNullOrEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        setGoogleDriveAccessToken(token)
+                        _googleDriveAccountEmail.value = email
                     }
                 }
             } catch (e: Exception) {
-                _isGoogleDriveSyncing.value = false
-                onComplete(false, "Preparation error: ${e.message}")
+                android.util.Log.d("GoogleDriveAutoSync", "Silent background token refresh deferred: ${e.message}")
+            }
+        }
+    }
+
+    fun backupToGoogleDrive(onComplete: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            val email = _googleDriveAccountEmail.value.ifEmpty { prefs.getString("gd_account_email", "") ?: "" }
+            if (email.isEmpty() && _googleDriveAccessToken.value.isEmpty()) {
+                onComplete(false, "Google Drive not authorized. Please connect an account.")
+                return@launch
+            }
+
+            _isGoogleDriveSyncing.value = true
+            val json = exportAppDataToJSON()
+
+            withContext(Dispatchers.IO) {
+                var token = getOrRefreshGoogleDriveToken(forceRefresh = false) ?: ""
+                if (token.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        _isGoogleDriveSyncing.value = false
+                        onComplete(false, "Could not acquire Google Drive access token. Please reconnect.")
+                    }
+                    return@withContext
+                }
+
+                try {
+                    val existingFileId = com.example.data.GoogleDriveService.findBackupFile(token)
+                    val success = com.example.data.GoogleDriveService.uploadBackupFile(token, json, existingFileId)
+                    
+                    withContext(Dispatchers.Main) {
+                        _isGoogleDriveSyncing.value = false
+                        if (success) {
+                            val nowStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+                            _googleDriveLastSyncTime.value = nowStr
+                            prefs.edit()
+                                .putString("gd_last_sync_time", nowStr)
+                                .putLong("gd_last_sync_timestamp", System.currentTimeMillis())
+                                .apply()
+                            onComplete(true, "Successfully backed up data to Google Drive!")
+                        } else {
+                            onComplete(false, "Drive upload failed. Please try again.")
+                        }
+                    }
+                } catch (e: Exception) {
+                    val errorMsg = e.message ?: ""
+                    if (errorMsg.contains("401") || errorMsg.contains("403") || errorMsg.contains("invalid_token") || errorMsg.contains("authError")) {
+                        android.util.Log.w("GoogleDriveService", "Received 401/403/auth error. Silently refreshing token and retrying...")
+                        val refreshedToken = getOrRefreshGoogleDriveToken(forceRefresh = true)
+                        if (!refreshedToken.isNullOrEmpty()) {
+                            try {
+                                val fileId = com.example.data.GoogleDriveService.findBackupFile(refreshedToken)
+                                val retrySuccess = com.example.data.GoogleDriveService.uploadBackupFile(refreshedToken, json, fileId)
+                                withContext(Dispatchers.Main) {
+                                    _isGoogleDriveSyncing.value = false
+                                    if (retrySuccess) {
+                                        val nowStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+                                        _googleDriveLastSyncTime.value = nowStr
+                                        prefs.edit()
+                                            .putString("gd_last_sync_time", nowStr)
+                                            .putLong("gd_last_sync_timestamp", System.currentTimeMillis())
+                                            .apply()
+                                        onComplete(true, "Successfully backed up data to Google Drive!")
+                                    } else {
+                                        onComplete(false, "Drive upload failed on retry.")
+                                    }
+                                }
+                                return@withContext
+                            } catch (retryEx: Exception) {
+                                android.util.Log.e("GoogleDriveService", "Retry backup failed: ${retryEx.message}")
+                            }
+                        }
+                    }
+                    withContext(Dispatchers.Main) {
+                        _isGoogleDriveSyncing.value = false
+                        onComplete(false, "Sync failed: ${e.message}")
+                    }
+                }
             }
         }
     }
 
     fun restoreFromGoogleDrive(onComplete: (Boolean, String) -> Unit) {
-        val token = _googleDriveAccessToken.value
-        if (token.isEmpty()) {
-            onComplete(false, "Google Drive not authorized. Please configure access token.")
-            return
-        }
-
-        viewModelScope.launch(Dispatchers.IO) {
-            withContext(Dispatchers.Main) {
-                _isGoogleDriveSyncing.value = true
+        viewModelScope.launch {
+            val email = _googleDriveAccountEmail.value.ifEmpty { prefs.getString("gd_account_email", "") ?: "" }
+            if (email.isEmpty() && _googleDriveAccessToken.value.isEmpty()) {
+                onComplete(false, "Google Drive not authorized. Please connect an account.")
+                return@launch
             }
 
-            try {
-                val existingFileId = com.example.data.GoogleDriveService.findBackupFile(token)
-                if (existingFileId == null) {
+            _isGoogleDriveSyncing.value = true
+
+            withContext(Dispatchers.IO) {
+                var token = getOrRefreshGoogleDriveToken(forceRefresh = false) ?: ""
+                if (token.isEmpty()) {
                     withContext(Dispatchers.Main) {
                         _isGoogleDriveSyncing.value = false
-                        onComplete(false, "No 'invoice_app_backup.json' file is found on your Google Drive.")
+                        onComplete(false, "Could not acquire Google Drive access token. Please reconnect.")
                     }
-                    return@launch
+                    return@withContext
                 }
 
-                val jsonContent = com.example.data.GoogleDriveService.downloadBackupFile(token, existingFileId)
-                withContext(Dispatchers.Main) {
-                    if (jsonContent != null) {
-                        restoreDatabaseBackup(
-                            jsonString = jsonContent,
-                            onSuccess = {
-                                _isGoogleDriveSyncing.value = false
-                                onComplete(true, "Successfully restored records from Google Drive!")
-                            },
-                            onError = { err ->
-                                _isGoogleDriveSyncing.value = false
-                                onComplete(false, "Restore error: $err")
-                            }
-                        )
-                    } else {
-                        _isGoogleDriveSyncing.value = false
-                        onComplete(false, "Failed to download backup file from Google Drive.")
+                try {
+                    val existingFileId = com.example.data.GoogleDriveService.findBackupFile(token)
+                    if (existingFileId == null) {
+                        withContext(Dispatchers.Main) {
+                            _isGoogleDriveSyncing.value = false
+                            onComplete(false, "No 'invoice_app_backup.json' file is found on your Google Drive.")
+                        }
+                        return@withContext
                     }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    _isGoogleDriveSyncing.value = false
+
+                    val jsonContent = com.example.data.GoogleDriveService.downloadBackupFile(token, existingFileId)
+                    withContext(Dispatchers.Main) {
+                        if (jsonContent != null) {
+                            restoreDatabaseBackup(
+                                jsonString = jsonContent,
+                                onSuccess = {
+                                    _isGoogleDriveSyncing.value = false
+                                    onComplete(true, "Successfully restored records from Google Drive!")
+                                },
+                                onError = { err ->
+                                    _isGoogleDriveSyncing.value = false
+                                    onComplete(false, "Restore error: $err")
+                                }
+                            )
+                        } else {
+                            _isGoogleDriveSyncing.value = false
+                            onComplete(false, "Failed to download backup file from Google Drive.")
+                        }
+                    }
+                } catch (e: Exception) {
                     val errorMsg = e.message ?: ""
-                    if (errorMsg.contains("HTTP 401") || errorMsg.contains("HTTP 403")) {
-                        com.example.data.GoogleDriveService.invalidateToken(getApplication(), token)
-                        _googleDriveAccessToken.value = ""
-                        prefs.edit().remove("gd_access_token").apply()
-                        onComplete(false, "Google Drive session expired. Please connect Google Drive again.")
-                    } else {
+                    if (errorMsg.contains("401") || errorMsg.contains("403") || errorMsg.contains("invalid_token") || errorMsg.contains("authError")) {
+                        android.util.Log.w("GoogleDriveService", "Received 401/403/auth error. Silently refreshing token and retrying...")
+                        val refreshedToken = getOrRefreshGoogleDriveToken(forceRefresh = true)
+                        if (!refreshedToken.isNullOrEmpty()) {
+                            try {
+                                val fileId = com.example.data.GoogleDriveService.findBackupFile(refreshedToken)
+                                if (fileId != null) {
+                                    val jsonContent = com.example.data.GoogleDriveService.downloadBackupFile(refreshedToken, fileId)
+                                    withContext(Dispatchers.Main) {
+                                        restoreDatabaseBackup(
+                                            jsonString = jsonContent,
+                                            onSuccess = {
+                                                _isGoogleDriveSyncing.value = false
+                                                onComplete(true, "Successfully restored records from Google Drive!")
+                                            },
+                                            onError = { err ->
+                                                _isGoogleDriveSyncing.value = false
+                                                onComplete(false, "Restore error: $err")
+                                            }
+                                        )
+                                    }
+                                    return@withContext
+                                }
+                            } catch (retryEx: Exception) {
+                                android.util.Log.e("GoogleDriveService", "Retry restore failed: ${retryEx.message}")
+                            }
+                        }
+                    }
+                    withContext(Dispatchers.Main) {
+                        _isGoogleDriveSyncing.value = false
                         onComplete(false, "Connection error: ${e.message}")
                     }
                 }
@@ -1055,12 +1177,21 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
     fun fetchGoogleDriveTokenAutomatically(context: Context, email: String) {
         if (email.isEmpty()) return
-        val activity = context as? android.app.Activity
         
+        var ctx: Context? = context
+        var activity: android.app.Activity? = null
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is android.app.Activity) {
+                activity = ctx
+                break
+            }
+            ctx = ctx.baseContext
+        }
+
         // Persistently save the email for auto-reauthentication on app launch
         prefs.edit().putString("gd_account_email", email).apply()
         _googleDriveAccountEmail.value = email
-        
+
         val accountManager = android.accounts.AccountManager.get(context)
         val matchingAccount = android.accounts.Account(email, "com.google")
         accountManager.getAuthToken(
@@ -1086,10 +1217,15 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                             }
                         }
                     } else {
-                        android.util.Log.e("GoogleDriveAutoSync", "Token was null or empty after consent flow")
-                        if (activity != null) {
-                            viewModelScope.launch(Dispatchers.Main) {
-                                android.widget.Toast.makeText(context, "Google Drive: failed to get access token", android.widget.Toast.LENGTH_LONG).show()
+                        val intent = bundle.getParcelable<android.content.Intent>(android.accounts.AccountManager.KEY_INTENT)
+                        if (intent != null && activity != null) {
+                            activity.startActivity(intent)
+                        } else {
+                            android.util.Log.e("GoogleDriveAutoSync", "Token was null and no intent provided")
+                            if (activity != null) {
+                                viewModelScope.launch(Dispatchers.Main) {
+                                    android.widget.Toast.makeText(context, "Google Drive: authorization required or account unavailable", android.widget.Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
                     }

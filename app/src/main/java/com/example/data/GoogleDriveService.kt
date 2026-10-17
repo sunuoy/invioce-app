@@ -106,7 +106,7 @@ object GoogleDriveService {
                 val responseCode = connection.responseCode
                 android.util.Log.d("GoogleDriveService", "uploadBackupFile (POST) response code: $responseCode")
 
-                if (responseCode == HttpURLConnection.HTTP_OK) {
+                if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
                     val reader = BufferedReader(InputStreamReader(connection.inputStream))
                     val response = StringBuilder()
                     var line: String?
@@ -159,7 +159,10 @@ object GoogleDriveService {
                 reader.close()
                 response.toString()
             } else {
-                throw Exception("Failed to download file, response code: ${connection.responseCode}")
+                val errorStream = connection.errorStream
+                val errorText = errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                android.util.Log.e("GoogleDriveService", "downloadBackupFile error response: $errorText")
+                throw Exception("HTTP ${connection.responseCode}: $errorText")
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -177,9 +180,12 @@ object GoogleDriveService {
         } catch (e: Exception) {
             android.util.Log.e("GoogleDriveService", "Failed to invalidate token locally: ${e.message}")
         }
+    }
 
-        var connection: HttpURLConnection? = null
+    fun revokeToken(token: String) {
+        if (token.isEmpty()) return
         Thread {
+            var connection: HttpURLConnection? = null
             try {
                 val url = URL("https://oauth2.googleapis.com/revoke?token=$token")
                 connection = url.openConnection() as HttpURLConnection

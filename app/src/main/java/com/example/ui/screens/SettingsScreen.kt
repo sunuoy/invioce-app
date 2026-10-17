@@ -1546,21 +1546,28 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
+                    val isDriveConnected = gdAccessToken.isNotEmpty() || gdAccountEmail.isNotEmpty()
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (gdAccessToken.isNotEmpty()) {
-                                if (gdAccountEmail.isNotEmpty()) "Status: Connected to $gdAccountEmail" else "Status: Connected (Auto-sync Active)"
+                            text = if (isDriveConnected) {
+                                val emailText = if (gdAccountEmail.isNotEmpty()) "to $gdAccountEmail" else ""
+                                val modeText = when (gdSyncMode) {
+                                    "auto" -> "Auto-sync Active"
+                                    "hourly" -> "Hourly Sync"
+                                    else -> "Manual"
+                                }
+                                "Status: Connected $emailText ($modeText)"
                             } else "Status: Disconnected",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
-                            color = if (gdAccessToken.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                            color = if (isDriveConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                         )
 
-                        if (gdAccessToken.isNotEmpty()) {
+                        if (isDriveConnected) {
                             TextButton(
                                 onClick = { viewModel.disableGoogleDriveSync() },
                                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
@@ -1576,7 +1583,7 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.outline
                     )
 
-                    if (gdAccessToken.isNotEmpty()) {
+                    if (isDriveConnected) {
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = "Sync Frequency",
@@ -1616,7 +1623,7 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    if (gdAccessToken.isEmpty()) {
+                    if (!isDriveConnected) {
                         Button(
                             modifier = Modifier.fillMaxWidth().height(42.dp),
                             shape = RoundedCornerShape(8.dp),
