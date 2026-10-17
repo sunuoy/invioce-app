@@ -78,7 +78,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     private val _googleDriveLastSyncTime = MutableStateFlow("Never")
     val googleDriveLastSyncTime: StateFlow<String> = _googleDriveLastSyncTime.asStateFlow()
 
-    private val _googleDriveSyncMode = MutableStateFlow(prefs.getString("gd_sync_mode", "auto") ?: "auto")
+    private val _googleDriveSyncMode = MutableStateFlow(prefs.getString("gd_sync_mode", "manual") ?: "manual")
     val googleDriveSyncMode: StateFlow<String> = _googleDriveSyncMode.asStateFlow()
 
     private val _googleDriveAccountEmail = MutableStateFlow(prefs.getString("gd_account_email", "") ?: "")
@@ -138,7 +138,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         _googleDriveAccessToken.value = gdToken
         _googleDriveLastSyncTime.value = gdLastSync
         _googleDriveAccountEmail.value = gdEmail
-        val gdSavedMode = prefs.getString("gd_sync_mode", "auto") ?: "auto"
+        val gdSavedMode = prefs.getString("gd_sync_mode", "manual") ?: "manual"
         _googleDriveSyncMode.value = gdSavedMode
 
         viewModelScope.launch {
@@ -157,7 +157,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             repository.businessProfile.collect { profile ->
                 val profileName = profile?.businessName ?: "default"
                 val mode = prefs.getString("gd_sync_mode_$profileName", null) 
-                    ?: prefs.getString("gd_sync_mode", "auto") ?: "auto"
+                    ?: prefs.getString("gd_sync_mode", "manual") ?: "manual"
                 _googleDriveSyncMode.value = mode
             }
         }
@@ -929,15 +929,15 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         _googleDriveAccessToken.value = trimmed
         if (trimmed.isNotEmpty()) {
             _googleDriveSyncEnabled.value = true
-            val currentMode = _googleDriveSyncMode.value
-            val effectiveMode = if (currentMode == "manual") "auto" else currentMode
-            _googleDriveSyncMode.value = effectiveMode
             val profileName = businessProfile.value?.businessName ?: "default"
+            val currentMode = prefs.getString("gd_sync_mode_$profileName", null)
+                ?: prefs.getString("gd_sync_mode", "manual") ?: "manual"
+            _googleDriveSyncMode.value = currentMode
             prefs.edit()
                 .putBoolean("gd_sync_enabled", true)
                 .putString("gd_access_token", trimmed)
-                .putString("gd_sync_mode", effectiveMode)
-                .putString("gd_sync_mode_$profileName", effectiveMode)
+                .putString("gd_sync_mode", currentMode)
+                .putString("gd_sync_mode_$profileName", currentMode)
                 .apply()
         }
     }
@@ -1175,7 +1175,13 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun fetchGoogleDriveTokenAutomatically(context: Context, email: String) {
+    fun fetchGoogleDriveTokenAutomatically(
+        context: Context,
+        email: String,
+        onIntentRequired: ((android.content.Intent) -> Unit)? = null,
+        onSuccess: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ) {
         if (email.isEmpty()) return
         
         var ctx: Context? = context
@@ -1207,6 +1213,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                         viewModelScope.launch(Dispatchers.Main) {
                             setGoogleDriveAccessToken(token)
                             android.util.Log.d("GoogleDriveAutoSync", "Successfully auto-authenticated Google Drive for $email")
+                            onSuccess?.invoke()
 
                             // Auto restore if database is empty
                             if (products.value.isEmpty() && invoices.value.isEmpty() && customers.value.isEmpty()) {
@@ -1218,12 +1225,25 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                         }
                     } else {
                         val intent = bundle.getParcelable<android.content.Intent>(android.accounts.AccountManager.KEY_INTENT)
-                        if (intent != null && activity != null) {
-                            activity.startActivity(intent)
+                        if (intent != null) {
+                            if (onIntentRequired != null) {
+                                viewModelScope.launch(Dispatchers.Main) {
+                                    onIntentRequired(intent)
+                                }
+                            } else if (activity != null) {
+                                activity.startActivity(intent)
+                            } else {
+                                android.util.Log.e("GoogleDriveAutoSync", "Token was null and no intent launcher provided")
+                                viewModelScope.launch(Dispatchers.Main) {
+                                    onError?.invoke("Google Drive permission required")
+                                    android.widget.Toast.makeText(context, "Google Drive: authorization required or account unavailable", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }
                         } else {
                             android.util.Log.e("GoogleDriveAutoSync", "Token was null and no intent provided")
-                            if (activity != null) {
-                                viewModelScope.launch(Dispatchers.Main) {
+                            viewModelScope.launch(Dispatchers.Main) {
+                                onError?.invoke("Google Drive token not available")
+                                if (activity != null) {
                                     android.widget.Toast.makeText(context, "Google Drive: authorization required or account unavailable", android.widget.Toast.LENGTH_LONG).show()
                                 }
                             }
@@ -1231,8 +1251,9 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("GoogleDriveAutoSync", "Failed to auto-authenticate Google Drive: ${e.message}")
-                    if (activity != null) {
-                        viewModelScope.launch(Dispatchers.Main) {
+                    viewModelScope.launch(Dispatchers.Main) {
+                        onError?.invoke(e.message ?: "Authentication failed")
+                        if (activity != null) {
                             android.widget.Toast.makeText(context, "Failed to connect Google Drive: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
                         }
                     }

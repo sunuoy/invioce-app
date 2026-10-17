@@ -75,6 +75,27 @@ fun AppSettingsScreen(
     val gdSyncing by viewModel.isGoogleDriveSyncing.collectAsStateWithLifecycle()
     val gdSyncMode by viewModel.googleDriveSyncMode.collectAsStateWithLifecycle()
 
+    val authConsentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val currentEmail = gdAccountEmail.ifEmpty {
+            context.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE)
+                .getString("gd_account_email", "") ?: ""
+        }
+        if (currentEmail.isNotEmpty()) {
+            viewModel.fetchGoogleDriveTokenAutomatically(
+                context = context,
+                email = currentEmail,
+                onSuccess = {
+                    Toast.makeText(context, "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
+                },
+                onError = { err ->
+                    Toast.makeText(context, "Google Drive auth error: $err", Toast.LENGTH_LONG).show()
+                }
+            )
+        }
+    }
+
     val googleAccountPickerLauncherForDrive = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -83,7 +104,17 @@ fun AppSettingsScreen(
             if (data != null) {
                 val accountName = data.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME)
                 if (!accountName.isNullOrEmpty()) {
-                    viewModel.fetchGoogleDriveTokenAutomatically(context, accountName)
+                    viewModel.fetchGoogleDriveTokenAutomatically(
+                        context = context,
+                        email = accountName,
+                        onIntentRequired = { authConsentLauncher.launch(it) },
+                        onSuccess = {
+                            Toast.makeText(context, "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
+                        },
+                        onError = { err ->
+                            Toast.makeText(context, "Failed to connect Google Drive: $err", Toast.LENGTH_LONG).show()
+                        }
+                    )
                 }
             }
         }
@@ -1036,7 +1067,10 @@ fun AppSettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    val isDriveConnected = gdAccessToken.isNotEmpty() || gdAccountEmail.isNotEmpty()
+                    val hasValidToken = gdAccessToken.isNotEmpty()
+                    val hasAccountEmail = gdAccountEmail.isNotEmpty()
+                    val isDriveConnected = hasValidToken || hasAccountEmail
+
                     if (isDriveConnected) {
                         Row(
                             modifier = Modifier
@@ -1054,13 +1088,16 @@ fun AppSettingsScreen(
                                     Box(
                                         modifier = Modifier
                                             .size(8.dp)
-                                            .background(Color(0xFF10B981), CircleShape)
+                                            .background(
+                                                if (hasValidToken) Color(0xFF10B981) else Color(0xFFF59E0B), 
+                                                CircleShape
+                                            )
                                     )
                                     Text(
-                                        text = "Status: Connected",
+                                        text = if (hasValidToken) "Status: Connected" else "Status: Action Required",
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
+                                        color = if (hasValidToken) MaterialTheme.colorScheme.primary else Color(0xFFD97706)
                                     )
                                 }
                                 if (gdAccountEmail.isNotEmpty()) {
@@ -1082,15 +1119,41 @@ fun AppSettingsScreen(
                                 }
                             }
 
-                            OutlinedButton(
-                                onClick = { viewModel.disableGoogleDriveSync() },
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) {
-                                Text("Disconnect", fontSize = 11.sp, maxLines = 1)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                if (!hasValidToken && hasAccountEmail) {
+                                    Button(
+                                        onClick = {
+                                            viewModel.fetchGoogleDriveTokenAutomatically(
+                                                context = context,
+                                                email = gdAccountEmail,
+                                                onIntentRequired = { authConsentLauncher.launch(it) },
+                                                onSuccess = {
+                                                    Toast.makeText(context, "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
+                                                },
+                                                onError = { err ->
+                                                    Toast.makeText(context, "Auth error: $err", Toast.LENGTH_LONG).show()
+                                                }
+                                            )
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text("Authorize", fontSize = 11.sp, maxLines = 1)
+                                    }
+                                }
+
+                                OutlinedButton(
+                                    onClick = { viewModel.disableGoogleDriveSync() },
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text("Disconnect", fontSize = 11.sp, maxLines = 1)
+                                }
                             }
                         }
                     } else {
@@ -1174,8 +1237,25 @@ fun AppSettingsScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 enabled = !gdSyncing,
                                 onClick = {
-                                    viewModel.backupToGoogleDrive { success, msg ->
-                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                    if (!hasValidToken && hasAccountEmail) {
+                                        Toast.makeText(context, "Authorizing Google Drive...", Toast.LENGTH_SHORT).show()
+                                        viewModel.fetchGoogleDriveTokenAutomatically(
+                                            context = context,
+                                            email = gdAccountEmail,
+                                            onIntentRequired = { authConsentLauncher.launch(it) },
+                                            onSuccess = {
+                                                viewModel.backupToGoogleDrive { success, msg ->
+                                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                                }
+                                            },
+                                            onError = { err ->
+                                                Toast.makeText(context, "Could not authorize Google Drive: $err", Toast.LENGTH_LONG).show()
+                                            }
+                                        )
+                                    } else {
+                                        viewModel.backupToGoogleDrive { success, msg ->
+                                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                        }
                                     }
                                 }
                             ) {
@@ -1193,8 +1273,25 @@ fun AppSettingsScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 enabled = !gdSyncing,
                                 onClick = {
-                                    viewModel.restoreFromGoogleDrive { success, msg ->
-                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                    if (!hasValidToken && hasAccountEmail) {
+                                        Toast.makeText(context, "Authorizing Google Drive...", Toast.LENGTH_SHORT).show()
+                                        viewModel.fetchGoogleDriveTokenAutomatically(
+                                            context = context,
+                                            email = gdAccountEmail,
+                                            onIntentRequired = { authConsentLauncher.launch(it) },
+                                            onSuccess = {
+                                                viewModel.restoreFromGoogleDrive { success, msg ->
+                                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                                }
+                                            },
+                                            onError = { err ->
+                                                Toast.makeText(context, "Could not authorize Google Drive: $err", Toast.LENGTH_LONG).show()
+                                            }
+                                        )
+                                    } else {
+                                        viewModel.restoreFromGoogleDrive { success, msg ->
+                                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                        }
                                     }
                                 }
                             ) {
