@@ -162,6 +162,8 @@ fun SettingsScreen(
     var showSalesTrend by remember { mutableStateOf(prefs.getBoolean("show_sales_trend", true)) }
     var showPdfQr by remember { mutableStateOf(prefs.getBoolean("show_pdf_qr", true)) }
     var showTermsConditions by remember { mutableStateOf(prefs.getBoolean("show_terms_conditions", true)) }
+    var showIrnBar by remember { mutableStateOf(prefs.getBoolean("show_irn_bar", true)) }
+    var customIrnText by remember { mutableStateOf(prefs.getString("custom_irn_text", "") ?: "") }
     var pdfModel by remember { mutableStateOf(prefs.getString("pdf_model", "Model 1") ?: "Model 1") }
 
     var customFontPath by remember { mutableStateOf(prefs.getString("custom_font_path", "") ?: "") }
@@ -1415,6 +1417,55 @@ fun SettingsScreen(
                                 Toast.makeText(context, if (isChecked) "PDF Terms & Conditions Enabled!" else "PDF Terms & Conditions Disabled!", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.testTag("terms_conditions_toggle_settings")
+                        )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    // Model 2 E-Invoice IRN Bar Toggle & Custom Field
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Model 2 E-Invoice IRN Bar",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Display Invoice Reference Number (IRN) & Ack Date on Model 2 PDF.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = showIrnBar,
+                            onCheckedChange = { isChecked ->
+                                showIrnBar = isChecked
+                                prefs.edit().putBoolean("show_irn_bar", isChecked).apply()
+                                Toast.makeText(context, if (isChecked) "IRN Bar Enabled!" else "IRN Bar Disabled!", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+
+                    if (showIrnBar) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = customIrnText,
+                            onValueChange = { newVal ->
+                                customIrnText = newVal
+                                prefs.edit().putString("custom_irn_text", newVal).apply()
+                            },
+                            label = { Text("Custom IRN Number / Prefix (Optional)") },
+                            placeholder = { Text("Leave empty for auto-generated IRN") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(10.dp)
                         )
                     }
 

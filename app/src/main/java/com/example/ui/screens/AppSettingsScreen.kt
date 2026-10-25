@@ -214,6 +214,12 @@ fun AppSettingsScreen(
     var showTermsConditionsSetting by remember {
         mutableStateOf(generatorPrefs.getBoolean("show_terms_conditions", true))
     }
+    var showIrnBarSetting by remember {
+        mutableStateOf(generatorPrefs.getBoolean("show_irn_bar", true))
+    }
+    var customIrnTextSetting by remember {
+        mutableStateOf(generatorPrefs.getString("custom_irn_text", "") ?: "")
+    }
     var pdfModelSetting by remember {
         mutableStateOf(generatorPrefs.getString("pdf_model", "Model 1") ?: "Model 1")
     }
@@ -718,6 +724,55 @@ fun AppSettingsScreen(
                                 Toast.makeText(context, if (isChecked) "PDF Terms & Conditions Enabled!" else "PDF Terms & Conditions Disabled!", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.testTag("terms_conditions_toggle_app_settings")
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    // Model 2 E-Invoice IRN Bar Settings
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Model 2 E-Invoice IRN Bar",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Display Invoice Reference Number (IRN) & Ack Date on Model 2 PDF.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = showIrnBarSetting,
+                            onCheckedChange = { isChecked ->
+                                showIrnBarSetting = isChecked
+                                generatorPrefs.edit().putBoolean("show_irn_bar", isChecked).apply()
+                                Toast.makeText(context, if (isChecked) "IRN Bar Enabled!" else "IRN Bar Disabled!", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+
+                    if (showIrnBarSetting) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = customIrnTextSetting,
+                            onValueChange = { newVal ->
+                                customIrnTextSetting = newVal
+                                generatorPrefs.edit().putString("custom_irn_text", newVal).apply()
+                            },
+                            label = { Text("Custom IRN Number / Prefix (Optional)") },
+                            placeholder = { Text("Leave empty for auto-generated IRN") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(10.dp)
                         )
                     }
 

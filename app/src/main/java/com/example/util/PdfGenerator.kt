@@ -347,9 +347,8 @@ object PdfGenerator {
         }
         
         if (bGstin.isNotBlank()) {
-            val panNumber = if (bGstin.trim().length == 15) bGstin.trim().substring(2, 12) else bGstin.take(10)
-            val gstinAndPan = "GSTIN - $bGstin | PAN - $panNumber"
-            canvas.drawText(gstinAndPan, 95f, currentHeaderY, boldTextPaint.apply { color = primaryColor; textSize = 12.5f })
+            val gstinText = "GSTIN - $bGstin"
+            canvas.drawText(gstinText, 95f, currentHeaderY, boldTextPaint.apply { color = primaryColor; textSize = 12.5f })
             boldTextPaint.color = textDarkColor // reset
         }
 
@@ -1259,7 +1258,7 @@ object PdfGenerator {
         canvas.drawText(gstinStr, leftBorder + (700f - gstinWidth) / 2f, curY, boldTextPaint)
 
         // Divider below Company Profile (y: 110f)
-        val metaTopY = topBorder + 80f
+        val metaTopY = topBorder + 82f
         canvas.drawLine(leftBorder, metaTopY, rightBorder, metaTopY, borderPaint)
 
         // 4. Two-Column Metadata Box (y: 110f to 210f)
@@ -1321,11 +1320,16 @@ object PdfGenerator {
         canvas.drawText(truncatedAddrLeft, leftBorder + 8f, metaBottomY + 60f, textPaint)
 
         // 6. Dynamic IRN / Ack Bar Row (y: 280f to 296f)
-        val irnBottomY = partyBottomY + 16f
-        canvas.drawLine(leftBorder, irnBottomY, rightBorder, irnBottomY, borderPaint)
-        val irnText = "IRN: ${invoice.invoiceNumber.hashCode().toString().replace("-", "")} | Ack Date: $invDateStr"
-        canvas.drawText(irnText, leftBorder + 6f, partyBottomY + 12f, boldTextPaint.apply { textSize = 9.0f })
-        boldTextPaint.textSize = 10.5f
+        val showIrnBar = prefs.getBoolean("show_irn_bar", true)
+        val irnBottomY = if (showIrnBar) partyBottomY + 16f else partyBottomY
+        if (showIrnBar) {
+            canvas.drawLine(leftBorder, irnBottomY, rightBorder, irnBottomY, borderPaint)
+            val customIrn = prefs.getString("custom_irn_text", "")?.trim().orEmpty()
+            val irnCode = if (customIrn.isNotBlank()) customIrn else invoice.invoiceNumber.hashCode().toString().replace("-", "")
+            val irnText = "IRN: $irnCode | Ack Date: $invDateStr"
+            canvas.drawText(irnText, leftBorder + 6f, partyBottomY + 12f, boldTextPaint.apply { textSize = 9.0f })
+            boldTextPaint.textSize = 10.5f
+        }
 
         // 7. Item Table Header & Grid (y: 296f to 590f)
         val tableTopY = irnBottomY
