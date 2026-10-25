@@ -987,7 +987,11 @@ object PdfGenerator {
 
     private fun generateQrCodeBitmap(content: String, size: Int): android.graphics.Bitmap {
         val wm = com.google.zxing.MultiFormatWriter()
-        val bitMatrix = wm.encode(content, com.google.zxing.BarcodeFormat.QR_CODE, size, size)
+        val hints = mapOf(
+            com.google.zxing.EncodeHintType.CHARACTER_SET to "UTF-8",
+            com.google.zxing.EncodeHintType.MARGIN to 1
+        )
+        val bitMatrix = wm.encode(content, com.google.zxing.BarcodeFormat.QR_CODE, size, size, hints)
         val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
         for (x in 0 until size) {
             for (y in 0 until size) {
@@ -1293,9 +1297,8 @@ object PdfGenerator {
         drawTransPair("Transporter Doc Date", invDateStr, metaTopY + 75f)
         drawTransPair("E-Way Bill No.", if (invoice.eWayBillNo.isNotBlank()) invoice.eWayBillNo else "N.A.", metaTopY + 90f)
 
-        // 5. Billing Details & Shipping Details Row (y: 210f to 280f)
+        // 5. Billing Details Row (y: 210f to 280f)
         val partyBottomY = metaBottomY + 70f
-        canvas.drawLine(midX, metaBottomY, midX, partyBottomY, borderPaint)
         canvas.drawLine(leftBorder, partyBottomY, rightBorder, partyBottomY, borderPaint)
 
         val cName = customer?.let { if (it.companyName.isNotBlank()) "${it.name} (${it.companyName})" else it.name } ?: "Guest Customer"
@@ -1304,31 +1307,18 @@ object PdfGenerator {
         val cEmail = customer?.email?.takeIf { it.isNotBlank() } ?: "N.A."
         val cAddr = customer?.address?.takeIf { it.isNotBlank() } ?: "N.A."
 
-        // Billing Details (Left Panel, Width ~350pt)
+        // Billing Details (Full Width)
         canvas.drawText("Billing Details", leftBorder + 8f, metaBottomY + 15f, boldTextPaint)
         
         canvas.drawText("Name", leftBorder + 8f, metaBottomY + 30f, textPaint)
-        val truncatedNameLeft = if (cName.length > 35) cName.take(32) + "..." else cName
+        val truncatedNameLeft = if (cName.length > 70) cName.take(67) + "..." else cName
         canvas.drawText(": $truncatedNameLeft", leftBorder + 45f, metaBottomY + 30f, boldTextPaint)
         
         val contactLineLeft = "GSTIN: $cGstin | Ph: $cPhone"
         canvas.drawText(contactLineLeft, leftBorder + 8f, metaBottomY + 45f, textPaint)
         
-        val truncatedAddrLeft = if (cAddr.length > 55) cAddr.take(52) + "..." else cAddr
+        val truncatedAddrLeft = if (cAddr.length > 100) cAddr.take(97) + "..." else cAddr
         canvas.drawText(truncatedAddrLeft, leftBorder + 8f, metaBottomY + 60f, textPaint)
-
-        // Shipping Details (Right Panel, Width ~350pt)
-        canvas.drawText("Shipping Details", midX + 8f, metaBottomY + 15f, boldTextPaint)
-        
-        canvas.drawText("Name", midX + 8f, metaBottomY + 30f, textPaint)
-        val truncatedNameRight = if (cName.length > 35) cName.take(32) + "..." else cName
-        canvas.drawText(": $truncatedNameRight", midX + 45f, metaBottomY + 30f, boldTextPaint)
-        
-        val contactLineRight = "GSTIN: $cGstin | Ph: $cPhone"
-        canvas.drawText(contactLineRight, midX + 8f, metaBottomY + 45f, textPaint)
-        
-        val truncatedAddrRight = if (cAddr.length > 55) cAddr.take(52) + "..." else cAddr
-        canvas.drawText(truncatedAddrRight, midX + 8f, metaBottomY + 60f, textPaint)
 
         // 6. Dynamic IRN / Ack Bar Row (y: 280f to 296f)
         val irnBottomY = partyBottomY + 16f
@@ -1530,18 +1520,107 @@ object PdfGenerator {
         textPaint.textSize = 10.5f
 
         // Panel 3: E-Invoice QR & Digital Signature (Center-Right to Right)
-        canvas.drawText("E-Invoice QR", col3End + 65f, footerTopY + 14f, boldTextPaint)
+        val qrHeaderTitle = "E-Invoice QR"
+        val qrHeaderW = boldTextPaint.measureText(qrHeaderTitle)
+        canvas.drawText(qrHeaderTitle, col3End + 65f - (qrHeaderW / 2f) + 15f, footerTopY + 14f, boldTextPaint)
 
-        // Draw Dynamic E-Invoice Verification QR Code
+        // Draw Dynamic E-Invoice Verification QR Code with complete invoice details
         try {
-            val eInvoiceQrPayload = "Invoice: ${invoice.invoiceNumber} | GSTIN: $bGstin | Total: ${invoice.grandTotal}"
-            val eInvBitmap = generateQrCodeBitmap(eInvoiceQrPayload, 100)
-            canvas.drawBitmap(eInvBitmap, col3End + 15f, footerTopY + 22f, null)
+            val qrText = buildString {
+                val docTitle = if (invoice.documentType.equals("ESTIMATE", ignoreCase = true) || invoice.documentType.equals("QUOTATION", ignoreCase = true)) {
+                    "ESTIMATE / QUOTATION DETAILS"
+                } else if (invoice.taxTotal > 0.0) {
+                    "TAX INVOICE DETAILS"
+                } else {
+                    "BILL OF SUPPLY DETAILS"
+                }
+                appendLine(docTitle)
+                appendLine("--------------------------------")
+                appendLine("Invoice No: ${invoice.invoiceNumber}")
+                appendLine("Date: $invDateStr")
+                if (invoice.dueDateTimestamp != 0L) {
+                    appendLine("Due Date: $dueDateStr")
+                }
+                if (invoice.placeOfSupply.isNotBlank()) {
+                    appendLine("Place of Supply: ${invoice.placeOfSupply}")
+                }
+                appendLine()
+                appendLine("SELLER:")
+                appendLine(bName)
+                if (bGstin.isNotBlank()) appendLine("GSTIN: $bGstin")
+                profile?.phone?.takeIf { it.isNotBlank() }?.let { appendLine("Ph: $it") }
+                profile?.address?.takeIf { it.isNotBlank() }?.let { appendLine("Address: $it") }
+                appendLine()
+                appendLine("BUYER:")
+                appendLine(cName)
+                if (cGstin != "N.A.") appendLine("GSTIN: $cGstin")
+                if (cPhone != "N.A.") appendLine("Ph: $cPhone")
+                if (cAddr != "N.A.") appendLine("Address: $cAddr")
+
+                val hasTransport = invoice.brokerageBy.isNotBlank() || invoice.vehicleNumber.isNotBlank() ||
+                        invoice.transporterDocNo.isNotBlank() || invoice.eWayBillNo.isNotBlank()
+                if (hasTransport) {
+                    appendLine()
+                    appendLine("TRANSPORT / DISPATCH:")
+                    if (invoice.brokerageBy.isNotBlank()) appendLine("Brokerage by: ${invoice.brokerageBy}")
+                    if (invoice.vehicleNumber.isNotBlank()) appendLine("Vehicle No: ${invoice.vehicleNumber}")
+                    if (invoice.transporterDocNo.isNotBlank()) appendLine("Trans. Doc No: ${invoice.transporterDocNo}")
+                    if (invoice.eWayBillNo.isNotBlank()) appendLine("E-Way Bill No: ${invoice.eWayBillNo}")
+                }
+
+                if (items.isNotEmpty()) {
+                    appendLine()
+                    appendLine("ITEMS:")
+                    val maxItems = 6
+                    items.take(maxItems).forEachIndexed { idx, itm ->
+                        val unitStr = if (itm.unit.isNotBlank()) " ${itm.unit}" else ""
+                        val rateStr = String.format(Locale.US, "%,.2f", itm.price)
+                        val totalStr = String.format(Locale.US, "%,.2f", itm.total)
+                        appendLine("${idx + 1}. ${itm.productName} (${itm.quantity}$unitStr @ Rs.$rateStr = Rs.$totalStr)")
+                    }
+                    if (items.size > maxItems) {
+                        appendLine("...and ${items.size - maxItems} more items")
+                    }
+                }
+
+                appendLine()
+                appendLine("TOTALS:")
+                appendLine("Taxable Value: Rs.${String.format(Locale.US, "%,.2f", invoice.subtotal)}")
+                appendLine("Total GST: Rs.${String.format(Locale.US, "%,.2f", invoice.taxTotal)}")
+                appendLine("Grand Total: Rs.${String.format(Locale.US, "%,.2f", invoice.grandTotal)}")
+                if (isPaid) {
+                    appendLine("Status: Paid (Rs.${String.format(Locale.US, "%,.2f", invoice.grandTotal)})")
+                    appendLine("Balance Due: Rs.0.00")
+                } else if (invoice.paidAmount > 0.0) {
+                    appendLine("Paid: Rs.${String.format(Locale.US, "%,.2f", invoice.paidAmount)}")
+                    val bal = (invoice.grandTotal - invoice.paidAmount).coerceAtLeast(0.0)
+                    appendLine("Balance Due: Rs.${String.format(Locale.US, "%,.2f", bal)}")
+                } else {
+                    appendLine("Balance Due: Rs.${String.format(Locale.US, "%,.2f", invoice.grandTotal)}")
+                }
+
+                if (bankAcc != "N.A." || bankN != "N.A.") {
+                    appendLine()
+                    appendLine("BANK DETAILS:")
+                    if (bankN != "N.A.") appendLine("Bank: $bankN")
+                    if (bankAcc != "N.A.") appendLine("A/C: $bankAcc")
+                    if (bankIfsc != "N.A.") appendLine("IFSC: $bankIfsc")
+                    if (bankBranch != "N.A.") appendLine("Branch: $bankBranch")
+                }
+                if (hasQr && upiId.isNotBlank()) {
+                    appendLine("UPI ID: $upiId")
+                }
+            }.trim()
+
+            val eInvBitmap = generateQrCodeBitmap(qrText, 250)
+            val qrDstRect = RectF(col3End + 15f, footerTopY + 20f, col3End + 115f, footerTopY + 120f)
+            canvas.drawBitmap(eInvBitmap, null, qrDstRect, null)
         } catch (_: Exception) {}
 
         val sigCompanyLabel = "For $bName"
-        val sigCompanyW = boldTextPaint.measureText(sigCompanyLabel)
-        canvas.drawText(sigCompanyLabel, rightBorder - sigCompanyW - 8f, footerTopY + 110f, boldTextPaint)
+        val sigCompanyTruncated = if (sigCompanyLabel.length > 20) sigCompanyLabel.take(17) + "..." else sigCompanyLabel
+        val sigCompanyW = boldTextPaint.measureText(sigCompanyTruncated)
+        canvas.drawText(sigCompanyTruncated, rightBorder - sigCompanyW - 8f, footerTopY + 110f, boldTextPaint)
 
         val sigTextW = textPaint.measureText("Authorized Signatory")
         canvas.drawText("Authorized Signatory", rightBorder - sigTextW - 8f, bottomBorder - 8f, textPaint)

@@ -36,18 +36,33 @@ object UpdateHelper {
                 val htmlUrl = json.optString("html_url", "")
                 val body = json.optString("body", "")
 
-                // Find apk download url in assets if available
+                // Find apk download url in assets matching the current build type (debug vs release)
                 var downloadUrl = ""
                 val assets = json.optJSONArray("assets")
                 if (assets != null) {
+                    val preferDebug = BuildConfig.DEBUG
+                    var fallbackUrl = ""
+                    var preferredUrl = ""
+
                     for (i in 0 until assets.length()) {
                         val asset = assets.getJSONObject(i)
                         val name = asset.optString("name", "")
-                        if (name.endsWith(".apk")) {
-                            downloadUrl = asset.optString("browser_download_url", "")
-                            break
+                        val assetUrl = asset.optString("browser_download_url", "")
+                        if (name.endsWith(".apk", ignoreCase = true)) {
+                            if (fallbackUrl.isEmpty()) {
+                                fallbackUrl = assetUrl
+                            }
+                            val isDebugAsset = name.contains("debug", ignoreCase = true)
+                            if (preferDebug && isDebugAsset) {
+                                preferredUrl = assetUrl
+                                break
+                            } else if (!preferDebug && !isDebugAsset) {
+                                preferredUrl = assetUrl
+                                break
+                            }
                         }
                     }
+                    downloadUrl = if (preferredUrl.isNotEmpty()) preferredUrl else fallbackUrl
                 }
 
                 // Fallback to htmlUrl if no apk in assets
