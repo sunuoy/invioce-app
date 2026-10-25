@@ -33,78 +33,77 @@ object PdfGenerator {
         return Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
     }
 
-    private fun englishNumberToWords(number: Long): String {
-        if (number == 0L) return "Zero"
-        val units = arrayOf("", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
-            "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen")
-        val tens = arrayOf("", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety")
-        
-        fun convertLessThanOneThousand(n: Int): String {
-            var str = ""
-            if (n % 100 < 20) {
-                str = units[n % 100]
-                val hundreds = n / 100
-                if (hundreds > 0) {
-                    str = units[hundreds] + " Hundred " + str
-                }
+    private fun indianNumberToWords(number: Long): String {
+        if (number == 0L) return "zero"
+        val units = arrayOf(
+            "", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+            "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"
+        )
+        val tens = arrayOf("", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
+
+        fun convertTwoDigits(n: Int): String {
+            return if (n < 20) {
+                units[n]
             } else {
-                str = units[n % 10]
-                val ten = (n % 100) / 10
-                str = tens[ten] + " " + str
-                val hundreds = n / 100
-                if (hundreds > 0) {
-                    str = units[hundreds] + " Hundred " + str
-                }
+                val t = n / 10
+                val u = n % 10
+                if (u > 0) "${tens[t]} ${units[u]}" else tens[t]
             }
-            return str.trim()
         }
-        
-        var temp = number
-        var result = ""
-        
-        val bill = temp / 1000000000L
-        temp %= 1000000000L
-        if (bill > 0) {
-            result += convertLessThanOneThousand(bill.toInt()) + " Billion "
-        }
-        
-        val mill = temp / 1000000L
-        temp %= 1000000L
-        if (mill > 0) {
-            result += convertLessThanOneThousand(mill.toInt()) + " Million "
-        }
-        
-        val thousand = temp / 1000L
-        temp %= 1000L
-        if (thousand > 0) {
-            result += convertLessThanOneThousand(thousand.toInt()) + " Thousand "
-        }
-        
-        if (temp > 0) {
-            result += convertLessThanOneThousand(temp.toInt())
-        }
-        
-        return result.trim()
+
+        val parts = mutableListOf<String>()
+
+        // Kharab (10^11 = 100,000,000,000)
+        val kharab = (number / 100_000_000_000L) % 100L
+        if (kharab > 0) parts.add("${convertTwoDigits(kharab.toInt())} kharab")
+
+        // Arab (10^9 = 1,000,000,000)
+        val arab = (number / 1_000_000_000L) % 100L
+        if (arab > 0) parts.add("${convertTwoDigits(arab.toInt())} arab")
+
+        // Crore (10^7 = 10,000,000)
+        val crore = (number / 10_000_000L) % 100L
+        if (crore > 0) parts.add("${convertTwoDigits(crore.toInt())} crore")
+
+        // Lakh (10^5 = 100,000)
+        val lakh = (number / 100_000L) % 100L
+        if (lakh > 0) parts.add("${convertTwoDigits(lakh.toInt())} lakh")
+
+        // Thousand (10^3 = 1,000)
+        val thousand = (number / 1_000L) % 100L
+        if (thousand > 0) parts.add("${convertTwoDigits(thousand.toInt())} thousand")
+
+        // Hundred (10^2 = 100)
+        val hundred = (number / 100L) % 10L
+        if (hundred > 0) parts.add("${units[hundred.toInt()]} hundred")
+
+        // Remaining two digits (0-99)
+        val rem = (number % 100L).toInt()
+        if (rem > 0) parts.add(convertTwoDigits(rem))
+
+        return parts.joinToString(" ").trim()
     }
-    
+
     private fun convertAmountToWords(amount: Double): String {
         val roundedInUnits = Math.round(amount * 100.0) / 100.0
         val rupees = roundedInUnits.toLong()
-        val paise = Math.round((roundedInUnits - rupees) * 100.0)
-        
-        val rupeesStr = if (rupees > 0) {
-            "${englishNumberToWords(rupees)} Rupees"
+        val paise = Math.round((roundedInUnits - rupees) * 100.0).toInt()
+
+        val raw = if (rupees > 0 && paise > 0) {
+            val rWords = indianNumberToWords(rupees)
+            val pWords = indianNumberToWords(paise.toLong())
+            "$rWords rupees and $pWords paise only."
+        } else if (rupees > 0) {
+            val rWords = indianNumberToWords(rupees)
+            "$rWords rupees only."
+        } else if (paise > 0) {
+            val pWords = indianNumberToWords(paise.toLong())
+            "$pWords paise only."
         } else {
-            "Zero Rupees"
+            "zero rupees only."
         }
-        
-        val paiseStr = if (paise > 0) {
-            " and ${englishNumberToWords(paise)} Paise"
-        } else {
-            ""
-        }
-        
-        return "$rupeesStr$paiseStr Only"
+
+        return raw.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
     }
 
     fun generateInvoicePdf(
@@ -618,7 +617,7 @@ object PdfGenerator {
         val amountInWords = convertAmountToWords(invoice.grandTotal)
         canvas.drawRect(leftBorder + 0.5f, 598.5f, rightBorder - 0.5f, 611f, footerBgPaint)
         canvas.drawLine(leftBorder, 611f, rightBorder, 611f, borderPaint)
-        canvas.drawText("Rupees $amountInWords Only", leftBorder + 10f, 607.5f, boldTextPaint.apply { color = primaryColor; textSize = 11.0f })
+        canvas.drawText(amountInWords, leftBorder + 10f, 607.5f, boldTextPaint.apply { color = primaryColor; textSize = 10.5f })
         boldTextPaint.color = textDarkColor // reset
 
         // Row 7: Settlement/Balance Summary Row (611f to 624f)
@@ -872,24 +871,37 @@ object PdfGenerator {
         context.startActivity(chooser)
     }
 
-    fun exportPdfToDownloads(context: Context, pdfFile: File, invoiceNumber: String): String? {
+    fun exportPdfToDownloads(context: Context, pdfFile: File, invoiceNumber: String, documentType: String = "INVOICE"): String? {
         try {
-            val fileName = "Invoice_${invoiceNumber.replace("/", "_")}.pdf"
+            val prefix = if (documentType.equals("ESTIMATE", ignoreCase = true)) "Estimate"
+                else if (documentType.equals("QUOTATION", ignoreCase = true)) "Quotation"
+                else "Invoice"
+            val cleanNumber = invoiceNumber.trim().replace(Regex("[/\\\\:*?\"<>|]"), "_")
+            val fileName = "${prefix}_${cleanNumber}.pdf"
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                 val resolver = context.contentResolver
                 val contentValues = android.content.ContentValues().apply {
                     put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                     put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
                     put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                    put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
                 }
                 
-                val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                var uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                if (uri == null) {
+                    val fallbackName = "${prefix}_${cleanNumber}_${System.currentTimeMillis()}.pdf"
+                    contentValues.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fallbackName)
+                    uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                }
                 if (uri != null) {
                     resolver.openOutputStream(uri)?.use { out ->
                         pdfFile.inputStream().use { input ->
                             input.copyTo(out)
                         }
                     }
+                    contentValues.clear()
+                    contentValues.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
+                    resolver.update(uri, contentValues, null, null)
                     return "Saved to Downloads/$fileName"
                 }
             } else {
@@ -1275,7 +1287,7 @@ object PdfGenerator {
         }
 
         drawTransPair("Transporter Details", "", metaTopY + 15f)
-        drawTransPair("Transporter", if (invoice.brokerageBy.isNotBlank()) invoice.brokerageBy else "N.A.", metaTopY + 30f)
+        drawTransPair("Brokerage by", if (invoice.brokerageBy.isNotBlank()) invoice.brokerageBy else "N.A.", metaTopY + 30f)
         drawTransPair("Vehicle No.", if (invoice.vehicleNumber.isNotBlank()) invoice.vehicleNumber else "N.A.", metaTopY + 45f)
         drawTransPair("Transporter Doc No.", if (invoice.transporterDocNo.isNotBlank()) invoice.transporterDocNo else "N.A.", metaTopY + 60f)
         drawTransPair("Transporter Doc Date", invDateStr, metaTopY + 75f)
@@ -1440,7 +1452,7 @@ object PdfGenerator {
 
         // 9. Rupees in Words & Settlement Audit Bar (y: 640f to 680f)
         val amountInWords = convertAmountToWords(invoice.grandTotal)
-        canvas.drawText("Rs. $amountInWords Only", leftBorder + 8f, totalRowY + 14f, boldTextPaint)
+        canvas.drawText(amountInWords, leftBorder + 8f, totalRowY + 14f, boldTextPaint)
 
         val isPaid = invoice.status.equals("Paid", ignoreCase = true)
         val settledText = if (isPaid) {
@@ -1502,7 +1514,7 @@ object PdfGenerator {
             } catch (_: Exception) {}
         }
 
-        var bankY = if (hasQr) footerTopY + 56f else footerTopY + 10f
+        var bankY = if (hasQr) footerTopY + 68f else footerTopY + 18f
         val bankAcc = profile?.bankAccountNo?.takeIf { it.isNotBlank() } ?: "N.A."
         val bankN = profile?.bankName?.takeIf { it.isNotBlank() } ?: "N.A."
         val bankIfsc = profile?.bankIfsc?.takeIf { it.isNotBlank() } ?: "N.A."

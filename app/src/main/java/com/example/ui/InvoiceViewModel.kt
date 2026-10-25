@@ -453,7 +453,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         paymentAttachmentPath: String = "",
         closeReason: String = "",
         documentType: String = "INVOICE",
-        paidAmount: Double = 0.0
+        paidAmount: Double = 0.0,
+        dateTimestamp: Long = 0L
     ) {
         viewModelScope.launch {
             if (invoiceNumber.isBlank()) {
@@ -473,12 +474,19 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             val companyNameForInvoice = existingInv?.businessName?.takeIf { it.isNotEmpty() }
                 ?: (businessProfile.value?.businessName ?: "")
 
+            val invoiceDate = if (dateTimestamp > 0L) {
+                dateTimestamp
+            } else {
+                existingInv?.dateTimestamp ?: System.currentTimeMillis()
+            }
+
             val invoice = Invoice(
                 id = id,
                 invoiceNumber = invoiceNumber.trim(),
                 customerId = customerId,
                 businessName = companyNameForInvoice,
                 attachmentPath = attachmentPath.trim(),
+                dateTimestamp = invoiceDate,
                 status = status,
                 notes = notes.trim(),
                 vehicleNumber = vehicleNumber.trim(),

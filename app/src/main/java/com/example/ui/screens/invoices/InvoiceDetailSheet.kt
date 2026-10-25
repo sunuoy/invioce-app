@@ -448,6 +448,28 @@ fun InvoiceDetailSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // PDF Download
+                OutlinedButton(
+                    onClick = {
+                        onSelectPdfModel("download") { model ->
+                            val pdf = PdfGenerator.generateInvoicePdf(context, invoiceWithDetails, profile, overrideModel = model)
+                            val result = PdfGenerator.exportPdfToDownloads(context, pdf, invoice.invoiceNumber, invoice.documentType)
+                            if (result != null) {
+                                viewModel.incrementDownloadCount(invoice.id)
+                                Toast.makeText(context, result, Toast.LENGTH_LONG).show()
+                            } else {
+                                Toast.makeText(context, "Failed to download PDF", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Download PDF", fontSize = 12.sp)
+                }
+
                 // PDF Share / Preview
                 OutlinedButton(
                     onClick = {
@@ -463,22 +485,6 @@ fun InvoiceDetailSheet(
                     Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Share PDF", fontSize = 12.sp)
-                }
-
-                // Thermal POS Print
-                OutlinedButton(
-                    onClick = {
-                        val pdf = PdfGenerator.generateThermalReceiptPdf(context, invoiceWithDetails, profile)
-                        PdfGenerator.previewPdf(context, pdf)
-                        viewModel.incrementDownloadCount(invoice.id)
-                        Toast.makeText(context, "Thermal POS Receipt generated!", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Thermal POS", fontSize = 12.sp)
                 }
             }
 
@@ -504,6 +510,27 @@ fun InvoiceDetailSheet(
                     Text("WhatsApp", fontSize = 12.sp, color = Color.White)
                 }
 
+                // Thermal POS Print
+                OutlinedButton(
+                    onClick = {
+                        val pdf = PdfGenerator.generateThermalReceiptPdf(context, invoiceWithDetails, profile)
+                        PdfGenerator.previewPdf(context, pdf)
+                        viewModel.incrementDownloadCount(invoice.id)
+                        Toast.makeText(context, "Thermal POS Receipt generated!", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Thermal POS", fontSize = 12.sp)
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 // Edit Document
                 OutlinedButton(
                     onClick = onEdit,
@@ -520,9 +547,12 @@ fun InvoiceDetailSheet(
                     onClick = { showDeleteConfirmDialog = true },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                    modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Delete", fontSize = 12.sp)
                 }
             }
         }

@@ -65,6 +65,7 @@ fun CreateInvoiceScreen(
     var transporterDocNo by remember { mutableStateOf(editingInvoice?.invoice?.transporterDocNo ?: "") }
     var eWayBillNo by remember { mutableStateOf(editingInvoice?.invoice?.eWayBillNo ?: "") }
     var dueDateTimestamp by remember { mutableStateOf(editingInvoice?.invoice?.dueDateTimestamp ?: 0L) }
+    var billDateTimestamp by remember { mutableStateOf(editingInvoice?.invoice?.dateTimestamp ?: System.currentTimeMillis()) }
     var attachmentPathState by remember { mutableStateOf(editingInvoice?.invoice?.attachmentPath ?: "") }
 
     var paymentMethodState by remember { mutableStateOf(editingInvoice?.invoice?.paymentMethod ?: "Cash") }
@@ -79,6 +80,7 @@ fun CreateInvoiceScreen(
             addedItems.clear()
             addedItems.addAll(it.lineItems)
             dueDateTimestamp = it.invoice.dueDateTimestamp
+            billDateTimestamp = it.invoice.dateTimestamp
             attachmentPathState = it.invoice.attachmentPath
             paymentMethodState = it.invoice.paymentMethod
             paymentNoteState = it.invoice.paymentNote
@@ -142,7 +144,8 @@ fun CreateInvoiceScreen(
                                     paymentAttachmentPath = if (statusState == "Paid") paymentAttachmentPathState else "",
                                     closeReason = if (statusState == "Closed") closeReasonState else "",
                                     documentType = documentType,
-                                    paidAmount = editingInvoice?.invoice?.paidAmount ?: if (statusState == "Paid") grandTotal else 0.0
+                                    paidAmount = editingInvoice?.invoice?.paidAmount ?: if (statusState == "Paid") grandTotal else 0.0,
+                                    dateTimestamp = billDateTimestamp
                                 )
                                 Toast.makeText(context, "${if (isEstimate) "Estimate" else "Invoice"} Saved Successfully!", Toast.LENGTH_SHORT).show()
                                 onBack()
@@ -252,6 +255,115 @@ fun CreateInvoiceScreen(
                             singleLine = true
                         )
 
+                        // Bill Date & Due Date Row
+                        val dFormatter = remember { SimpleDateFormat("dd MMM yyyy", Locale.US) }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // Bill Date Picker
+                            Box(modifier = Modifier.weight(1f)) {
+                                OutlinedTextField(
+                                    value = dFormatter.format(Date(billDateTimestamp)),
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                    label = { Text(if (isEstimate) "Estimate Date" else "Bill Date", fontSize = 12.sp) },
+                                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = "Edit Bill Date", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                                    modifier = Modifier.fillMaxWidth().testTag("bill_date_picker_trigger"),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        disabledTrailingIconColor = MaterialTheme.colorScheme.primary
+                                    ),
+                                    enabled = false
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .clickable {
+                                            val cal = Calendar.getInstance().apply { timeInMillis = billDateTimestamp }
+                                            DatePickerDialog(
+                                                context,
+                                                { _, y, m, d ->
+                                                    val resCal = Calendar.getInstance().apply {
+                                                        timeInMillis = billDateTimestamp
+                                                        set(Calendar.YEAR, y)
+                                                        set(Calendar.MONTH, m)
+                                                        set(Calendar.DAY_OF_MONTH, d)
+                                                    }
+                                                    billDateTimestamp = resCal.timeInMillis
+                                                },
+                                                cal.get(Calendar.YEAR),
+                                                cal.get(Calendar.MONTH),
+                                                cal.get(Calendar.DAY_OF_MONTH)
+                                            ).show()
+                                        }
+                                )
+                            }
+
+                            // Due Date Picker
+                            Box(modifier = Modifier.weight(1f)) {
+                                OutlinedTextField(
+                                    value = if (dueDateTimestamp != 0L) dFormatter.format(Date(dueDateTimestamp)) else "Default (+5d)",
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                    label = { Text(if (isEstimate) "Valid Until" else "Due Date", fontSize = 12.sp) },
+                                    trailingIcon = {
+                                        if (dueDateTimestamp != 0L) {
+                                            IconButton(onClick = { dueDateTimestamp = 0L }, modifier = Modifier.size(20.dp)) {
+                                                Icon(Icons.Default.Close, contentDescription = "Clear Due Date", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                            }
+                                        } else {
+                                            Icon(Icons.Default.Event, contentDescription = "Select Due Date", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        disabledTrailingIconColor = MaterialTheme.colorScheme.primary
+                                    ),
+                                    enabled = false
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .clickable {
+                                            val cal = Calendar.getInstance().apply {
+                                                if (dueDateTimestamp != 0L) {
+                                                    timeInMillis = dueDateTimestamp
+                                                } else {
+                                                    timeInMillis = billDateTimestamp + (5L * 24 * 60 * 60 * 1000)
+                                                }
+                                            }
+                                            DatePickerDialog(
+                                                context,
+                                                { _, y, m, d ->
+                                                    val resCal = Calendar.getInstance().apply {
+                                                        set(Calendar.YEAR, y)
+                                                        set(Calendar.MONTH, m)
+                                                        set(Calendar.DAY_OF_MONTH, d)
+                                                        set(Calendar.HOUR_OF_DAY, 23)
+                                                        set(Calendar.MINUTE, 59)
+                                                        set(Calendar.SECOND, 59)
+                                                    }
+                                                    dueDateTimestamp = resCal.timeInMillis
+                                                },
+                                                cal.get(Calendar.YEAR),
+                                                cal.get(Calendar.MONTH),
+                                                cal.get(Calendar.DAY_OF_MONTH)
+                                            ).show()
+                                        }
+                                )
+                            }
+                        }
+
                         // Client Selector Row
                         Row(
                             Modifier.fillMaxWidth(),
@@ -348,74 +460,6 @@ fun CreateInvoiceScreen(
                                         label = { Text("Payment Note / Reference No.") },
                                         placeholder = { Text("e.g. UPI Transaction ID, Cheque number") },
                                         modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                            }
-                        }
-
-                        // Due Date Picker
-                        val dFormatter = remember { SimpleDateFormat("dd-MM-yyyy", Locale.US) }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                OutlinedTextField(
-                                    value = if (dueDateTimestamp != 0L) dFormatter.format(Date(dueDateTimestamp)) else "Not set (Default 5 days)",
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    label = { Text(if (isEstimate) "Valid Until Date" else "Due Date") },
-                                    trailingIcon = { Icon(Icons.Default.DateRange, "Select date") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                        disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    enabled = false
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .matchParentSize()
-                                        .clickable {
-                                            val cal = Calendar.getInstance().apply {
-                                                if (dueDateTimestamp != 0L) {
-                                                    timeInMillis = dueDateTimestamp
-                                                } else {
-                                                    timeInMillis = System.currentTimeMillis() + (5L * 24 * 60 * 60 * 1000)
-                                                }
-                                            }
-                                            DatePickerDialog(
-                                                context,
-                                                { _, y, m, d ->
-                                                    val resCal = Calendar.getInstance().apply {
-                                                        set(Calendar.YEAR, y)
-                                                        set(Calendar.MONTH, m)
-                                                        set(Calendar.DAY_OF_MONTH, d)
-                                                        set(Calendar.HOUR_OF_DAY, 23)
-                                                        set(Calendar.MINUTE, 59)
-                                                        set(Calendar.SECOND, 59)
-                                                    }
-                                                    dueDateTimestamp = resCal.timeInMillis
-                                                },
-                                                cal.get(Calendar.YEAR),
-                                                cal.get(Calendar.MONTH),
-                                                cal.get(Calendar.DAY_OF_MONTH)
-                                            ).show()
-                                        }
-                                )
-                            }
-                            if (dueDateTimestamp != 0L) {
-                                IconButton(
-                                    onClick = { dueDateTimestamp = 0L },
-                                    modifier = Modifier.padding(top = 8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Clear,
-                                        contentDescription = "Clear Due Date",
-                                        tint = MaterialTheme.colorScheme.error
                                     )
                                 }
                             }
@@ -620,7 +664,8 @@ fun CreateInvoiceScreen(
                             dueDateTimestamp = dueDateTimestamp,
                             attachmentPath = attachmentPathState,
                             documentType = documentType,
-                            paidAmount = editingInvoice?.invoice?.paidAmount ?: if (statusState == "Paid") grandTotal else 0.0
+                            paidAmount = editingInvoice?.invoice?.paidAmount ?: if (statusState == "Paid") grandTotal else 0.0,
+                            dateTimestamp = billDateTimestamp
                         )
                         Toast.makeText(context, "${if (isEstimate) "Estimate" else "Invoice"} Saved Successfully!", Toast.LENGTH_SHORT).show()
                         onBack()
