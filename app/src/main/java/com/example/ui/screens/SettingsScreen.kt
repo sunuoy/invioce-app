@@ -138,6 +138,13 @@ fun SettingsScreen(
     var bankBranch by remember { mutableStateOf("") }
     var bankIfsc by remember { mutableStateOf("") }
 
+    var showCreateProfileDialog by remember { mutableStateOf(false) }
+    var newProfileName by remember { mutableStateOf("") }
+    var newProfileEmail by remember { mutableStateOf("") }
+    var newProfilePhone by remember { mutableStateOf("") }
+    var newProfileGstin by remember { mutableStateOf("") }
+    var newProfileAddress by remember { mutableStateOf("") }
+
     val isBankNameError = remember(bankName) {
         bankName.isNotEmpty() && !bankName.all { it.isLetter() || it.isWhitespace() }
     }
@@ -281,25 +288,23 @@ fun SettingsScreen(
 
     var isProfilePrefilled by remember { mutableStateOf(false) }
 
-    // Prefill fields when profile in DB is loaded
+    // Sync input fields when active profile changes
     LaunchedEffect(businessProfile) {
-        if (!isProfilePrefilled && businessProfile != null) {
-            businessProfile?.let {
-                name = it.businessName
-                address = it.address
-                phone = it.phone
-                email = it.email
-                gstin = it.gstin
-                upiId = it.upiId
-                gmailId = it.gmailId
-                shortIcon = if (it.shortIcon.isBlank()) "💼" else it.shortIcon
-                logoUrl = it.logoUrl
-                bankAccountName = it.bankAccountName
-                bankName = it.bankName
-                bankAccountNo = it.bankAccountNo
-                bankBranch = it.bankBranch
-                bankIfsc = it.bankIfsc
-            }
+        businessProfile?.let {
+            name = it.businessName
+            address = it.address
+            phone = it.phone
+            email = it.email
+            gstin = it.gstin
+            upiId = it.upiId
+            gmailId = it.gmailId
+            shortIcon = if (it.shortIcon.isBlank()) "💼" else it.shortIcon
+            logoUrl = it.logoUrl
+            bankAccountName = it.bankAccountName
+            bankName = it.bankName
+            bankAccountNo = it.bankAccountNo
+            bankBranch = it.bankBranch
+            bankIfsc = it.bankIfsc
             isProfilePrefilled = true
         }
     }
@@ -420,200 +425,171 @@ fun SettingsScreen(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-            // Visual Banner introduction Card
+            // Business Profiles Management Card
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-                    .floating3D(rotationX = 2.5f, rotationY = -3f)
+                    .padding(vertical = 4.dp)
+                    .testTag("business_profiles_management_card")
+                    .floating3D(rotationX = 2.0f, rotationY = -2f)
                     .drawBehind {
                         drawCircle(
-                            color = Color(0xFF3B82F6).copy(alpha = 0.05f),
-                            radius = size.maxDimension * 0.4f,
-                            center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.1f)
+                            color = Color(0xFF6366F1).copy(alpha = 0.05f),
+                            radius = size.maxDimension * 0.45f,
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.2f)
                         )
                     },
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                ),
-                elevation = CardDefaults.cardElevation(4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                 border = BorderStroke(
                     1.dp,
                     Brush.linearGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = 0.4f),
-                            Color.White.copy(alpha = 0.05f),
-                            Color.Black.copy(alpha = 0.15f)
-                        )
-                    )
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Business,
-                        contentDescription = "Business header details setup",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Column {
-                        Text(
-                            text = "Set Your Business Header",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            text = "This metadata is utilized in PDF generation for headers, and sets tax identifiers like GSTIN.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                        )
-                    }
-                }
-            }
-
-            // Saved business profiles registry
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("saved_headers_registry_card")
-                    .floating3D(rotationX = 2.5f, rotationY = -3f)
-                    .drawBehind {
-                        drawCircle(
-                            color = Color(0xFF10B981).copy(alpha = 0.03f),
-                            radius = size.maxDimension * 0.4f,
-                            center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.8f)
-                        )
-                    },
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-                elevation = CardDefaults.cardElevation(4.dp),
-                border = BorderStroke(
-                    1.dp,
-                    Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.4f),
-                            Color.White.copy(alpha = 0.05f),
-                            Color.Black.copy(alpha = 0.15f)
+                            Color.White.copy(alpha = 0.5f),
+                            Color.White.copy(alpha = 0.1f),
+                            Color.Black.copy(alpha = 0.12f)
                         )
                     )
                 )
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(
-                                text = "Saved Business Headers",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "${savedProfiles.size} template(s) saved",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    Icon(
+                                        imageVector = Icons.Default.Business,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                            Column {
+                                Text(
+                                    text = "Business Profiles",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "${savedProfiles.size} profile(s) configured",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
                         }
 
-                        // Add current input fields as a template profile to database
-                        FilledTonalButton(
+                        Button(
                             onClick = {
-                                if (name.isBlank()) {
-                                    Toast.makeText(context, "Enter a Business name first to save template", Toast.LENGTH_SHORT).show()
-                                } else if (isBankNameError) {
-                                    Toast.makeText(context, "Bank Name must contain text only", Toast.LENGTH_SHORT).show()
-                                } else if (isBankAccountNoError) {
-                                    Toast.makeText(context, "Bank Account number must be 9 to 16 digits only", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    val newTemplate = SavedBusinessProfile(
-                                        businessName = name.trim(),
-                                        address = address.trim(),
-                                        phone = phone.trim(),
-                                        email = email.trim(),
-                                        gstin = gstin.trim(),
-                                        upiId = upiId.trim(),
-                                        gmailId = gmailId.trim(),
-                                        shortIcon = shortIcon.trim(),
-                                        bankAccountName = bankAccountName.trim(),
-                                        bankName = bankName.trim(),
-                                        bankAccountNo = bankAccountNo.trim(),
-                                        bankBranch = bankBranch.trim(),
-                                        bankIfsc = bankIfsc.trim()
-                                    )
-                                    viewModel.saveSavedBusinessProfile(newTemplate)
-                                }
+                                newProfileName = ""
+                                newProfileEmail = ""
+                                newProfilePhone = ""
+                                newProfileGstin = ""
+                                newProfileAddress = ""
+                                showCreateProfileDialog = true
                             },
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Add template icon", modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Save As Template", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("New Profile", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 
                     if (savedProfiles.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(80.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.outlineVariant,
-                                    shape = RoundedCornerShape(8.dp)
-                                ),
-                            contentAlignment = Alignment.Center
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                         ) {
-                            Text(
-                                text = "No templates saved yet. Fill above inputs and tap 'Save As Template'.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outline,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 20.dp, horizontal = 16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Business,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Text(
+                                    text = "No Business Profiles Created Yet",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Create a profile with your business name & email ID to easily switch accounts for billing and PDF generation.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                FilledTonalButton(
+                                    onClick = {
+                                        newProfileName = name
+                                        newProfileEmail = email
+                                        newProfilePhone = phone
+                                        newProfileGstin = gstin
+                                        newProfileAddress = address
+                                        showCreateProfileDialog = true
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.AddBusiness, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Create Profile With Email ID", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
                     } else {
                         androidx.compose.foundation.lazy.LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
                         ) {
                             items(savedProfiles.size) { index ->
                                 val profile = savedProfiles[index]
+                                val isActive = profile.businessName.equals(name.trim(), ignoreCase = true)
+
                                 Card(
                                     modifier = Modifier
-                                        .width(190.dp)
+                                        .width(220.dp)
                                         .clickable {
-                                            name = profile.businessName
-                                            address = profile.address
-                                            phone = profile.phone
-                                            email = profile.email
-                                            gstin = profile.gstin
-                                            upiId = profile.upiId
-                                            gmailId = profile.gmailId
-                                            shortIcon = if (profile.shortIcon.isBlank()) "💼" else profile.shortIcon
-                                            bankAccountName = profile.bankAccountName
-                                            bankName = profile.bankName
-                                            bankAccountNo = profile.bankAccountNo
-                                            bankBranch = profile.bankBranch
-                                            bankIfsc = profile.bankIfsc
-                                            Toast.makeText(context, "Loaded: ${profile.businessName}", Toast.LENGTH_SHORT).show()
+                                            viewModel.switchToBusinessProfile(profile)
                                         },
                                     colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surface
+                                        containerColor = if (isActive)
+                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                                        else
+                                            MaterialTheme.colorScheme.surface
                                     ),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                                    border = BorderStroke(
+                                        width = if (isActive) 1.5.dp else 1.dp,
+                                        color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
                                 ) {
                                     Column(
                                         modifier = Modifier.padding(12.dp),
@@ -624,18 +600,28 @@ fun SettingsScreen(
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Surface(
-                                                shape = RoundedCornerShape(6.dp),
-                                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                                                modifier = Modifier.size(28.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Business,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(16.dp)
-                                                    )
+                                            if (isActive) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(10.dp))
+                                                        Text("ACTIVE", fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
+                                                    }
+                                                }
+                                            } else {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                                ) {
+                                                    Text("PROFILE", fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                                                 }
                                             }
 
@@ -647,7 +633,7 @@ fun SettingsScreen(
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.DeleteOutline,
-                                                    contentDescription = "Delete template",
+                                                    contentDescription = "Delete Profile",
                                                     tint = MaterialTheme.colorScheme.error,
                                                     modifier = Modifier.size(16.dp)
                                                 )
@@ -662,6 +648,27 @@ fun SettingsScreen(
                                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
+
+                                        // Email ID display
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Email,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                            Text(
+                                                text = if (profile.email.isNotBlank()) profile.email else (if (profile.gmailId.isNotBlank()) profile.gmailId else "No email ID"),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontSize = 11.sp,
+                                                color = if (profile.email.isNotBlank() || profile.gmailId.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                                maxLines = 1,
+                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                            )
+                                        }
 
                                         if (profile.phone.isNotBlank()) {
                                             Text(
@@ -679,19 +686,25 @@ fun SettingsScreen(
                                                 text = "GSTIN: ${profile.gstin}",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 10.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.outline,
                                                 maxLines = 1,
                                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                             )
-                                        } else {
-                                            Text(
-                                                text = "No GSTIN added",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 10.sp,
-                                                color = MaterialTheme.colorScheme.outline,
-                                                maxLines = 1
-                                            )
+                                        }
+
+                                        if (!isActive) {
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            FilledTonalButton(
+                                                onClick = {
+                                                    viewModel.switchToBusinessProfile(profile)
+                                                },
+                                                modifier = Modifier.fillMaxWidth().height(28.dp),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text("Switch", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
                                         }
                                     }
                                 }
@@ -730,69 +743,29 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "Header Profile Details",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    // Header Profile Drop Down Box for selecting saved templates
-                    var headerSelectorExpanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = if (name.isNotBlank()) name else "",
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Quick-Load Saved Header Profile") },
-                            placeholder = { Text("Tap to choose from saved headers...") },
-                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, "Open templates dropdown") },
-                            leadingIcon = { Icon(Icons.Default.FolderOpen, "Templates icon") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            ),
-                            enabled = false
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (name.isNotBlank()) "Profile: $name" else "Active Business Profile Details",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .clickable { headerSelectorExpanded = true }
-                        )
-                        DropdownMenu(
-                            expanded = headerSelectorExpanded,
-                            onDismissRequest = { headerSelectorExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.9f)
-                        ) {
-                            if (savedProfiles.isEmpty()) {
-                                DropdownMenuItem(
-                                    text = { Text("No saved business templates found. Build one below and save!") },
-                                    onClick = { headerSelectorExpanded = false }
+                        if (name.isNotBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            ) {
+                                Text(
+                                    text = "ACTIVE",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
-                            } else {
-                                savedProfiles.forEach { p ->
-                                    DropdownMenuItem(
-                                        leadingIcon = { Icon(Icons.Default.Business, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                        text = { Text("${p.businessName} (Ph: ${p.phone})") },
-                                        onClick = {
-                                            name = p.businessName
-                                            address = p.address
-                                            phone = p.phone
-                                            email = p.email
-                                            gstin = p.gstin
-                                            upiId = p.upiId
-                                            gmailId = p.gmailId
-                                            shortIcon = if (p.shortIcon.isBlank()) "💼" else p.shortIcon
-                                            headerSelectorExpanded = false
-                                            Toast.makeText(context, "Loaded Profile: ${p.businessName}", Toast.LENGTH_SHORT).show()
-                                        }
-                                    )
-                                }
                             }
                         }
                     }
@@ -1988,7 +1961,164 @@ fun SettingsScreen(
             }
         }
         }
+
+        if (showCreateProfileDialog) {
+            CreateBusinessProfileDialog(
+                initialName = newProfileName,
+                initialEmail = newProfileEmail,
+                initialPhone = newProfilePhone,
+                initialGstin = newProfileGstin,
+                initialAddress = newProfileAddress,
+                onDismiss = { showCreateProfileDialog = false },
+                onConfirm = { pName, pEmail, pPhone, pGstin, pAddress ->
+                    viewModel.createBusinessProfileWithEmail(
+                        businessName = pName,
+                        email = pEmail,
+                        phone = pPhone,
+                        gstin = pGstin,
+                        address = pAddress
+                    )
+                    showCreateProfileDialog = false
+                }
+            )
+        }
     }
+}
+
+@Composable
+fun CreateBusinessProfileDialog(
+    initialName: String = "",
+    initialEmail: String = "",
+    initialPhone: String = "",
+    initialGstin: String = "",
+    initialAddress: String = "",
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, email: String, phone: String, gstin: String, address: String) -> Unit
+) {
+    var dialogName by remember(initialName) { mutableStateOf(initialName) }
+    var dialogEmail by remember(initialEmail) { mutableStateOf(initialEmail) }
+    var dialogPhone by remember(initialPhone) { mutableStateOf(initialPhone) }
+    var dialogGstin by remember(initialGstin) { mutableStateOf(initialGstin) }
+    var dialogAddress by remember(initialAddress) { mutableStateOf(initialAddress) }
+    var nameError by remember { mutableStateOf(false) }
+    var emailError by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AddBusiness,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text("Create Business Profile", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "Configure a business profile with its dedicated email ID for billing, invoicing, and PDF headers.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+
+                OutlinedTextField(
+                    value = dialogName,
+                    onValueChange = {
+                        dialogName = it
+                        if (it.isNotBlank()) nameError = false
+                    },
+                    label = { Text("Business Name*") },
+                    placeholder = { Text("e.g. Acme Corporation") },
+                    leadingIcon = { Icon(Icons.Default.Storefront, contentDescription = null) },
+                    isError = nameError,
+                    supportingText = if (nameError) { { Text("Business name is required") } } else null,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = dialogEmail,
+                    onValueChange = {
+                        dialogEmail = it
+                        if (it.isNotBlank()) emailError = false
+                    },
+                    label = { Text("Business Email ID*") },
+                    placeholder = { Text("e.g. billing@acmecorp.com") },
+                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                    isError = emailError,
+                    supportingText = if (emailError) { { Text("Email ID is required") } } else null,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = dialogPhone,
+                    onValueChange = { dialogPhone = it },
+                    label = { Text("Phone Number") },
+                    placeholder = { Text("e.g. +91 9876543210") },
+                    leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = dialogGstin,
+                    onValueChange = { dialogGstin = it },
+                    label = { Text("GSTIN / Tax ID") },
+                    placeholder = { Text("e.g. 29ABCDE1234F1Z5") },
+                    leadingIcon = { Icon(Icons.Default.AssignmentInd, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = dialogAddress,
+                    onValueChange = { dialogAddress = it },
+                    label = { Text("Business Address") },
+                    placeholder = { Text("e.g. 102 Business Hub, Downtown") },
+                    leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val validName = dialogName.trim().isNotBlank()
+                    val validEmail = dialogEmail.trim().isNotBlank()
+                    nameError = !validName
+                    emailError = !validEmail
+                    if (validName && validEmail) {
+                        onConfirm(
+                            dialogName.trim(),
+                            dialogEmail.trim(),
+                            dialogPhone.trim(),
+                            dialogGstin.trim(),
+                            dialogAddress.trim()
+                        )
+                    }
+                }
+            ) {
+                Text("Create & Activate")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable

@@ -329,7 +329,99 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 bankIfsc = bankIfsc.trim()
             )
             repository.saveBusinessProfile(profile)
+
+            // Keep saved profiles list in sync with active profile
+            val matching = savedBusinessProfiles.value.find { it.businessName.equals(name.trim(), ignoreCase = true) }
+            val savedEntry = SavedBusinessProfile(
+                id = matching?.id ?: 0,
+                businessName = name.trim(),
+                address = address.trim(),
+                phone = phone.trim(),
+                email = email.trim(),
+                gstin = gstin.trim(),
+                upiId = upiId.trim(),
+                gmailId = gmailId.trim(),
+                shortIcon = shortIcon.trim(),
+                logoUrl = logoUrl.trim(),
+                bankAccountName = bankAccountName.trim(),
+                bankName = bankName.trim(),
+                bankAccountNo = bankAccountNo.trim(),
+                bankBranch = bankBranch.trim(),
+                bankIfsc = bankIfsc.trim()
+            )
+            repository.saveSavedBusinessProfile(savedEntry)
+
             _uiEvents.emit(UiEvent.ShowSuccess("Business profile updated successfully!"))
+        }
+    }
+
+    fun switchToBusinessProfile(profile: SavedBusinessProfile) {
+        viewModelScope.launch {
+            val active = BusinessProfile(
+                id = 1,
+                businessName = profile.businessName,
+                address = profile.address,
+                phone = profile.phone,
+                email = profile.email,
+                gstin = profile.gstin,
+                upiId = profile.upiId,
+                gmailId = profile.gmailId,
+                shortIcon = if (profile.shortIcon.isBlank()) "💼" else profile.shortIcon,
+                logoUrl = profile.logoUrl,
+                bankAccountName = profile.bankAccountName,
+                bankName = profile.bankName,
+                bankAccountNo = profile.bankAccountNo,
+                bankBranch = profile.bankBranch,
+                bankIfsc = profile.bankIfsc
+            )
+            repository.saveBusinessProfile(active)
+            _uiEvents.emit(UiEvent.ShowSuccess("Switched to ${profile.businessName}"))
+        }
+    }
+
+    fun createBusinessProfileWithEmail(
+        businessName: String,
+        email: String,
+        phone: String = "",
+        gstin: String = "",
+        address: String = ""
+    ) {
+        viewModelScope.launch {
+            val trimmedName = businessName.trim()
+            val trimmedEmail = email.trim()
+            if (trimmedName.isEmpty()) {
+                _uiEvents.emit(UiEvent.ShowError("Business name cannot be empty"))
+                return@launch
+            }
+            if (trimmedEmail.isEmpty()) {
+                _uiEvents.emit(UiEvent.ShowError("Business Email ID cannot be empty"))
+                return@launch
+            }
+
+            val newProfile = SavedBusinessProfile(
+                businessName = trimmedName,
+                email = trimmedEmail,
+                gmailId = trimmedEmail,
+                phone = phone.trim(),
+                gstin = gstin.trim(),
+                address = address.trim(),
+                shortIcon = "💼"
+            )
+            repository.saveSavedBusinessProfile(newProfile)
+
+            // Automatically switch active profile to newly created profile
+            val active = BusinessProfile(
+                id = 1,
+                businessName = trimmedName,
+                email = trimmedEmail,
+                gmailId = trimmedEmail,
+                phone = phone.trim(),
+                gstin = gstin.trim(),
+                address = address.trim(),
+                shortIcon = "💼"
+            )
+            repository.saveBusinessProfile(active)
+            _uiEvents.emit(UiEvent.ShowSuccess("Created and activated: $trimmedName ($trimmedEmail)"))
         }
     }
 
@@ -340,14 +432,14 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 return@launch
             }
             repository.saveSavedBusinessProfile(profile)
-            _uiEvents.emit(UiEvent.ShowSuccess("Business profile template saved to your list!"))
+            _uiEvents.emit(UiEvent.ShowSuccess("Business profile saved!"))
         }
     }
 
     fun deleteSavedBusinessProfile(id: Int) {
         viewModelScope.launch {
             repository.deleteSavedBusinessProfile(id)
-            _uiEvents.emit(UiEvent.ShowSuccess("Removed from saved list"))
+            _uiEvents.emit(UiEvent.ShowSuccess("Profile removed"))
         }
     }
 
