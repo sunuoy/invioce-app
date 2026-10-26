@@ -64,6 +64,7 @@ fun AppSettingsScreen(
     val products by viewModel.products.collectAsStateWithLifecycle()
     val customers by viewModel.customers.collectAsStateWithLifecycle()
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
+    val allInvoices by viewModel.allInvoices.collectAsStateWithLifecycle()
     
     var showRestoreConfirmation by remember { mutableStateOf<String?>(null) }
     var showClearDataConfirmation by remember { mutableStateOf(false) }
@@ -153,7 +154,7 @@ fun AppSettingsScreen(
                     savedProfiles = savedBusinessProfiles,
                     products = products,
                     customers = customers,
-                    invoices = invoices
+                    invoices = allInvoices
                 )
                 context.contentResolver.openOutputStream(uri)?.use { output ->
                     output.write(jsonString.toByteArray())
@@ -178,7 +179,7 @@ fun AppSettingsScreen(
                 savedProfiles = savedBusinessProfiles,
                 products = products,
                 customers = customers,
-                invoices = invoices
+                invoices = allInvoices
             )
             val backupDir = File(context.cacheDir, "backups")
             if (!backupDir.exists()) backupDir.mkdirs()
@@ -219,7 +220,7 @@ fun AppSettingsScreen(
         mutableStateOf(generatorPrefs.getBoolean("show_terms_conditions", true))
     }
     var showIrnBarSetting by remember {
-        mutableStateOf(generatorPrefs.getBoolean("show_irn_bar", true))
+        mutableStateOf(generatorPrefs.getBoolean("show_irn_bar", false))
     }
     var customIrnTextSetting by remember {
         mutableStateOf(generatorPrefs.getString("custom_irn_text", "") ?: "")

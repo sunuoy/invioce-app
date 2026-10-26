@@ -1320,7 +1320,7 @@ object PdfGenerator {
         canvas.drawText(truncatedAddrLeft, leftBorder + 8f, metaBottomY + 60f, textPaint)
 
         // 6. Dynamic IRN / Ack Bar Row (y: 280f to 296f)
-        val showIrnBar = prefs.getBoolean("show_irn_bar", true)
+        val showIrnBar = prefs.getBoolean("show_irn_bar", false)
         val irnBottomY = if (showIrnBar) partyBottomY + 16f else partyBottomY
         if (showIrnBar) {
             canvas.drawLine(leftBorder, irnBottomY, rightBorder, irnBottomY, borderPaint)

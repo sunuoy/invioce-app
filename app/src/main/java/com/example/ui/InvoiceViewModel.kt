@@ -114,20 +114,44 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     val customers: StateFlow<List<Customer>> = repository.allCustomers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val invoices: StateFlow<List<InvoiceWithDetails>> = repository.allInvoices
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     val businessProfile: StateFlow<BusinessProfile?> = repository.businessProfile
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val savedBusinessProfiles: StateFlow<List<SavedBusinessProfile>> = repository.savedBusinessProfiles
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val totalSales: StateFlow<Double?> = repository.totalSales
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+    val allInvoices: StateFlow<List<InvoiceWithDetails>> = repository.allInvoices
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val outstandingAmount: StateFlow<Double?> = repository.outstandingAmount
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+    val invoices: StateFlow<List<InvoiceWithDetails>> = combine(
+        repository.allInvoices,
+        repository.businessProfile,
+        repository.savedBusinessProfiles
+    ) { allInvs, activeProfile, savedProfiles ->
+        val activeName = activeProfile?.businessName?.trim().orEmpty()
+        if (activeName.isEmpty()) {
+            allInvs
+        } else {
+            allInvs.filter { inv ->
+                val invBiz = inv.invoice.businessName.trim()
+                if (invBiz.isEmpty()) {
+                    val firstSaved = savedProfiles.firstOrNull()?.businessName?.trim().orEmpty()
+                    firstSaved.isEmpty() || firstSaved.equals(activeName, ignoreCase = true)
+                } else {
+                    invBiz.equals(activeName, ignoreCase = true)
+                }
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val totalSales: StateFlow<Double?> = invoices.map { invList ->
+        invList.filter { it.invoice.status == "Paid" }.sumOf { it.invoice.grandTotal }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val outstandingAmount: StateFlow<Double?> = invoices.map { invList ->
+        invList.filter { it.invoice.status != "Paid" && it.invoice.status != "Closed" }
+            .sumOf { it.invoice.grandTotal - it.invoice.paidAmount }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     init {
         val gdEnabled = prefs.getBoolean("gd_sync_enabled", false)
@@ -573,9 +597,9 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 return@launch
             }
 
-            val existingInv = if (id != 0) invoices.value.find { it.invoice.id == id }?.invoice else null
+            val existingInv = if (id != 0) allInvoices.value.find { it.invoice.id == id }?.invoice else null
             val companyNameForInvoice = existingInv?.businessName?.takeIf { it.isNotEmpty() }
-                ?: (businessProfile.value?.businessName ?: "")
+                ?: (businessProfile.value?.businessName?.trim() ?: "")
 
             val invoiceDate = if (dateTimestamp > 0L) {
                 dateTimestamp
@@ -1390,7 +1414,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             savedProfiles = savedBusinessProfiles.value,
             products = products.value,
             customers = customers.value,
-            invoices = invoices.value
+            invoices = allInvoices.value
         )
     }
 

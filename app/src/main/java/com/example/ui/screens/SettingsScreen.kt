@@ -173,7 +173,7 @@ fun SettingsScreen(
     var showSalesTrend by remember { mutableStateOf(prefs.getBoolean("show_sales_trend", true)) }
     var showPdfQr by remember { mutableStateOf(prefs.getBoolean("show_pdf_qr", true)) }
     var showTermsConditions by remember { mutableStateOf(prefs.getBoolean("show_terms_conditions", true)) }
-    var showIrnBar by remember { mutableStateOf(prefs.getBoolean("show_irn_bar", true)) }
+    var showIrnBar by remember { mutableStateOf(prefs.getBoolean("show_irn_bar", false)) }
     var customIrnText by remember { mutableStateOf(prefs.getString("custom_irn_text", "") ?: "") }
     var pdfModel by remember { mutableStateOf(prefs.getString("pdf_model", "Model 1") ?: "Model 1") }
 
