@@ -54,7 +54,8 @@ data class Product(
     val stock: Double = 0.0, // stock quantity
     val hsnSac: String = "",
     val attachmentPath: String = "",
-    val dateTimestamp: Long = System.currentTimeMillis()
+    val dateTimestamp: Long = System.currentTimeMillis(),
+    val businessName: String = ""
 )
 
 @Entity(tableName = "customers")
@@ -67,7 +68,8 @@ data class Customer(
     val address: String = "",
     val gstin: String = "",
     val placeOfSupply: String = "",
-    val isClosed: Boolean = false
+    val isClosed: Boolean = false,
+    val businessName: String = ""
 )
 
 @Entity(tableName = "invoices")
@@ -217,6 +219,15 @@ interface InvoiceDao {
 
     @Query("SELECT SUM(grandTotal) FROM invoices WHERE status != 'Paid' AND status != 'Closed'")
     fun getOutstandingAmount(): Flow<Double?>
+
+    @Query("SELECT * FROM invoices WHERE businessName = :businessName")
+    suspend fun getInvoicesByBusinessSync(businessName: String): List<Invoice>
+
+    @Query("DELETE FROM invoices WHERE businessName = :businessName")
+    suspend fun deleteInvoicesByBusiness(businessName: String)
+
+    @Query("UPDATE invoices SET businessName = :businessName WHERE businessName = ''")
+    suspend fun backfillEmptyBusinessNames(businessName: String)
 }
 
 @Dao
@@ -244,6 +255,12 @@ interface ProductDao {
 
     @Query("DELETE FROM products")
     suspend fun clearAllProducts()
+
+    @Query("DELETE FROM products WHERE businessName = :businessName")
+    suspend fun deleteProductsByBusiness(businessName: String)
+
+    @Query("UPDATE products SET businessName = :businessName WHERE businessName = ''")
+    suspend fun backfillEmptyBusinessNames(businessName: String)
 }
 
 @Dao
@@ -268,6 +285,12 @@ interface CustomerDao {
 
     @Query("DELETE FROM customers")
     suspend fun clearAllCustomers()
+
+    @Query("DELETE FROM customers WHERE businessName = :businessName")
+    suspend fun deleteCustomersByBusiness(businessName: String)
+
+    @Query("UPDATE customers SET businessName = :businessName WHERE businessName = ''")
+    suspend fun backfillEmptyBusinessNames(businessName: String)
 }
 
 @Dao
@@ -301,6 +324,9 @@ interface SavedBusinessProfileDao {
 
     @Query("DELETE FROM saved_business_profile")
     suspend fun clearAllSavedProfiles()
+
+    @Query("SELECT * FROM saved_business_profile ORDER BY id DESC")
+    suspend fun getAllSavedProfilesSync(): List<SavedBusinessProfile>
 }
 
 // ------------------ DATABASE ------------------
@@ -315,7 +341,7 @@ interface SavedBusinessProfileDao {
         InvoiceLineItem::class,
         InvoicePayment::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 abstract class InvoiceDatabase : RoomDatabase() {
@@ -377,6 +403,28 @@ abstract class InvoiceDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_15_16 = object : androidx.room.migration.Migration(15, 16) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE products ADD COLUMN businessName TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE customers ADD COLUMN businessName TEXT NOT NULL DEFAULT ''")
+                db.execSQL("""
+                    UPDATE products SET businessName = (
+                        SELECT businessName FROM saved_business_profile ORDER BY id ASC LIMIT 1
+                    ) WHERE businessName = '' AND EXISTS (SELECT 1 FROM saved_business_profile)
+                """.trimIndent())
+                db.execSQL("""
+                    UPDATE customers SET businessName = (
+                        SELECT businessName FROM saved_business_profile ORDER BY id ASC LIMIT 1
+                    ) WHERE businessName = '' AND EXISTS (SELECT 1 FROM saved_business_profile)
+                """.trimIndent())
+                db.execSQL("""
+                    UPDATE invoices SET businessName = (
+                        SELECT businessName FROM saved_business_profile ORDER BY id ASC LIMIT 1
+                    ) WHERE businessName = '' AND EXISTS (SELECT 1 FROM saved_business_profile)
+                """.trimIndent())
+            }
+        }
+
         fun getDatabase(context: Context): InvoiceDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -385,7 +433,7 @@ abstract class InvoiceDatabase : RoomDatabase() {
                     "invoice_database"
                 )
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
+                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

@@ -11,10 +11,10 @@ import org.json.JSONObject
 
 object GoogleDriveService {
 
-    fun findBackupFile(token: String): String? {
+    fun findBackupFile(token: String, fileName: String = "invoice_app_backup.json"): String? {
         var connection: HttpURLConnection? = null
         return try {
-            val query = URLEncoder.encode("name = 'invoice_app_backup.json' and trashed = false", "UTF-8")
+            val query = URLEncoder.encode("name = '$fileName' and trashed = false", "UTF-8")
             val url = URL("https://www.googleapis.com/drive/v3/files?q=$query&fields=files(id)")
             connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
@@ -23,7 +23,7 @@ object GoogleDriveService {
             connection.readTimeout = 10000
 
             val responseCode = connection.responseCode
-            android.util.Log.d("GoogleDriveService", "findBackupFile response code: $responseCode")
+            android.util.Log.d("GoogleDriveService", "findBackupFile ($fileName) response code: $responseCode")
 
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val reader = BufferedReader(InputStreamReader(connection.inputStream))
@@ -55,7 +55,7 @@ object GoogleDriveService {
         }
     }
 
-    fun uploadBackupFile(token: String, jsonContent: String, fileId: String?): Boolean {
+    fun uploadBackupFile(token: String, jsonContent: String, fileId: String?, fileName: String = "invoice_app_backup.json"): Boolean {
         var connection: HttpURLConnection? = null
         return try {
             if (fileId != null) {
@@ -96,7 +96,7 @@ object GoogleDriveService {
                 connection.readTimeout = 10000
 
                 val metadata = JSONObject()
-                metadata.put("name", "invoice_app_backup.json")
+                metadata.put("name", fileName)
                 
                 val writer = OutputStreamWriter(connection.outputStream, "UTF-8")
                 writer.write(metadata.toString())
@@ -120,7 +120,7 @@ object GoogleDriveService {
                     
                     if (newFileId != null) {
                         connection.disconnect()
-                        uploadBackupFile(token, jsonContent, newFileId)
+                        uploadBackupFile(token, jsonContent, newFileId, fileName)
                     } else {
                         throw Exception("Failed to get created file ID from response")
                     }

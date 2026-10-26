@@ -47,6 +47,14 @@ class InvoiceRepository(
 
     suspend fun deleteSavedBusinessProfile(id: Int) = savedBusinessProfileDao.deleteSavedProfile(id)
 
+    suspend fun backfillEmptyBusinessNames(businessName: String) {
+        if (businessName.isNotBlank()) {
+            productDao.backfillEmptyBusinessNames(businessName)
+            customerDao.backfillEmptyBusinessNames(businessName)
+            invoiceDao.backfillEmptyBusinessNames(businessName)
+        }
+    }
+
     // ------------------ INVOICES ------------------
     val allInvoices: Flow<List<InvoiceWithDetails>> = invoiceDao.getAllInvoices()
     
@@ -164,6 +172,53 @@ class InvoiceRepository(
         }
         if (invoices.isNotEmpty()) {
             invoiceDao.insertInvoicesBulk(invoices)
+        }
+        if (lineItems.isNotEmpty()) {
+            invoiceDao.insertLineItems(lineItems)
+        }
+        if (payments.isNotEmpty()) {
+            invoiceDao.insertPaymentsBulk(payments)
+        }
+    }
+
+    suspend fun restoreProfileData(
+        profileName: String,
+        profile: BusinessProfile?,
+        savedProfile: SavedBusinessProfile?,
+        products: List<Product>,
+        customers: List<Customer>,
+        invoices: List<Invoice>,
+        lineItems: List<InvoiceLineItem>,
+        payments: List<InvoicePayment> = emptyList()
+    ) {
+        val targetName = profileName.trim()
+        if (targetName.isNotEmpty()) {
+            productDao.deleteProductsByBusiness(targetName)
+            customerDao.deleteCustomersByBusiness(targetName)
+            val oldInvs = invoiceDao.getInvoicesByBusinessSync(targetName)
+            for (inv in oldInvs) {
+                invoiceDao.deleteLineItemsByInvoiceId(inv.id)
+                invoiceDao.deletePaymentsByInvoiceId(inv.id)
+                invoiceDao.deleteInvoiceById(inv.id)
+            }
+        }
+
+        if (profile != null) {
+            businessProfileDao.insertOrUpdateProfile(profile)
+        }
+        if (savedProfile != null) {
+            val existingList = savedBusinessProfileDao.getAllSavedProfilesSync()
+            val existing = existingList.find { it.businessName.equals(targetName, ignoreCase = true) }
+            savedBusinessProfileDao.insertSavedProfile(savedProfile.copy(id = existing?.id ?: 0))
+        }
+        if (products.isNotEmpty()) {
+            productDao.insertProductsBulk(products.map { if (it.businessName.isBlank()) it.copy(businessName = targetName) else it })
+        }
+        if (customers.isNotEmpty()) {
+            customerDao.insertCustomersBulk(customers.map { if (it.businessName.isBlank()) it.copy(businessName = targetName) else it })
+        }
+        if (invoices.isNotEmpty()) {
+            invoiceDao.insertInvoicesBulk(invoices.map { if (it.businessName.isBlank()) it.copy(businessName = targetName) else it })
         }
         if (lineItems.isNotEmpty()) {
             invoiceDao.insertLineItems(lineItems)

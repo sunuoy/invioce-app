@@ -108,10 +108,10 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     val uiEvents: SharedFlow<UiEvent> = _uiEvents
 
     // Reactive State Flows
-    val products: StateFlow<List<Product>> = repository.allProducts
+    val allProducts: StateFlow<List<Product>> = repository.allProducts
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val customers: StateFlow<List<Customer>> = repository.allCustomers
+    val allCustomers: StateFlow<List<Customer>> = repository.allCustomers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val businessProfile: StateFlow<BusinessProfile?> = repository.businessProfile
@@ -119,6 +119,48 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
     val savedBusinessProfiles: StateFlow<List<SavedBusinessProfile>> = repository.savedBusinessProfiles
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val products: StateFlow<List<Product>> = combine(
+        repository.allProducts,
+        repository.businessProfile,
+        repository.savedBusinessProfiles
+    ) { allProds, activeProfile, savedProfiles ->
+        val activeName = activeProfile?.businessName?.trim().orEmpty()
+        val originalProfile = savedProfiles.minByOrNull { it.id }?.businessName?.trim().orEmpty()
+        if (activeName.isEmpty()) {
+            allProds
+        } else {
+            allProds.filter { prod ->
+                val prodBiz = prod.businessName.trim()
+                if (prodBiz.isEmpty()) {
+                    originalProfile.isNotEmpty() && originalProfile.equals(activeName, ignoreCase = true)
+                } else {
+                    prodBiz.equals(activeName, ignoreCase = true)
+                }
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val customers: StateFlow<List<Customer>> = combine(
+        repository.allCustomers,
+        repository.businessProfile,
+        repository.savedBusinessProfiles
+    ) { allCusts, activeProfile, savedProfiles ->
+        val activeName = activeProfile?.businessName?.trim().orEmpty()
+        val originalProfile = savedProfiles.minByOrNull { it.id }?.businessName?.trim().orEmpty()
+        if (activeName.isEmpty()) {
+            allCusts
+        } else {
+            allCusts.filter { cust ->
+                val custBiz = cust.businessName.trim()
+                if (custBiz.isEmpty()) {
+                    originalProfile.isNotEmpty() && originalProfile.equals(activeName, ignoreCase = true)
+                } else {
+                    custBiz.equals(activeName, ignoreCase = true)
+                }
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allInvoices: StateFlow<List<InvoiceWithDetails>> = repository.allInvoices
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -129,14 +171,14 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         repository.savedBusinessProfiles
     ) { allInvs, activeProfile, savedProfiles ->
         val activeName = activeProfile?.businessName?.trim().orEmpty()
+        val originalProfile = savedProfiles.minByOrNull { it.id }?.businessName?.trim().orEmpty()
         if (activeName.isEmpty()) {
             allInvs
         } else {
             allInvs.filter { inv ->
                 val invBiz = inv.invoice.businessName.trim()
                 if (invBiz.isEmpty()) {
-                    val firstSaved = savedProfiles.firstOrNull()?.businessName?.trim().orEmpty()
-                    firstSaved.isEmpty() || firstSaved.equals(activeName, ignoreCase = true)
+                    originalProfile.isNotEmpty() && originalProfile.equals(activeName, ignoreCase = true)
                 } else {
                     invBiz.equals(activeName, ignoreCase = true)
                 }
@@ -164,6 +206,17 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         _googleDriveAccountEmail.value = gdEmail
         val gdSavedMode = prefs.getString("gd_sync_mode", "manual") ?: "manual"
         _googleDriveSyncMode.value = gdSavedMode
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val originalProfile = repository.savedBusinessProfiles.first().minByOrNull { it.id }?.businessName?.trim().orEmpty()
+                if (originalProfile.isNotEmpty()) {
+                    repository.backfillEmptyBusinessNames(originalProfile)
+                }
+            } catch (e: Exception) {
+                // Ignore startup backfill issue
+            }
+        }
 
         viewModelScope.launch {
             kotlinx.coroutines.delay(3500)
@@ -487,6 +540,10 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 return@launch
             }
 
+            val existingProd = if (id != 0) allProducts.value.find { it.id == id } else null
+            val companyNameForProduct = existingProd?.businessName?.takeIf { it.isNotEmpty() }
+                ?: (businessProfile.value?.businessName?.trim() ?: "")
+
             val product = Product(
                 id = id,
                 name = name.trim(),
@@ -495,7 +552,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 unit = unit.trim(),
                 stock = stock,
                 hsnSac = hsnSac.trim(),
-                attachmentPath = attachmentPath.trim()
+                attachmentPath = attachmentPath.trim(),
+                businessName = companyNameForProduct
             )
             repository.insertProduct(product)
             _uiEvents.emit(UiEvent.ShowSuccess("Product stock saved successfully!"))
@@ -523,6 +581,10 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     return@launch
                 }
             }
+            val existingCust = if (id != 0) allCustomers.value.find { it.id == id } else null
+            val companyNameForCustomer = existingCust?.businessName?.takeIf { it.isNotEmpty() }
+                ?: (businessProfile.value?.businessName?.trim() ?: "")
+
             val customer = Customer(
                 id = id,
                 name = name.trim(),
@@ -532,7 +594,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 address = address.trim(),
                 gstin = gstin.trim(),
                 placeOfSupply = placeOfSupply.trim(),
-                isClosed = isClosed
+                isClosed = isClosed,
+                businessName = companyNameForCustomer
             )
             repository.insertCustomer(customer)
             _uiEvents.emit(UiEvent.ShowSuccess("Customer details saved!"))
@@ -550,7 +613,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
     fun deleteCustomer(customer: Customer) {
         viewModelScope.launch {
-            val hasInvoices = invoices.value.any { it.invoice.customerId == customer.id }
+            val hasInvoices = allInvoices.value.any { it.invoice.customerId == customer.id }
             if (hasInvoices) {
                 _uiEvents.emit(UiEvent.ShowError("Client has generated invoices. Cannot be deleted. Please mark them as Closed instead."))
             } else {
@@ -819,15 +882,29 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             try {
                 val backupData = BackupRestoreHelper.importFromJson(jsonString)
-                repository.restoreData(
-                    profile = backupData.profile,
-                    savedProfiles = backupData.savedProfiles,
-                    products = backupData.products,
-                    customers = backupData.customers,
-                    invoices = backupData.invoices,
-                    lineItems = backupData.lineItems,
-                    payments = backupData.payments
-                )
+                val targetProfileName = backupData.profile?.businessName?.trim().orEmpty()
+                if (targetProfileName.isNotEmpty() && backupData.savedProfiles.size <= 1) {
+                    repository.restoreProfileData(
+                        profileName = targetProfileName,
+                        profile = backupData.profile,
+                        savedProfile = backupData.savedProfiles.firstOrNull(),
+                        products = backupData.products,
+                        customers = backupData.customers,
+                        invoices = backupData.invoices,
+                        lineItems = backupData.lineItems,
+                        payments = backupData.payments
+                    )
+                } else {
+                    repository.restoreData(
+                        profile = backupData.profile,
+                        savedProfiles = backupData.savedProfiles,
+                        products = backupData.products,
+                        customers = backupData.customers,
+                        invoices = backupData.invoices,
+                        lineItems = backupData.lineItems,
+                        payments = backupData.payments
+                    )
+                }
                 onSuccess()
                 _uiEvents.emit(UiEvent.ShowSuccess("Data backup restored successfully!"))
             } catch (e: Exception) {
@@ -912,11 +989,11 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 repository.saveSavedBusinessProfile(saved2)
 
                 // Seed Products
-                val p1 = Product(name = "Premium Wireless Earbuds", price = 2499.0, taxRate = 18.0, unit = "pcs", stock = 120.0, hsnSac = "8518")
-                val p2 = Product(name = "Ultra-thin Mechanical Keyboard", price = 3999.0, taxRate = 18.0, unit = "pcs", stock = 50.0, hsnSac = "8471")
-                val p3 = Product(name = "Ergonomic Office Chair", price = 7999.0, taxRate = 12.0, unit = "pcs", stock = 25.0, hsnSac = "9403")
-                val p4 = Product(name = "Software Development Services", price = 1500.0, taxRate = 18.0, unit = "hrs", stock = 900.0, hsnSac = "9983")
-                val p5 = Product(name = "USB-C Fast Charging Adapter", price = 899.0, taxRate = 18.0, unit = "pcs", stock = 200.0, hsnSac = "8504")
+                val p1 = Product(name = "Premium Wireless Earbuds", price = 2499.0, taxRate = 18.0, unit = "pcs", stock = 120.0, hsnSac = "8518", businessName = "Apex Tech Solutions")
+                val p2 = Product(name = "Ultra-thin Mechanical Keyboard", price = 3999.0, taxRate = 18.0, unit = "pcs", stock = 50.0, hsnSac = "8471", businessName = "Apex Tech Solutions")
+                val p3 = Product(name = "Ergonomic Office Chair", price = 7999.0, taxRate = 12.0, unit = "pcs", stock = 25.0, hsnSac = "9403", businessName = "Apex Tech Solutions")
+                val p4 = Product(name = "Software Development Services", price = 1500.0, taxRate = 18.0, unit = "hrs", stock = 900.0, hsnSac = "9983", businessName = "Apex Tech Solutions")
+                val p5 = Product(name = "USB-C Fast Charging Adapter", price = 899.0, taxRate = 18.0, unit = "pcs", stock = 200.0, hsnSac = "8504", businessName = "Apex Tech Solutions")
 
                 val id1 = repository.insertProduct(p1).toInt()
                 val id2 = repository.insertProduct(p2).toInt()
@@ -925,9 +1002,9 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 val id5 = repository.insertProduct(p5).toInt()
 
                 // Seed Customers
-                val c1 = Customer(name = "Aman Sharma", phone = "+91 99999 88888", email = "aman@gmail.com", address = "Sector 15, Noida, UP", gstin = "09AAAAA5555A2Z3", placeOfSupply = "09-Uttar Pradesh")
-                val c2 = Customer(name = "Global Tech Ltd", phone = "+91 90000 11111", email = "accounts@globaltech.co", address = "BKC, Bandra, Mumbai, MH", gstin = "27BBBBB6666B1Z4", placeOfSupply = "27-Maharashtra")
-                val c3 = Customer(name = "Rohan Mehra", phone = "+91 91111 22222", email = "rohan@yahoo.com", address = "Karol Bagh, New Delhi", placeOfSupply = "07-Delhi")
+                val c1 = Customer(name = "Aman Sharma", phone = "+91 99999 88888", email = "aman@gmail.com", address = "Sector 15, Noida, UP", gstin = "09AAAAA5555A2Z3", placeOfSupply = "09-Uttar Pradesh", businessName = "Apex Tech Solutions")
+                val c2 = Customer(name = "Global Tech Ltd", phone = "+91 90000 11111", email = "accounts@globaltech.co", address = "BKC, Bandra, Mumbai, MH", gstin = "27BBBBB6666B1Z4", placeOfSupply = "27-Maharashtra", businessName = "Apex Tech Solutions")
+                val c3 = Customer(name = "Rohan Mehra", phone = "+91 91111 22222", email = "rohan@yahoo.com", address = "Karol Bagh, New Delhi", placeOfSupply = "07-Delhi", businessName = "Apex Tech Solutions")
 
                 val custId1 = repository.insertCustomer(c1).toInt()
                 val custId2 = repository.insertCustomer(c2).toInt()
@@ -941,6 +1018,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     id = 0,
                     invoiceNumber = "INV-${fmt.format(java.util.Date(inv1_date)).uppercase()}-0001",
                     customerId = custId1,
+                    businessName = "Apex Tech Solutions",
                     dateTimestamp = inv1_date,
                     status = "Paid",
                     notes = "Thank you for shopping with Apex Tech!",
@@ -984,6 +1062,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     id = 0,
                     invoiceNumber = "INV-${fmt.format(java.util.Date(inv2_date)).uppercase()}-0002",
                     customerId = custId2,
+                    businessName = "Apex Tech Solutions",
                     dateTimestamp = inv2_date,
                     status = "Sent",
                     notes = "Due immediately upon receipt of invoice.",
@@ -1012,6 +1091,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     id = 0,
                     invoiceNumber = "INV-${fmt.format(java.util.Date()).uppercase()}-0003",
                     customerId = custId3,
+                    businessName = "Apex Tech Solutions",
                     dateTimestamp = System.currentTimeMillis(),
                     status = "Draft",
                     notes = "Self pickup by client.",
@@ -1145,6 +1225,27 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun getActiveProfileBackupFileName(): String {
+        val bizName = businessProfile.value?.businessName?.trim()
+        val sanitized = bizName?.replace(Regex("[^a-zA-Z0-9_-]"), "_")?.lowercase()
+        return if (sanitized.isNullOrEmpty()) "invoice_backup_default.json" else "invoice_backup_${sanitized}.json"
+    }
+
+    fun exportActiveProfileDataToJSON(): String {
+        val activeBiz = businessProfile.value
+        val activeBizName = activeBiz?.businessName?.trim().orEmpty()
+        val matchingSaved = savedBusinessProfiles.value.find { 
+            it.businessName.trim().equals(activeBizName, ignoreCase = true) 
+        }
+        return BackupRestoreHelper.exportToJson(
+            profile = activeBiz,
+            savedProfiles = if (matchingSaved != null) listOf(matchingSaved) else emptyList(),
+            products = products.value,
+            customers = customers.value,
+            invoices = invoices.value
+        )
+    }
+
     fun backupToGoogleDrive(onComplete: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             val email = _googleDriveAccountEmail.value.ifEmpty { prefs.getString("gd_account_email", "") ?: "" }
@@ -1154,7 +1255,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             }
 
             _isGoogleDriveSyncing.value = true
-            val json = exportAppDataToJSON()
+            val backupFileName = getActiveProfileBackupFileName()
+            val json = exportActiveProfileDataToJSON()
 
             withContext(Dispatchers.IO) {
                 var token = getOrRefreshGoogleDriveToken(forceRefresh = false) ?: ""
@@ -1167,8 +1269,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 }
 
                 try {
-                    val existingFileId = com.example.data.GoogleDriveService.findBackupFile(token)
-                    val success = com.example.data.GoogleDriveService.uploadBackupFile(token, json, existingFileId)
+                    val existingFileId = com.example.data.GoogleDriveService.findBackupFile(token, backupFileName)
+                    val success = com.example.data.GoogleDriveService.uploadBackupFile(token, json, existingFileId, backupFileName)
                     
                     withContext(Dispatchers.Main) {
                         _isGoogleDriveSyncing.value = false
@@ -1179,7 +1281,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                                 .putString("gd_last_sync_time", nowStr)
                                 .putLong("gd_last_sync_timestamp", System.currentTimeMillis())
                                 .apply()
-                            onComplete(true, "Successfully backed up data to Google Drive!")
+                            onComplete(true, "Successfully backed up data to Google Drive ($backupFileName)!")
                         } else {
                             onComplete(false, "Drive upload failed. Please try again.")
                         }
@@ -1191,8 +1293,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                         val refreshedToken = getOrRefreshGoogleDriveToken(forceRefresh = true)
                         if (!refreshedToken.isNullOrEmpty()) {
                             try {
-                                val fileId = com.example.data.GoogleDriveService.findBackupFile(refreshedToken)
-                                val retrySuccess = com.example.data.GoogleDriveService.uploadBackupFile(refreshedToken, json, fileId)
+                                val fileId = com.example.data.GoogleDriveService.findBackupFile(refreshedToken, backupFileName)
+                                val retrySuccess = com.example.data.GoogleDriveService.uploadBackupFile(refreshedToken, json, fileId, backupFileName)
                                 withContext(Dispatchers.Main) {
                                     _isGoogleDriveSyncing.value = false
                                     if (retrySuccess) {
@@ -1202,7 +1304,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                                             .putString("gd_last_sync_time", nowStr)
                                             .putLong("gd_last_sync_timestamp", System.currentTimeMillis())
                                             .apply()
-                                        onComplete(true, "Successfully backed up data to Google Drive!")
+                                        onComplete(true, "Successfully backed up data to Google Drive ($backupFileName)!")
                                     } else {
                                         onComplete(false, "Drive upload failed on retry.")
                                     }
@@ -1231,6 +1333,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             }
 
             _isGoogleDriveSyncing.value = true
+            val backupFileName = getActiveProfileBackupFileName()
 
             withContext(Dispatchers.IO) {
                 var token = getOrRefreshGoogleDriveToken(forceRefresh = false) ?: ""
@@ -1243,11 +1346,12 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 }
 
                 try {
-                    val existingFileId = com.example.data.GoogleDriveService.findBackupFile(token)
+                    val existingFileId = com.example.data.GoogleDriveService.findBackupFile(token, backupFileName)
+                        ?: com.example.data.GoogleDriveService.findBackupFile(token, "invoice_app_backup.json")
                     if (existingFileId == null) {
                         withContext(Dispatchers.Main) {
                             _isGoogleDriveSyncing.value = false
-                            onComplete(false, "No 'invoice_app_backup.json' file is found on your Google Drive.")
+                            onComplete(false, "No backup file found for current profile on your Google Drive.")
                         }
                         return@withContext
                     }
@@ -1278,7 +1382,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                         val refreshedToken = getOrRefreshGoogleDriveToken(forceRefresh = true)
                         if (!refreshedToken.isNullOrEmpty()) {
                             try {
-                                val fileId = com.example.data.GoogleDriveService.findBackupFile(refreshedToken)
+                                val fileId = com.example.data.GoogleDriveService.findBackupFile(refreshedToken, backupFileName)
+                                    ?: com.example.data.GoogleDriveService.findBackupFile(refreshedToken, "invoice_app_backup.json")
                                 if (fileId != null) {
                                     val jsonContent = com.example.data.GoogleDriveService.downloadBackupFile(refreshedToken, fileId)
                                     withContext(Dispatchers.Main) {
@@ -1412,8 +1517,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         return BackupRestoreHelper.exportToJson(
             profile = businessProfile.value,
             savedProfiles = savedBusinessProfiles.value,
-            products = products.value,
-            customers = customers.value,
+            products = allProducts.value,
+            customers = allCustomers.value,
             invoices = allInvoices.value
         )
     }

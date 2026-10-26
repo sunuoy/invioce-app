@@ -149,17 +149,19 @@ fun AppSettingsScreen(
     ) { uri ->
         if (uri != null) {
             try {
+                val activeBizName = businessProfile?.businessName?.trim().orEmpty()
+                val matchingSaved = savedBusinessProfiles.find { it.businessName.trim().equals(activeBizName, ignoreCase = true) }
                 val jsonString = BackupRestoreHelper.exportToJson(
                     profile = businessProfile,
-                    savedProfiles = savedBusinessProfiles,
+                    savedProfiles = if (matchingSaved != null) listOf(matchingSaved) else emptyList(),
                     products = products,
                     customers = customers,
-                    invoices = allInvoices
+                    invoices = invoices
                 )
                 context.contentResolver.openOutputStream(uri)?.use { output ->
                     output.write(jsonString.toByteArray())
                 }
-                Toast.makeText(context, "Backup saved offline successfully!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Profile backup saved successfully!", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Toast.makeText(context, "Failed to save backup: ${e.message}", Toast.LENGTH_LONG).show()
             }
@@ -167,23 +169,28 @@ fun AppSettingsScreen(
     }
 
     val saveBackupOffline = {
+        val activeBizName = businessProfile?.businessName?.trim().orEmpty()
+        val sanitized = activeBizName.replace(Regex("[^a-zA-Z0-9_-]"), "_").lowercase().ifEmpty { "profile" }
         val dateStr = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
-        createBackupFileLauncher.launch("invoice_easy_backup_$dateStr.json")
+        createBackupFileLauncher.launch("invoice_backup_${sanitized}_$dateStr.json")
     }
     
     // Export function
     val exportBackupData = {
         try {
+            val activeBizName = businessProfile?.businessName?.trim().orEmpty()
+            val matchingSaved = savedBusinessProfiles.find { it.businessName.trim().equals(activeBizName, ignoreCase = true) }
             val jsonString = BackupRestoreHelper.exportToJson(
                 profile = businessProfile,
-                savedProfiles = savedBusinessProfiles,
+                savedProfiles = if (matchingSaved != null) listOf(matchingSaved) else emptyList(),
                 products = products,
                 customers = customers,
-                invoices = allInvoices
+                invoices = invoices
             )
+            val sanitized = activeBizName.replace(Regex("[^a-zA-Z0-9_-]"), "_").lowercase().ifEmpty { "profile" }
             val backupDir = File(context.cacheDir, "backups")
             if (!backupDir.exists()) backupDir.mkdirs()
-            val file = File(backupDir, "invoice_easy_backup.json")
+            val file = File(backupDir, "invoice_backup_${sanitized}.json")
             file.writeText(jsonString)
             
             val fileUri = FileProvider.getUriForFile(

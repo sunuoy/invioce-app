@@ -72,6 +72,7 @@ object BackupRestoreHelper {
                 put("stock", prod.stock)
                 put("hsnSac", prod.hsnSac)
                 put("attachmentPath", prod.attachmentPath)
+                put("businessName", prod.businessName)
             }
             productsArr.put(prodJson)
         }
@@ -89,6 +90,8 @@ object BackupRestoreHelper {
                 put("address", cust.address)
                 put("gstin", cust.gstin)
                 put("placeOfSupply", cust.placeOfSupply)
+                put("isClosed", cust.isClosed)
+                put("businessName", cust.businessName)
             }
             customersArr.put(custJson)
         }
@@ -233,7 +236,8 @@ object BackupRestoreHelper {
                         unit = prodJson.optString("unit", "pcs"),
                         stock = prodJson.optDouble("stock", 0.0),
                         hsnSac = prodJson.optString("hsnSac", ""),
-                        attachmentPath = prodJson.optString("attachmentPath", "")
+                        attachmentPath = prodJson.optString("attachmentPath", ""),
+                        businessName = prodJson.optString("businessName", "")
                     )
                 )
             }
@@ -254,7 +258,9 @@ object BackupRestoreHelper {
                         email = custJson.optString("email", ""),
                         address = custJson.optString("address", ""),
                         gstin = custJson.optString("gstin", ""),
-                        placeOfSupply = custJson.optString("placeOfSupply", "")
+                        placeOfSupply = custJson.optString("placeOfSupply", ""),
+                        isClosed = custJson.optBoolean("isClosed", false),
+                        businessName = custJson.optString("businessName", "")
                     )
                 )
             }
