@@ -142,11 +142,13 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         _googleDriveSyncMode.value = gdSavedMode
 
         viewModelScope.launch {
+            kotlinx.coroutines.delay(3500)
             checkForUpdates(silent = true)
         }
 
-        // Silent background token refresh on app launch if account is configured
+        // Silent background token refresh on app launch if account is configured (deferred to keep startup snappy)
         viewModelScope.launch {
+            kotlinx.coroutines.delay(3000)
             if (gdEnabled && gdEmail.isNotEmpty()) {
                 refreshGoogleDriveTokenSilently(gdEmail)
             }
@@ -162,8 +164,9 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             }
         }
 
-        // Auto-run Google Drive background sync when data changes and sync is enabled
+        // Auto-run Google Drive background sync when data changes and sync is enabled (deferred after initial launch)
         viewModelScope.launch {
+            kotlinx.coroutines.delay(4000)
             combine(
                 repository.allProducts,
                 repository.allCustomers,
@@ -208,13 +211,17 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         val calendar = java.util.Calendar.getInstance()
         val currentYear = calendar.get(java.util.Calendar.YEAR)
         val dateString = java.text.SimpleDateFormat("yyyy-MMM-dd", java.util.Locale.US).format(calendar.time).uppercase()
-        val currentCompany = businessProfile.value?.businessName ?: ""
+        val currentCompany = businessProfile.value?.businessName?.trim() ?: ""
         
         var maxSuffix = 0
         val regex = Regex("\\d+$")
         for (inv in existingInvoices) {
-            // Filter sequence to only include invoices belonging to the active company profile
-            if (inv.invoice.businessName != currentCompany) {
+            // Filter sequence to only include invoices belonging to the active company profile and documentType
+            val invCompany = inv.invoice.businessName.trim()
+            if (currentCompany.isNotEmpty() && !invCompany.equals(currentCompany, ignoreCase = true)) {
+                continue
+            }
+            if (inv.invoice.documentType == "ESTIMATE" || inv.invoice.invoiceNumber.startsWith("EST-")) {
                 continue
             }
             // Filter to only include invoices created in the current calendar year
@@ -247,12 +254,16 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         val calendar = java.util.Calendar.getInstance()
         val currentYear = calendar.get(java.util.Calendar.YEAR)
         val dateString = java.text.SimpleDateFormat("yyyy-MMM-dd", java.util.Locale.US).format(calendar.time).uppercase()
-        val currentCompany = businessProfile.value?.businessName ?: ""
+        val currentCompany = businessProfile.value?.businessName?.trim() ?: ""
 
         var maxSuffix = 0
         val regex = Regex("\\d+$")
         for (inv in existingInvoices) {
-            if (inv.invoice.businessName != currentCompany || inv.invoice.documentType == "INVOICE") {
+            val invCompany = inv.invoice.businessName.trim()
+            if (currentCompany.isNotEmpty() && !invCompany.equals(currentCompany, ignoreCase = true)) {
+                continue
+            }
+            if (inv.invoice.documentType == "INVOICE" || inv.invoice.invoiceNumber.startsWith("INV-")) {
                 continue
             }
             val invCalendar = java.util.Calendar.getInstance().apply { timeInMillis = inv.invoice.dateTimestamp }
@@ -1208,11 +1219,16 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
         val accountManager = android.accounts.AccountManager.get(context)
         val matchingAccount = android.accounts.Account(email, "com.google")
+        // When onIntentRequired is provided (e.g. via Compose ActivityResultLauncher),
+        // passing null for activity instructs AccountManager to return KEY_INTENT in bundle
+        // rather than launching an unmanaged activity prompt directly.
+        val targetActivity = if (onIntentRequired != null) null else activity
+
         accountManager.getAuthToken(
             matchingAccount,
             "oauth2:https://www.googleapis.com/auth/drive.file",
             null,
-            activity,
+            targetActivity,
             { future ->
                 try {
                     val bundle = future.result
@@ -1232,7 +1248,12 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                             }
                         }
                     } else {
-                        val intent = bundle.getParcelable<android.content.Intent>(android.accounts.AccountManager.KEY_INTENT)
+                        val intent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                            bundle.getParcelable(android.accounts.AccountManager.KEY_INTENT, android.content.Intent::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            bundle.getParcelable(android.accounts.AccountManager.KEY_INTENT)
+                        }
                         if (intent != null) {
                             if (onIntentRequired != null) {
                                 viewModelScope.launch(Dispatchers.Main) {

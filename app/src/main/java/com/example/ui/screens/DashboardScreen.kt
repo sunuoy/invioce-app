@@ -1083,8 +1083,8 @@ fun Modifier.floating3D(
     rotationY: Float = -8f,
     cameraDistance: Float = 14f
 ): Modifier = this.composed {
-    var rawTiltX by remember { mutableStateOf(0f) }
-    var rawTiltY by remember { mutableStateOf(0f) }
+    var rawTiltX by remember { mutableFloatStateOf(0f) }
+    var rawTiltY by remember { mutableFloatStateOf(0f) }
 
     val animatedTiltX by animateFloatAsState(
         targetValue = rawTiltX,
@@ -1119,7 +1119,7 @@ fun Modifier.floating3D(
                             rawTiltX = -normY * 12f
                             rawTiltY = normX * 12f
                         }
-                    } else {
+                    } else if (rawTiltX != 0f || rawTiltY != 0f) {
                         rawTiltX = 0f
                         rawTiltY = 0f
                     }

@@ -75,21 +75,25 @@ fun SettingsScreen(
     val authConsentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        val currentEmail = gdAccountEmail.ifEmpty {
-            context.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE)
-                .getString("gd_account_email", "") ?: ""
-        }
-        if (currentEmail.isNotEmpty()) {
-            viewModel.fetchGoogleDriveTokenAutomatically(
-                context = context,
-                email = currentEmail,
-                onSuccess = {
-                    Toast.makeText(context, "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
-                },
-                onError = { err ->
-                    Toast.makeText(context, "Google Drive auth error: $err", Toast.LENGTH_LONG).show()
-                }
-            )
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val currentEmail = gdAccountEmail.ifEmpty {
+                context.getSharedPreferences("invoice_generator_prefs", Context.MODE_PRIVATE)
+                    .getString("gd_account_email", "") ?: ""
+            }
+            if (currentEmail.isNotEmpty()) {
+                viewModel.fetchGoogleDriveTokenAutomatically(
+                    context = context,
+                    email = currentEmail,
+                    onSuccess = {
+                        Toast.makeText(context, "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
+                    },
+                    onError = { err ->
+                        Toast.makeText(context, "Google Drive auth error: $err", Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
+        } else {
+            Toast.makeText(context, "Authorization was cancelled. Tap 'Authorize' to retry.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1660,6 +1664,13 @@ fun SettingsScreen(
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = if (hasValidToken) MaterialTheme.colorScheme.primary else Color(0xFFD97706)
+                                    )
+                                }
+                                if (!hasValidToken) {
+                                    Text(
+                                        text = "Tap 'Authorize' to grant Google Drive backup permission",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFFB45309)
                                     )
                                 }
                                 if (gdAccountEmail.isNotEmpty()) {

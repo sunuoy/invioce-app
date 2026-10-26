@@ -65,12 +65,13 @@ fun MainAppNavigation(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            val businessProfile by viewModel.businessProfile.collectAsState()
+            val isDrawerVisible = drawerState.isOpen || drawerState.isAnimationRunning || drawerState.targetValue == DrawerValue.Open
             val surfaceColor = MaterialTheme.colorScheme.surface
             ModalDrawerSheet(
                 modifier = Modifier
                     .width(310.dp)
                     .drawBehind {
+                        if (!isDrawerVisible) return@drawBehind
                         // Draw background with 88% (top) to 98% (bottom) opacity
                         drawRect(
                             brush = Brush.verticalGradient(
@@ -105,10 +106,12 @@ fun MainAppNavigation(
                     },
                 drawerContainerColor = Color.Transparent
             ) {
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                // GORGEOUS GLASS BRAND CARD
-                Card(
+                if (isDrawerVisible) {
+                    val businessProfile by viewModel.businessProfile.collectAsState()
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    // GORGEOUS GLASS BRAND CARD
+                    Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
@@ -330,6 +333,7 @@ fun MainAppNavigation(
                             }
                         }
                     }
+                }
                 }
             }
         },
