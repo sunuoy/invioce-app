@@ -172,6 +172,9 @@ interface InvoiceDao {
     @Query("DELETE FROM invoices WHERE id = :id")
     suspend fun deleteInvoiceById(id: Int)
 
+    @Query("DELETE FROM invoices WHERE id IN (:ids)")
+    suspend fun deleteInvoicesByIds(ids: List<Int>)
+
     // Lines items queries
     @Query("SELECT * FROM invoice_line_items WHERE invoiceId = :invoiceId")
     suspend fun getLineItemsByInvoiceId(invoiceId: Int): List<InvoiceLineItem>
@@ -181,6 +184,9 @@ interface InvoiceDao {
 
     @Query("DELETE FROM invoice_line_items WHERE invoiceId = :invoiceId")
     suspend fun deleteLineItemsByInvoiceId(invoiceId: Int)
+
+    @Query("DELETE FROM invoice_line_items WHERE invoiceId IN (:invoiceIds)")
+    suspend fun deleteLineItemsByInvoiceIds(invoiceIds: List<Int>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertInvoicesBulk(invoices: List<Invoice>)
@@ -209,6 +215,9 @@ interface InvoiceDao {
 
     @Query("DELETE FROM invoice_payments WHERE invoiceId = :invoiceId")
     suspend fun deletePaymentsByInvoiceId(invoiceId: Int)
+
+    @Query("DELETE FROM invoice_payments WHERE invoiceId IN (:invoiceIds)")
+    suspend fun deletePaymentsByInvoiceIds(invoiceIds: List<Int>)
 
     @Query("DELETE FROM invoice_payments")
     suspend fun clearAllPayments()
@@ -434,7 +443,6 @@ abstract class InvoiceDatabase : RoomDatabase() {
                 )
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                 .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
-                .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
                 instance

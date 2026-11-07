@@ -18,6 +18,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
     private val database = InvoiceDatabase.getDatabase(application)
     private val repository = InvoiceRepository(
+        database,
         database.invoiceDao(),
         database.productDao(),
         database.customerDao(),
@@ -120,25 +121,33 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     val savedBusinessProfiles: StateFlow<List<SavedBusinessProfile>> = repository.savedBusinessProfiles
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private fun <T> filterListByActiveBusiness(
+        items: List<T>,
+        activeProfile: BusinessProfile?,
+        savedProfiles: List<SavedBusinessProfile>,
+        getItemBusinessName: (T) -> String
+    ): List<T> {
+        val activeName = activeProfile?.businessName?.trim().orEmpty()
+        val originalProfile = savedProfiles.minByOrNull { it.id }?.businessName?.trim().orEmpty()
+        if (activeName.isEmpty()) {
+            return items
+        }
+        return items.filter { item ->
+            val itemBiz = getItemBusinessName(item).trim()
+            if (itemBiz.isEmpty()) {
+                originalProfile.isNotEmpty() && originalProfile.equals(activeName, ignoreCase = true)
+            } else {
+                itemBiz.equals(activeName, ignoreCase = true)
+            }
+        }
+    }
+
     val products: StateFlow<List<Product>> = combine(
         repository.allProducts,
         repository.businessProfile,
         repository.savedBusinessProfiles
     ) { allProds, activeProfile, savedProfiles ->
-        val activeName = activeProfile?.businessName?.trim().orEmpty()
-        val originalProfile = savedProfiles.minByOrNull { it.id }?.businessName?.trim().orEmpty()
-        if (activeName.isEmpty()) {
-            allProds
-        } else {
-            allProds.filter { prod ->
-                val prodBiz = prod.businessName.trim()
-                if (prodBiz.isEmpty()) {
-                    originalProfile.isNotEmpty() && originalProfile.equals(activeName, ignoreCase = true)
-                } else {
-                    prodBiz.equals(activeName, ignoreCase = true)
-                }
-            }
-        }
+        filterListByActiveBusiness(allProds, activeProfile, savedProfiles) { it.businessName }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val customers: StateFlow<List<Customer>> = combine(
@@ -146,20 +155,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         repository.businessProfile,
         repository.savedBusinessProfiles
     ) { allCusts, activeProfile, savedProfiles ->
-        val activeName = activeProfile?.businessName?.trim().orEmpty()
-        val originalProfile = savedProfiles.minByOrNull { it.id }?.businessName?.trim().orEmpty()
-        if (activeName.isEmpty()) {
-            allCusts
-        } else {
-            allCusts.filter { cust ->
-                val custBiz = cust.businessName.trim()
-                if (custBiz.isEmpty()) {
-                    originalProfile.isNotEmpty() && originalProfile.equals(activeName, ignoreCase = true)
-                } else {
-                    custBiz.equals(activeName, ignoreCase = true)
-                }
-            }
-        }
+        filterListByActiveBusiness(allCusts, activeProfile, savedProfiles) { it.businessName }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allInvoices: StateFlow<List<InvoiceWithDetails>> = repository.allInvoices
@@ -170,20 +166,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         repository.businessProfile,
         repository.savedBusinessProfiles
     ) { allInvs, activeProfile, savedProfiles ->
-        val activeName = activeProfile?.businessName?.trim().orEmpty()
-        val originalProfile = savedProfiles.minByOrNull { it.id }?.businessName?.trim().orEmpty()
-        if (activeName.isEmpty()) {
-            allInvs
-        } else {
-            allInvs.filter { inv ->
-                val invBiz = inv.invoice.businessName.trim()
-                if (invBiz.isEmpty()) {
-                    originalProfile.isNotEmpty() && originalProfile.equals(activeName, ignoreCase = true)
-                } else {
-                    invBiz.equals(activeName, ignoreCase = true)
-                }
-            }
-        }
+        filterListByActiveBusiness(allInvs, activeProfile, savedProfiles) { it.invoice.businessName }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val totalSales: StateFlow<Double?> = invoices.map { invList ->
@@ -282,32 +265,37 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Support sequential generation: INV-YYYY-MMM-DD-XXXX with progressive suffix logic per active company
-    fun generateNextInvoiceNumber(): String {
+    // Helper for sequential number generation: {PREFIX}-YYYY-MMM-DD-XXXX per active company and year
+    private fun generateNextDocumentNumber(prefix: String, isEstimate: Boolean): String {
         val existingInvoices = invoices.value
         val calendar = java.util.Calendar.getInstance()
         val currentYear = calendar.get(java.util.Calendar.YEAR)
         val dateString = java.text.SimpleDateFormat("yyyy-MMM-dd", java.util.Locale.US).format(calendar.time).uppercase()
         val currentCompany = businessProfile.value?.businessName?.trim() ?: ""
-        
+
         var maxSuffix = 0
         val regex = Regex("\\d+$")
         for (inv in existingInvoices) {
-            // Filter sequence to only include invoices belonging to the active company profile and documentType
             val invCompany = inv.invoice.businessName.trim()
             if (currentCompany.isNotEmpty() && !invCompany.equals(currentCompany, ignoreCase = true)) {
                 continue
             }
-            if (inv.invoice.documentType == "ESTIMATE" || inv.invoice.invoiceNumber.startsWith("EST-")) {
-                continue
+            if (isEstimate) {
+                if (inv.invoice.documentType == "INVOICE" || inv.invoice.invoiceNumber.startsWith("INV-")) {
+                    continue
+                }
+            } else {
+                if (inv.invoice.documentType == "ESTIMATE" || inv.invoice.invoiceNumber.startsWith("EST-")) {
+                    continue
+                }
             }
-            // Filter to only include invoices created in the current calendar year
+
             val invCalendar = java.util.Calendar.getInstance().apply { timeInMillis = inv.invoice.dateTimestamp }
             val invYear = invCalendar.get(java.util.Calendar.YEAR)
             if (invYear != currentYear) {
                 continue
             }
-            
+
             val numStr = inv.invoice.invoiceNumber
             val matchResult = regex.find(numStr)
             if (matchResult != null) {
@@ -322,49 +310,14 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         val nextSuffix = maxSuffix + 1
-        return "INV-$dateString-${String.format(java.util.Locale.US, "%04d", nextSuffix)}"
+        return "$prefix-$dateString-${String.format(java.util.Locale.US, "%04d", nextSuffix)}"
     }
+
+    // Support sequential generation: INV-YYYY-MMM-DD-XXXX with progressive suffix logic per active company
+    fun generateNextInvoiceNumber(): String = generateNextDocumentNumber("INV", isEstimate = false)
 
     // Support sequential generation: EST-YYYY-MMM-DD-XXXX for Estimates/Quotations
-    fun generateNextEstimateNumber(): String {
-        val existingInvoices = invoices.value
-        val calendar = java.util.Calendar.getInstance()
-        val currentYear = calendar.get(java.util.Calendar.YEAR)
-        val dateString = java.text.SimpleDateFormat("yyyy-MMM-dd", java.util.Locale.US).format(calendar.time).uppercase()
-        val currentCompany = businessProfile.value?.businessName?.trim() ?: ""
-
-        var maxSuffix = 0
-        val regex = Regex("\\d+$")
-        for (inv in existingInvoices) {
-            val invCompany = inv.invoice.businessName.trim()
-            if (currentCompany.isNotEmpty() && !invCompany.equals(currentCompany, ignoreCase = true)) {
-                continue
-            }
-            if (inv.invoice.documentType == "INVOICE" || inv.invoice.invoiceNumber.startsWith("INV-")) {
-                continue
-            }
-            val invCalendar = java.util.Calendar.getInstance().apply { timeInMillis = inv.invoice.dateTimestamp }
-            val invYear = invCalendar.get(java.util.Calendar.YEAR)
-            if (invYear != currentYear) {
-                continue
-            }
-
-            val numStr = inv.invoice.invoiceNumber
-            val matchResult = regex.find(numStr)
-            if (matchResult != null) {
-                try {
-                    val suffixVal = matchResult.value.toInt()
-                    if (suffixVal > maxSuffix) {
-                        maxSuffix = suffixVal
-                    }
-                } catch (e: Exception) {
-                    // Ignore parsing issues
-                }
-            }
-        }
-        val nextSuffix = maxSuffix + 1
-        return "EST-$dateString-${String.format(java.util.Locale.US, "%04d", nextSuffix)}"
-    }
+    fun generateNextEstimateNumber(): String = generateNextDocumentNumber("EST", isEstimate = true)
 
     // ------------------ BUSINESS OPERATIONS ------------------
     fun saveBusinessProfile(
@@ -709,9 +662,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     fun deleteInvoicesBulk(invoiceIds: List<Int>) {
         viewModelScope.launch {
             try {
-                for (id in invoiceIds) {
-                    repository.deleteInvoice(id)
-                }
+                repository.deleteInvoicesBulk(invoiceIds)
                 _uiEvents.emit(UiEvent.ShowSuccess("Successfully deleted ${invoiceIds.size} invoices"))
             } catch (e: Exception) {
                 _uiEvents.emit(UiEvent.ShowError("Invoices bulk delete failed: ${e.message}"))
@@ -830,7 +781,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             if (match != null) {
                 val newPaid = (match.invoice.paidAmount - payment.amount).coerceAtLeast(0.0)
                 val newStatus = if (newPaid <= 0.0) {
-                    "Sent"
+                    if (match.invoice.status == "Draft") "Draft" else "Sent"
                 } else if (newPaid >= match.invoice.grandTotal) {
                     "Paid"
                 } else {
@@ -934,7 +885,9 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
     fun populateDummyData() {
         viewModelScope.launch {
-            println("=== InvoiceViewModel: Seeding dummy data started ===")
+            if (com.example.BuildConfig.DEBUG) {
+                android.util.Log.d("InvoiceViewModel", "Seeding dummy data started")
+            }
             try {
                 // Seed Business Profile
                 val sampleProfile = BusinessProfile(
@@ -1128,11 +1081,14 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 )
                 repository.saveInvoice(inv3, listOf(item4, item5))
 
-                println("=== InvoiceViewModel: Seeding dummy data completed successfully ===")
+                if (com.example.BuildConfig.DEBUG) {
+                    android.util.Log.d("InvoiceViewModel", "Seeding dummy data completed successfully")
+                }
                 _uiEvents.emit(UiEvent.ShowSuccess("Sample Demo Data Loaded successfully!"))
             } catch (e: Exception) {
-                println("=== InvoiceViewModel: Seeding dummy data FAILED ===")
-                e.printStackTrace()
+                if (com.example.BuildConfig.DEBUG) {
+                    android.util.Log.e("InvoiceViewModel", "Seeding dummy data FAILED", e)
+                }
                 _uiEvents.emit(UiEvent.ShowError("Failed to seed data: ${e.message}"))
             }
         }
@@ -1674,10 +1630,16 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         val lastEmail = prefs.getString("last_logged_account_email", "") ?: ""
         if (lastEmail.isNotEmpty() && !lastEmail.equals(newEmail, ignoreCase = true)) {
             viewModelScope.launch(Dispatchers.IO) {
-                database.clearAllTables()
+                repository.clearAllTables()
             }
         }
         prefs.edit().putString("last_logged_account_email", newEmail).apply()
+    }
+
+    private fun hashPassword(password: String, email: String): String {
+        val input = "inv_salt_${email.lowercase().trim()}_$password"
+        val bytes = java.security.MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     suspend fun loginUser(email: String, password: String): Boolean {
@@ -1699,8 +1661,22 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             }
         }
 
-        val registeredPassword = prefs.getString("reg_pwd_$email", null)
-        return if (registeredPassword != null && registeredPassword == password) {
+        val storedHash = prefs.getString("reg_pwd_hash_$email", null)
+        val plainStored = prefs.getString("reg_pwd_$email", null)
+        val passwordMatches = if (storedHash != null) {
+            storedHash == hashPassword(password, email)
+        } else if (plainStored != null && plainStored == password) {
+            // Auto-upgrade legacy plain password to salted hash
+            prefs.edit()
+                .putString("reg_pwd_hash_$email", hashPassword(password, email))
+                .remove("reg_pwd_$email")
+                .apply()
+            true
+        } else {
+            false
+        }
+
+        return if (passwordMatches) {
             checkAndClearOnAccountSwitch(email)
             prefs.edit()
                 .putBoolean("is_logged_in", true)
@@ -1721,7 +1697,8 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             val res = SupabaseClientManager.signUpUser(getApplication(), email, password)
             if (res.isSuccess) {
                 val status = res.getOrNull()
-                prefs.edit().putString("reg_pwd_$email", password).apply()
+                val pwdHash = hashPassword(password, email)
+                prefs.edit().putString("reg_pwd_hash_$email", pwdHash).remove("reg_pwd_$email").apply()
 
                 if (status == "CONFIRMATION_REQUIRED") {
                     _uiEvents.emit(UiEvent.ShowSuccess("Registration successful! Please check your email inbox to confirm your account."))
@@ -1743,14 +1720,17 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             }
         }
 
-        val existing = prefs.getString("reg_pwd_$email", null)
-        return if (existing != null) {
+        val existingHash = prefs.getString("reg_pwd_hash_$email", null)
+        val existingPlain = prefs.getString("reg_pwd_$email", null)
+        return if (existingHash != null || existingPlain != null) {
             _uiEvents.emit(UiEvent.ShowError("User already exists with this email"))
             false
         } else {
             checkAndClearOnAccountSwitch(email)
+            val pwdHash = hashPassword(password, email)
             prefs.edit()
-                .putString("reg_pwd_$email", password)
+                .putString("reg_pwd_hash_$email", pwdHash)
+                .remove("reg_pwd_$email")
                 .putBoolean("is_logged_in", true)
                 .putString("user_email", email)
                 .apply()
@@ -1786,7 +1766,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         _userEmail.value = ""
 
         viewModelScope.launch(Dispatchers.IO) {
-            database.clearAllTables()
+            repository.clearAllTables()
         }
 
         viewModelScope.launch {

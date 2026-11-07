@@ -30,7 +30,7 @@ object PdfGenerator {
     }
 
     private fun getItalicTypeface(): Typeface {
-        return Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        return Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
     }
 
     private fun indianNumberToWords(number: Long): String {
@@ -530,7 +530,7 @@ object PdfGenerator {
 
             // Quantities details
             val displayName = if (item.productName.length > 32) item.productName.take(29) + "..." else item.productName
-            val hsnSacVal = item.hsnSac.takeIf { it.isNotBlank() } ?: "9983"
+            val hsnSacVal = item.hsnSac.takeIf { it.isNotBlank() } ?: "-"
 
             canvas.drawText("${idx + 1}", tableColsX[0] + 5f, tableRowY, tableTextPaint)
             canvas.drawText(displayName, tableColsX[1] + 5f, tableRowY, tableTextPaint)

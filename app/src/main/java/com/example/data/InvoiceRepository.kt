@@ -1,8 +1,10 @@
 package com.example.data
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 
 class InvoiceRepository(
+    private val database: InvoiceDatabase,
     private val invoiceDao: InvoiceDao,
     private val productDao: ProductDao,
     private val customerDao: CustomerDao,
@@ -60,7 +62,7 @@ class InvoiceRepository(
     
     fun getInvoiceById(id: Int): Flow<InvoiceWithDetails?> = invoiceDao.getInvoiceById(id)
 
-    suspend fun saveInvoice(invoice: Invoice, items: List<InvoiceLineItem>): Long {
+    suspend fun saveInvoice(invoice: Invoice, items: List<InvoiceLineItem>): Long = database.withTransaction {
         // Revert stock for older line items if editing an existing invoice
         if (invoice.id != 0) {
             val oldItems = invoiceDao.getLineItemsByInvoiceId(invoice.id)
@@ -108,10 +110,10 @@ class InvoiceRepository(
             }
         }
 
-        return invoiceId.toLong()
+        invoiceId.toLong()
     }
 
-    suspend fun deleteInvoice(invoiceId: Int) {
+    suspend fun deleteInvoice(invoiceId: Int) = database.withTransaction {
         // Restore stock levels before removing the invoice
         val oldItems = invoiceDao.getLineItemsByInvoiceId(invoiceId)
         for (oldItem in oldItems) {
@@ -125,6 +127,28 @@ class InvoiceRepository(
         invoiceDao.deleteInvoiceById(invoiceId)
         invoiceDao.deleteLineItemsByInvoiceId(invoiceId)
         invoiceDao.deletePaymentsByInvoiceId(invoiceId)
+    }
+
+    suspend fun deleteInvoicesBulk(invoiceIds: List<Int>) = database.withTransaction {
+        if (invoiceIds.isEmpty()) return@withTransaction
+        for (id in invoiceIds) {
+            val oldItems = invoiceDao.getLineItemsByInvoiceId(id)
+            for (oldItem in oldItems) {
+                if (oldItem.productId != 0) {
+                    val prod = productDao.getProductById(oldItem.productId)
+                    if (prod != null) {
+                        productDao.updateProduct(prod.copy(stock = prod.stock + oldItem.quantity))
+                    }
+                }
+            }
+        }
+        invoiceDao.deleteLineItemsByInvoiceIds(invoiceIds)
+        invoiceDao.deletePaymentsByInvoiceIds(invoiceIds)
+        invoiceDao.deleteInvoicesByIds(invoiceIds)
+    }
+
+    suspend fun clearAllTables() = database.withTransaction {
+        database.clearAllTables()
     }
 
     // ------------------ INVOICE PAYMENTS ------------------
