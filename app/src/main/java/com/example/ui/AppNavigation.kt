@@ -57,6 +57,13 @@ fun MainAppNavigation(
     var showSeparateSettingsPage by remember { mutableStateOf(false) }
     var startInvoicesInCreateMode by remember { mutableStateOf(false) }
     var viewInvoiceId by remember { mutableStateOf<Int?>(null) }
+    val showTutorial by viewModel.showTutorial.collectAsState()
+
+    if (showTutorial) {
+        AppTutorialDialog(
+            onDismiss = { viewModel.dismissTutorial() }
+        )
+    }
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -278,6 +285,24 @@ fun MainAppNavigation(
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // App Tutorial / Guide Button
+                            IconButton(
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    viewModel.openTutorial()
+                                },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .testTag("drawer_tutorial_item")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.HelpOutline,
+                                    contentDescription = "App Tutorial / Guide",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
                             // Invite/Share App Button
                             IconButton(
                                 onClick = {

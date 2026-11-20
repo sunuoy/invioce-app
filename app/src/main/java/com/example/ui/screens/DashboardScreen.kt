@@ -155,6 +155,17 @@ fun DashboardScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { viewModel.openTutorial() },
+                        modifier = Modifier.testTag("dashboard_tutorial_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.HelpOutline,
+                            contentDescription = "App Tutorial",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
                     if (profile?.gstin?.isNotBlank() == true) {
                         Surface(
                             shape = CircleShape,

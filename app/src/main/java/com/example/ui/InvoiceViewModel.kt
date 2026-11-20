@@ -32,6 +32,19 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         SupabaseClientManager.initialize(application)
     }
 
+    // App Tutorial state (shows automatically on first app launch)
+    private val _showTutorial = MutableStateFlow(!prefs.getBoolean("tutorial_completed", false))
+    val showTutorial: StateFlow<Boolean> = _showTutorial.asStateFlow()
+
+    fun dismissTutorial() {
+        prefs.edit().putBoolean("tutorial_completed", true).apply()
+        _showTutorial.value = false
+    }
+
+    fun openTutorial() {
+        _showTutorial.value = true
+    }
+
     // Low stock threshold
     private val _lowStockThreshold = MutableStateFlow(prefs.getFloat("low_stock_threshold", 5.0f))
     val lowStockThreshold: StateFlow<Float> = _lowStockThreshold
